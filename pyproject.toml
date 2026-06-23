@@ -1,0 +1,16 @@
+[project]
+name = "stat-sightline"
+version = "0.1.0"
+description = "MLB advanced metrics & predictive modeling platform (Baseball Savant-style)."
+requires-python = ">=3.10"
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.black]
+line-length = 100
