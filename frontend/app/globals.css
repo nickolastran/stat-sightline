@@ -1,12 +1,67 @@
 @import "tailwindcss";
 
+/*
+ * Design tokens — "brutalist-technical" chrome.
+ * The @theme block is the DARK default (unchanged look). A light theme is
+ * layered on by overriding the same --color-* vars under
+ * :root[data-theme="light"]; every `bg-bg`/`text-ink` utility reads the var,
+ * so flipping the attribute repaints the whole app. See ThemeToggle.
+ */
+@theme {
+  --color-bg: #0d0d0d; /* page plane */
+  --color-surface: #1a1a19; /* card / chart surface (validator surface) */
+  --color-surface-2: #222220; /* hover / raised */
+  --color-ink: #ffffff; /* primary */
+  --color-ink-2: #c3c2b7; /* secondary */
+  --color-ink-3: #898781; /* muted: axis, labels, captions */
+  --color-grid: #2c2c2a; /* hairline gridlines */
+  --color-line: rgba(255, 255, 255, 0.1); /* hairline borders */
+  --color-accent: #3987e5; /* categorical slot 1 (blue) doubles as UI accent */
+  --color-good: #0ca30c; /* status — reserved, never a series */
+  --color-crit: #d03b3b;
+
+  --font-mono:
+    ui-monospace, "SFMono-Regular", "Cascadia Mono", "JetBrains Mono", Menlo,
+    Consolas, monospace;
+
+  /* Kill every radius utility: sharp corners only. */
+  --radius-*: initial;
+}
+
+/* Light theme: warm paper, same ink hierarchy inverted. Overrides only the
+   token values — no utility class needs to know which theme is active. */
+:root[data-theme="light"] {
+  --color-bg: #f4f2ec; /* warm paper */
+  --color-surface: #ffffff;
+  --color-surface-2: #e9e6dc; /* hover / raised */
+  --color-ink: #16150f; /* primary */
+  --color-ink-2: #45433b; /* secondary */
+  --color-ink-3: #78756b; /* muted: axis, labels, captions */
+  --color-grid: #ddd9cd; /* hairline gridlines */
+  --color-line: rgba(0, 0, 0, 0.14); /* hairline borders */
+  --color-accent: #2668c9; /* darker blue for AA contrast on white */
+  --color-crit: #c62d2d;
+  color-scheme: light;
+}
+
 :root {
-  --background: #0b0f17;
-  --foreground: #e8eef7;
+  color-scheme: dark;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: ui-sans-serif, system-ui, -apple-system, sans-serif;
+  background: var(--color-bg);
+  color: var(--color-ink);
+  font-family: var(--font-mono);
+  font-size: 14px;
+}
+
+::selection {
+  background: var(--color-accent);
+  color: #ffffff;
+}
+
+/* Hairline scrollbars to match the chrome. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-grid) transparent;
 }
