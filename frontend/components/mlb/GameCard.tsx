@@ -1,26 +1,11 @@
-import { teamLogo, type Game, type GameSide } from "@/lib/mlb";
+import { gameStatus, teamLogo, type Game, type GameSide } from "@/lib/mlb";
 
 /*
  * One game in the scoreboard. `detailed` adds probable pitchers + venue for
  * the games/schedule page; the compact form is used in the dashboard strip.
- * Server component — no interactivity.
+ * Presentational only — the scoreboard strip wraps it in the button that
+ * opens the box score.
  */
-
-function statusTag(g: Game) {
-  if (g.state === "Live") {
-    const half = g.inningState ? g.inningState.slice(0, 3).toUpperCase() : "";
-    return { text: `${half} ${g.inning ?? ""}`.trim(), tone: "live" as const };
-  }
-  if (g.state === "Final")
-    return { text: g.detailedState.toUpperCase(), tone: "final" as const };
-  // Preview — show first-pitch time in ET.
-  const t = new Intl.DateTimeFormat("en-US", {
-    timeZone: "America/New_York",
-    hour: "numeric",
-    minute: "2-digit",
-  }).format(new Date(g.startTime));
-  return { text: `${t} ET`, tone: "pre" as const };
-}
 
 function TeamRow({
   s,
@@ -72,11 +57,13 @@ function TeamRow({
 export default function GameCard({
   game,
   detailed = false,
+  className = "",
 }: {
   game: Game;
   detailed?: boolean;
+  className?: string;
 }) {
-  const st = statusTag(game);
+  const st = gameStatus(game);
   const live = game.state === "Live";
   const tone =
     st.tone === "live"
@@ -86,7 +73,7 @@ export default function GameCard({
         : "text-accent";
 
   return (
-    <div className="border border-line bg-bg p-2">
+    <div className={`border border-line bg-bg p-2 ${className}`}>
       <div className="mb-1 flex items-center justify-between">
         <span className={`text-[10px] tracking-widest ${tone}`}>
           {live && (

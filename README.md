@@ -96,7 +96,11 @@ working set in memory rather than re-querying per control.
 - `/pitcher/[id]` — pitch-level analysis: strike-zone scatter, filter panel,
   summary metrics. A non-numeric id falls back to the highest-workload pitcher.
 - `/api/games` — same-origin proxy for the schedule, used by the client
-  scoreboard bar
+  scoreboard bar (a date-picker calendar + arrow-paged rail of the day's
+  games, present on every page via the root layout)
+- `/api/games/{gamePk}` — same-origin proxy for one game's box score
+  (linescore + both teams' batting/pitching lines), fetched when a card in
+  that rail is clicked
 
 ## Tests
 

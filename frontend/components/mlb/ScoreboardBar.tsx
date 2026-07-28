@@ -1,30 +1,51 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { todayET, type Game } from "@/lib/mlb";
 import GameCard from "@/components/mlb/GameCard";
+import BoxScoreModal from "@/components/mlb/BoxScoreModal";
+import Calendar from "@/components/ui/Calendar";
 import { SkeletonGameCard } from "@/components/ui/Skeleton";
 
 /*
- * Global scoreboard strip under the header. Collapsed: a horizontally
- * scrolling preview of the day's games. The calendar button expands a panel
- * with date navigation and every game in full. Games load client-side from
- * the same-origin /api/games proxy, with motion skeletons so the strip never
- * looks frozen.
+ * Global scoreboard strip under the header. One horizontal rail of the
+ * chosen day's games, paged by the ‹ › arrows rather than a manual drag;
+ * the date button opens a month calendar to jump to any day, and a card
+ * opens that game's box score. Games load client-side from the same-origin
+ * /api/games proxy, with motion skeletons so the strip never looks frozen.
  */
 
 const STATE_ORDER: Record<string, number> = { Live: 0, Preview: 1, Final: 2 };
-const shift = (iso: string, days: number) =>
-  new Date(new Date(`${iso}T00:00:00Z`).getTime() + days * 86400000)
-    .toISOString()
-    .slice(0, 10);
+const CARD_W = 228; // 220px card + 8px gap — the minimum arrow step
 
 const CalendarIcon = () => (
-  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden>
+  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" aria-hidden>
     <rect x="3" y="4" width="18" height="17" stroke="currentColor" strokeWidth="2" />
     <path d="M3 9h18M8 2v4M16 2v4" stroke="currentColor" strokeWidth="2" />
   </svg>
+);
+
+const ArrowButton = ({
+  label,
+  disabled,
+  onClick,
+  children,
+}: {
+  label: string;
+  disabled: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) => (
+  <button
+    type="button"
+    aria-label={label}
+    disabled={disabled}
+    onClick={onClick}
+    className="h-7 w-7 border border-line text-ink-2 enabled:hover:border-accent enabled:hover:text-ink disabled:text-ink-3 disabled:opacity-40"
+  >
+    {children}
+  </button>
 );
 
 export default function ScoreboardBar() {
@@ -32,7 +53,12 @@ export default function ScoreboardBar() {
   const [date, setDate] = useState(today);
   const [games, setGames] = useState<Game[] | null>(null); // null = loading
   const [error, setError] = useState(false);
-  const [open, setOpen] = useState(false);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [openGame, setOpenGame] = useState<Game | null>(null);
+  const [arrows, setArrows] = useState({ prev: false, next: false });
+
+  const stripRef = useRef<HTMLDivElement>(null);
+  const pickerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     let alive = true;
@@ -55,6 +81,49 @@ export default function ScoreboardBar() {
     };
   }, [date]);
 
+  /* ── Arrow paging ─────────────────────────────────────────── */
+
+  const syncArrows = useCallback(() => {
+    const el = stripRef.current;
+    if (!el) return;
+    const max = el.scrollWidth - el.clientWidth;
+    setArrows({ prev: el.scrollLeft > 4, next: el.scrollLeft < max - 4 });
+  }, []);
+
+  useEffect(() => {
+    const el = stripRef.current;
+    if (!el) return;
+    el.scrollLeft = 0; // a new day starts at the first game
+    syncArrows();
+    const ro = new ResizeObserver(syncArrows);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [games, syncArrows]);
+
+  const page = (dir: -1 | 1) => {
+    const el = stripRef.current;
+    if (!el) return;
+    // Scroll close to a full viewport, snapped down to whole cards.
+    const step = Math.max(Math.floor(el.clientWidth / CARD_W), 1) * CARD_W;
+    el.scrollBy({ left: dir * step, behavior: "smooth" });
+  };
+
+  /* ── Date picker dismissal ────────────────────────────────── */
+
+  useEffect(() => {
+    if (!pickerOpen) return;
+    const onDown = (e: MouseEvent) => {
+      if (!pickerRef.current?.contains(e.target as Node)) setPickerOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setPickerOpen(false);
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [pickerOpen]);
+
   const loading = games === null;
   const sorted = (games ?? [])
     .slice()
@@ -69,55 +138,82 @@ export default function ScoreboardBar() {
     weekday: "short",
     month: "short",
     day: "numeric",
+    year: "numeric",
   }).format(new Date(`${date}T00:00:00Z`));
 
   return (
     <div className="border-b border-line bg-bg">
       {/* ── Strip header ─────────────────────────────────────── */}
       <div className="flex items-center gap-2 px-4 py-1.5">
-        <span className="shrink-0 text-[10px] tracking-[0.25em] text-ink-3">
+        <span className="hidden shrink-0 text-[10px] tracking-[0.25em] text-ink-3 sm:inline">
           SCOREBOARD
         </span>
-        <span className="shrink-0 text-[10px] text-ink-3">
-          {date === today ? "TODAY" : dateLabel.toUpperCase()} ·{" "}
-          {loading ? "…" : `${sorted.length} GAMES`}
-        </span>
-        <div className="ml-auto flex items-center gap-px">
+
+        <div ref={pickerRef} className="relative shrink-0">
           <button
             type="button"
-            aria-label="Previous day"
-            onClick={() => setDate((d) => shift(d, -1))}
-            className="h-7 w-7 border border-line text-ink-2 hover:border-accent hover:text-ink"
-          >
-            ‹
-          </button>
-          <button
-            type="button"
-            aria-label="Next day"
-            onClick={() => setDate((d) => shift(d, 1))}
-            className="h-7 w-7 border border-line text-ink-2 hover:border-accent hover:text-ink"
-          >
-            ›
-          </button>
-          <button
-            type="button"
-            aria-expanded={open}
-            aria-label="Show all games"
-            onClick={() => setOpen((o) => !o)}
+            aria-haspopup="dialog"
+            aria-expanded={pickerOpen}
+            onClick={() => setPickerOpen((o) => !o)}
             className={`flex h-7 items-center gap-1.5 border px-2 text-[10px] tracking-wider ${
-              open
+              pickerOpen
                 ? "border-accent bg-accent/15 text-ink"
                 : "border-line text-ink-2 hover:border-accent hover:text-ink"
             }`}
           >
             <CalendarIcon />
-            ALL GAMES
+            {dateLabel.toUpperCase()}
           </button>
+          <AnimatePresence>
+            {pickerOpen && (
+              <motion.div
+                initial={{ opacity: 0, y: -4 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -4 }}
+                transition={{ duration: 0.15 }}
+                className="absolute left-0 top-full z-50 mt-1"
+              >
+                <Calendar
+                  value={date}
+                  today={today}
+                  onSelect={(d) => {
+                    setDate(d);
+                    setPickerOpen(false);
+                  }}
+                />
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+
+        <span className="shrink-0 text-[10px] text-ink-3">
+          {loading ? "…" : `${sorted.length} GAMES`}
+        </span>
+
+        <div className="ml-auto flex items-center gap-px">
+          <ArrowButton
+            label="Scroll to earlier games"
+            disabled={loading || !arrows.prev}
+            onClick={() => page(-1)}
+          >
+            ‹
+          </ArrowButton>
+          <ArrowButton
+            label="Scroll to later games"
+            disabled={loading || !arrows.next}
+            onClick={() => page(1)}
+          >
+            ›
+          </ArrowButton>
         </div>
       </div>
 
-      {/* ── Collapsed preview strip ──────────────────────────── */}
-      <div className="flex gap-2 overflow-x-auto px-4 pb-2">
+      {/* ── Game rail ────────────────────────────────────────── */}
+      <div
+        ref={stripRef}
+        onScroll={syncArrows}
+        className="no-scrollbar flex gap-2 overflow-x-auto px-4 pb-2"
+      >
         {loading ? (
           Array.from({ length: 6 }).map((_, i) => (
             <div key={i} className="w-[220px] shrink-0">
@@ -139,66 +235,30 @@ export default function ScoreboardBar() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.25, delay: Math.min(i * 0.03, 0.3) }}
             >
-              <GameCard game={g} />
+              <button
+                type="button"
+                onClick={() => setOpenGame(g)}
+                aria-label={`Box score — ${g.away.name} at ${g.home.name}`}
+                className="w-full text-left focus-visible:outline-2 focus-visible:outline-accent"
+              >
+                <GameCard
+                  game={g}
+                  className="transition-colors hover:border-accent"
+                />
+              </button>
             </motion.div>
           ))
         )}
       </div>
 
-      {/* ── Expanded full-day panel ──────────────────────────── */}
-      <AnimatePresence initial={false}>
-        {open && (
-          <motion.div
-            key="all-games"
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: "auto", opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.28, ease: "easeInOut" }}
-            className="overflow-hidden border-t border-line bg-surface"
-          >
-            <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-2">
-              <span className="text-[10px] tracking-[0.25em] text-ink-3">
-                ALL GAMES — {dateLabel.toUpperCase()}
-              </span>
-              <div className="flex items-center gap-px">
-                <input
-                  type="date"
-                  value={date}
-                  onChange={(e) => e.target.value && setDate(e.target.value)}
-                  aria-label="Pick a date"
-                  className="h-7 border border-line bg-surface px-2 text-xs text-ink focus:border-accent focus:outline-none"
-                />
-                {date !== today && (
-                  <button
-                    type="button"
-                    onClick={() => setDate(today)}
-                    className="ml-1 h-7 border border-line px-2 text-[10px] tracking-wide text-ink-2 hover:border-accent hover:text-ink"
-                  >
-                    TODAY
-                  </button>
-                )}
-              </div>
-            </div>
-            <div className="px-4 pb-3">
-              {loading ? (
-                <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
-                  {Array.from({ length: 8 }).map((_, i) => (
-                    <SkeletonGameCard key={i} delay={i * 0.1} />
-                  ))}
-                </div>
-              ) : sorted.length === 0 ? (
-                <p className="py-6 text-center text-xs text-ink-3">
-                  NO GAMES SCHEDULED ON THIS DATE
-                </p>
-              ) : (
-                <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
-                  {sorted.map((g) => (
-                    <GameCard key={g.pk} game={g} detailed />
-                  ))}
-                </div>
-              )}
-            </div>
-          </motion.div>
+      {/* ── Box score ────────────────────────────────────────── */}
+      <AnimatePresence>
+        {openGame && (
+          <BoxScoreModal
+            key={openGame.pk}
+            game={openGame}
+            onClose={() => setOpenGame(null)}
+          />
         )}
       </AnimatePresence>
     </div>

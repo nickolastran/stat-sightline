@@ -94,6 +94,167 @@ export async function getSchedule(date: string): Promise<Game[]> {
   }));
 }
 
+/**
+ * The one-line status a game shows everywhere: half-inning while live, the
+ * detailed state once final, otherwise first pitch in ET. `tone` picks the
+ * colour without the caller re-deriving the state.
+ */
+export function gameStatus(g: Game): {
+  text: string;
+  tone: "live" | "final" | "pre";
+} {
+  if (g.state === "Live") {
+    const half = g.inningState ? g.inningState.slice(0, 3).toUpperCase() : "";
+    return { text: `${half} ${g.inning ?? ""}`.trim(), tone: "live" };
+  }
+  if (g.state === "Final")
+    return { text: g.detailedState.toUpperCase(), tone: "final" };
+  const t = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/New_York",
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(new Date(g.startTime));
+  return { text: `${t} ET`, tone: "pre" };
+}
+
+/* ── Box score ──────────────────────────────────────────────────────── */
+
+export interface BoxBatter {
+  id: number;
+  name: string;
+  pos: string;
+  /** Entered mid-game — indented under the starter it replaced, savant-style. */
+  sub: boolean;
+  ab: number;
+  r: number;
+  h: number;
+  rbi: number;
+  bb: number;
+  k: number;
+  avg: string; // season, not game
+  summary: string;
+}
+
+export interface BoxPitcher {
+  id: number;
+  name: string;
+  /** "(W, 11-5)" / "(L, 4-2)" / "(S, 21)" when this pitcher got the decision. */
+  decision: string;
+  ip: string;
+  h: number;
+  r: number;
+  er: number;
+  bb: number;
+  k: number;
+  hr: number;
+  pitches: number;
+  strikes: number;
+  era: string; // season
+}
+
+export interface BoxTeam {
+  id: number;
+  name: string;
+  abbr: string;
+  runs: number | null;
+  hits: number | null;
+  errors: number | null;
+  lob: number | null;
+  batters: BoxBatter[];
+  pitchers: BoxPitcher[];
+}
+
+export interface BoxInning {
+  num: number;
+  away: number | null;
+  home: number | null;
+}
+
+export interface BoxScore {
+  pk: number;
+  scheduledInnings: number;
+  innings: BoxInning[];
+  away: BoxTeam;
+  home: BoxTeam;
+}
+
+/** A starter's battingOrder is a round hundred ("100"); subs are "101", "102". */
+const isSub = (order: string | undefined) => !!order && !/00$/.test(order);
+
+function boxTeam(raw: any, line: any): BoxTeam {
+  const players = raw.players ?? {};
+  const at = (id: number) => players[`ID${id}`] ?? {};
+  return {
+    id: raw.team?.id,
+    name: raw.team?.name ?? "—",
+    abbr: raw.team?.abbreviation ?? "—",
+    runs: line?.runs ?? null,
+    hits: line?.hits ?? null,
+    errors: line?.errors ?? null,
+    lob: line?.leftOnBase ?? null,
+    batters: (raw.batters ?? []).map((id: number): BoxBatter => {
+      const p = at(id);
+      const s = p.stats?.batting ?? {};
+      return {
+        id,
+        name: p.person?.boxscoreName ?? p.person?.fullName ?? "—",
+        pos: p.position?.abbreviation ?? "",
+        sub: isSub(p.battingOrder),
+        ab: s.atBats ?? 0,
+        r: s.runs ?? 0,
+        h: s.hits ?? 0,
+        rbi: s.rbi ?? 0,
+        bb: s.baseOnBalls ?? 0,
+        k: s.strikeOuts ?? 0,
+        avg: p.seasonStats?.batting?.avg ?? "—",
+        summary: s.summary ?? "",
+      };
+    }),
+    pitchers: (raw.pitchers ?? []).map((id: number): BoxPitcher => {
+      const p = at(id);
+      const s = p.stats?.pitching ?? {};
+      return {
+        id,
+        name: p.person?.boxscoreName ?? p.person?.fullName ?? "—",
+        decision: s.note ?? "",
+        ip: s.inningsPitched ?? "0.0",
+        h: s.hits ?? 0,
+        r: s.runs ?? 0,
+        er: s.earnedRuns ?? 0,
+        bb: s.baseOnBalls ?? 0,
+        k: s.strikeOuts ?? 0,
+        hr: s.homeRuns ?? 0,
+        pitches: s.pitchesThrown ?? s.numberOfPitches ?? 0,
+        strikes: s.strikes ?? 0,
+        era: p.seasonStats?.pitching?.era ?? "—",
+      };
+    }),
+  };
+}
+
+/**
+ * Full box score for one game: inning-by-inning line plus both teams' batting
+ * and pitching lines. Boxscore and linescore are separate endpoints, so they
+ * are fetched together and merged. Short revalidate — a live game moves.
+ */
+export async function getBoxScore(pk: number): Promise<BoxScore> {
+  const [box, line] = await Promise.all([
+    mlb(`/game/${pk}/boxscore`, 30),
+    mlb(`/game/${pk}/linescore`, 30),
+  ]);
+  return {
+    pk,
+    scheduledInnings: line.scheduledInnings ?? 9,
+    innings: (line.innings ?? []).map((i: any): BoxInning => ({
+      num: i.num,
+      away: i.away?.runs ?? null,
+      home: i.home?.runs ?? null,
+    })),
+    away: boxTeam(box.teams?.away ?? {}, line.teams?.away),
+    home: boxTeam(box.teams?.home ?? {}, line.teams?.home),
+  };
+}
+
 /* ── Standings ──────────────────────────────────────────────────────── */
 
 export interface StandingRow {
