@@ -96,8 +96,13 @@ export async function getSchedule(date: string): Promise<Game[]> {
 
 /**
  * The one-line status a game shows everywhere: half-inning while live, the
- * detailed state once final, otherwise first pitch in ET. `tone` picks the
- * colour without the caller re-deriving the state.
+ * detailed state once final, otherwise first pitch. `tone` picks the colour
+ * without the caller re-deriving the state.
+ *
+ * First pitch is rendered in the viewer's own zone — no `timeZone` option, so
+ * Intl falls back to the runtime default — and carries its abbreviation
+ * ("7:05 PM PDT") so the number is never ambiguous. Only the client-side
+ * scoreboard and box score call this, so "runtime" is the browser.
  */
 export function gameStatus(g: Game): {
   text: string;
@@ -110,11 +115,11 @@ export function gameStatus(g: Game): {
   if (g.state === "Final")
     return { text: g.detailedState.toUpperCase(), tone: "final" };
   const t = new Intl.DateTimeFormat("en-US", {
-    timeZone: "America/New_York",
     hour: "numeric",
     minute: "2-digit",
+    timeZoneName: "short",
   }).format(new Date(g.startTime));
-  return { text: `${t} ET`, tone: "pre" };
+  return { text: t, tone: "pre" };
 }
 
 /* ── Box score ──────────────────────────────────────────────────────── */
