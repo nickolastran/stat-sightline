@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import ThemeToggle from "@/components/ThemeToggle";
-import ScoreboardBar from "@/components/mlb/ScoreboardBar";
+import LeagueBar from "@/components/mlb/LeagueBar";
+import ScoreboardSlot from "@/components/mlb/ScoreboardSlot";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -14,8 +15,6 @@ export const metadata: Metadata = {
 // React hydrates; the html attribute it sets is why <html> suppresses the
 // hydration warning.
 const NO_FLASH = `(function(){try{var t=localStorage.getItem('theme');if(!t){t=matchMedia('(prefers-color-scheme: light)').matches?'light':'dark';}document.documentElement.dataset.theme=t;}catch(e){document.documentElement.dataset.theme='dark';}})();`;
-
-const NAV = [{ href: "/dashboard", label: "DASHBOARD" }];
 
 export default function RootLayout({
   children,
@@ -31,15 +30,6 @@ export default function RootLayout({
             STAT<span className="text-accent">//</span>SIGHTLINE
           </Link>
           <nav className="flex items-center gap-px text-xs">
-            {NAV.map((n) => (
-              <Link
-                key={n.href}
-                href={n.href}
-                className="border border-line px-3 py-1.5 text-ink-2 hover:bg-surface-2 hover:text-ink"
-              >
-                {n.label}
-              </Link>
-            ))}
             <Link
               href="/#access"
               className="border border-accent bg-accent px-3 py-1.5 font-bold text-white hover:opacity-90"
@@ -51,7 +41,8 @@ export default function RootLayout({
             </span>
           </nav>
         </header>
-        <ScoreboardBar />
+        <LeagueBar />
+        <ScoreboardSlot />
         {children}
       </body>
     </html>

@@ -2,8 +2,10 @@ import Panel from "@/components/ui/Panel";
 import MetricCard from "@/components/ui/MetricCard";
 import Standings from "@/components/mlb/Standings";
 import Leaderboards from "@/components/mlb/Leaderboards";
+import ProbablePitchers, {
+  probableGames,
+} from "@/components/mlb/ProbablePitchers";
 import PlayerSearch from "@/components/landing/PlayerSearch";
-import { teamLogo } from "@/lib/mlb";
 import {
   getSchedule,
   getStandings,
@@ -37,7 +39,7 @@ export default async function DashboardPage() {
 
   const live = games.filter((g) => g.state === "Live").length;
   const final = games.filter((g) => g.state === "Final").length;
-  const probables = games.filter((g) => g.away.probable || g.home.probable);
+  const probables = probableGames(games);
 
   return (
     <div className="mx-auto max-w-7xl space-y-3 p-3">
@@ -69,18 +71,7 @@ export default async function DashboardPage() {
       {/* ── Probable pitchers ──────────────────────────────────── */}
       {probables.length > 0 && (
         <Panel title="PROBABLE PITCHERS — TODAY">
-          <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
-            {probables.map((g) => (
-              <div
-                key={g.pk}
-                className="flex items-center justify-between gap-3 border border-line bg-bg px-3 py-2 text-xs"
-              >
-                <Prob side={g.away} />
-                <span className="shrink-0 text-[10px] text-ink-3">@</span>
-                <Prob side={g.home} alignRight />
-              </div>
-            ))}
-          </div>
+          <ProbablePitchers games={games} />
         </Panel>
       )}
 
@@ -93,38 +84,6 @@ export default async function DashboardPage() {
       <Panel title="STAT LEADERS">
         <Leaderboards boards={leaderboards} />
       </Panel>
-    </div>
-  );
-}
-
-/* Probable-pitcher cell for one side of a matchup. */
-function Prob({
-  side,
-  alignRight = false,
-}: {
-  side: Game["away"];
-  alignRight?: boolean;
-}) {
-  return (
-    <div
-      className={`flex min-w-0 flex-1 items-center gap-2 ${
-        alignRight ? "flex-row-reverse text-right" : ""
-      }`}
-    >
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src={teamLogo(side.id)}
-        alt=""
-        width={20}
-        height={20}
-        className="h-5 w-5 shrink-0"
-      />
-      <div className="min-w-0">
-        <p className="truncate font-bold text-ink">{side.abbr}</p>
-        <p className="truncate text-[10px] text-ink-3">
-          {side.probable?.name ?? "TBD"}
-        </p>
-      </div>
     </div>
   );
 }
