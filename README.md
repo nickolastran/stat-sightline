@@ -25,10 +25,15 @@ pybaseball ──► ETL (pandas) ──► PostgreSQL ──► FastAPI ──�
 | `scripts/` | `init_db.py`, `run_etl.py` |
 | `tests/` | pytest for cleaning + feature math |
 
-`src/stat_sightline/{modeling,viz,dashboard}/` are empty placeholders — the
-predictive models advertised on the landing page aren't built yet.
-`src/app/` is a leftover `create-next-app` scaffold; the live frontend is
-`frontend/`.
+The predictive models advertised on the landing page aren't built yet; the
+`modeling/`, `viz/` and `dashboard/` placeholder packages that used to reserve
+space for them are gone. `src/app/` is a leftover `create-next-app` scaffold;
+the live frontend is `frontend/`.
+
+Packages carry no `__init__.py`: every import (`api.*`, `src.stat_sightline.*`,
+`config.*`) resolves as a PEP 420 namespace package off the repo root, which
+pytest gets from `pythonpath = ["."]` in `pyproject.toml`. Add `__init__.py`
+back — and a `[build-system]` — if this ever needs to be `pip install`ed.
 
 ## Setup
 
