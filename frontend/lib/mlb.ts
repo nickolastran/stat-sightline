@@ -78,23 +78,40 @@ function side(raw: any): GameSide {
   };
 }
 
+const toGame = (g: any): Game => ({
+  pk: g.gamePk,
+  state: g.status?.abstractGameState ?? "Preview",
+  detailedState: g.status?.detailedState ?? "",
+  startTime: g.gameDate,
+  venue: g.venue?.name ?? "",
+  inning: g.linescore?.currentInning ?? null,
+  inningState: g.linescore?.inningState ?? null,
+  away: side(g.teams?.away ?? {}),
+  home: side(g.teams?.home ?? {}),
+});
+
+const SCHEDULE_HYDRATE = "probablePitcher,linescore,team";
+
 export async function getSchedule(date: string): Promise<Game[]> {
   const data = await mlb(
-    `/schedule?sportId=1&date=${date}&hydrate=probablePitcher,linescore,team`,
+    `/schedule?sportId=1&date=${date}&hydrate=${SCHEDULE_HYDRATE}`,
     60
   );
-  const games = data.dates?.[0]?.games ?? [];
-  return games.map((g: any): Game => ({
-    pk: g.gamePk,
-    state: g.status?.abstractGameState ?? "Preview",
-    detailedState: g.status?.detailedState ?? "",
-    startTime: g.gameDate,
-    venue: g.venue?.name ?? "",
-    inning: g.linescore?.currentInning ?? null,
-    inningState: g.linescore?.inningState ?? null,
-    away: side(g.teams?.away ?? {}),
-    home: side(g.teams?.home ?? {}),
-  }));
+  return (data.dates?.[0]?.games ?? []).map(toGame);
+}
+
+/**
+ * One game's schedule row — the header half of /game/[pk] (records, status,
+ * venue, probables), which the box score payload alone doesn't carry. Null for
+ * an unknown gamePk so the route can 404.
+ */
+export async function getGame(pk: number): Promise<Game | null> {
+  const data = await mlb(
+    `/schedule?sportId=1&gamePk=${pk}&hydrate=${SCHEDULE_HYDRATE}`,
+    60
+  );
+  const g = data.dates?.[0]?.games?.[0];
+  return g ? toGame(g) : null;
 }
 
 /**

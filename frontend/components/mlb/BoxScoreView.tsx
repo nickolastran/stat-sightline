@@ -1,10 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { motion } from "framer-motion";
+import { useState } from "react";
 import {
   gameStatus,
-  gamedayUrl,
   teamLogo,
   type BoxBatter,
   type BoxPitcher,
@@ -14,14 +12,12 @@ import {
 } from "@/lib/mlb";
 import SegmentedControl from "@/components/ui/SegmentedControl";
 import PlayerLink from "@/components/mlb/PlayerLink";
-import GameFeedLink from "@/components/mlb/GameFeedLink";
-import { Skeleton } from "@/components/ui/Skeleton";
 
 /*
- * Full box score for one game, opened from a card in the scoreboard strip.
- * The game itself is already in hand (the strip fetched the schedule), so
- * only the batting/pitching/linescore payload is pulled on open, from the
- * same-origin /api/games/[pk] proxy.
+ * Full box score for one game: linescore plus each team's batting and
+ * pitching lines. Both payloads are fetched server-side by /game/[pk] and
+ * passed in whole; this is a client component only because the team toggle
+ * and the local-timezone first-pitch label need the browser.
  */
 
 const BAT_COLS = ["AB", "R", "H", "RBI", "BB", "K", "AVG"] as const;
@@ -228,7 +224,7 @@ function TeamLines({ team }: { team: BoxTeam }) {
   );
 }
 
-/* ── Modal shell ─────────────────────────────────────────────────────── */
+/* ── Page shell ──────────────────────────────────────────────────────── */
 
 function HeaderSide({ side }: { side: Game["away"] }) {
   return (
@@ -250,152 +246,75 @@ function HeaderSide({ side }: { side: Game["away"] }) {
   );
 }
 
-export default function BoxScoreModal({
+export default function BoxScoreView({
   game,
-  onClose,
+  box,
+  right,
 }: {
   game: Game;
-  onClose: () => void;
+  box: BoxScore;
+  /** Header slot for the page's own chrome (the gameday ↗ link). */
+  right?: React.ReactNode;
 }) {
-  const [box, setBox] = useState<BoxScore | null>(null);
-  const [error, setError] = useState(false);
   const [side, setSide] = useState<"away" | "home">("away");
-  const closeRef = useRef<HTMLButtonElement>(null);
-
   const st = gameStatus(game);
-
-  useEffect(() => {
-    let alive = true;
-    fetch(`/api/games/${game.pk}`)
-      .then((r) => r.json())
-      .then((d) => {
-        if (!alive) return;
-        if (d.box) setBox(d.box);
-        else setError(true);
-      })
-      .catch(() => alive && setError(true));
-    return () => {
-      alive = false;
-    };
-  }, [game.pk]);
-
-  // Esc closes; the page behind must not scroll while the dialog is up.
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
-    document.addEventListener("keydown", onKey);
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    closeRef.current?.focus();
-    return () => {
-      document.removeEventListener("keydown", onKey);
-      document.body.style.overflow = prev;
-    };
-  }, [onClose]);
-
   const tone =
     st.tone === "live" ? "text-good" : st.tone === "final" ? "text-ink-3" : "text-accent";
 
   return (
-    <motion.div
-      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/70 p-4 sm:p-8"
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      transition={{ duration: 0.15 }}
-      onClick={onClose}
-    >
-      <motion.div
-        role="dialog"
-        aria-modal="true"
-        aria-label={`Box score — ${game.away.name} at ${game.home.name}`}
-        onClick={(e) => e.stopPropagation()}
-        initial={{ opacity: 0, y: 12 }}
-        animate={{ opacity: 1, y: 0 }}
-        exit={{ opacity: 0, y: 12 }}
-        transition={{ duration: 0.2, ease: "easeOut" }}
-        className="w-full max-w-3xl border border-line bg-surface"
-      >
-        {/* ── Header ──────────────────────────────────────────── */}
-        <div className="flex items-center justify-between gap-3 border-b border-line px-3 py-2">
-          <div className="flex min-w-0 flex-1 items-center gap-4">
-            <HeaderSide side={game.away} />
-            <span className="text-[10px] text-ink-3">@</span>
-            <HeaderSide side={game.home} />
-          </div>
-          <div className="shrink-0 text-right">
-            <p className={`text-[10px] tracking-widest ${tone}`}>
-              {st.tone === "live" && (
-                <span className="mr-1 inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-good align-middle" />
-              )}
-              {st.text}
-            </p>
-            {game.venue && (
-              <p className="hidden text-[10px] text-ink-3 sm:block">{game.venue}</p>
-            )}
-          </div>
-          <GameFeedLink
-            pk={game.pk}
-            label={`${game.away.name} at ${game.home.name}`}
-            className="h-7 w-7 shrink-0"
-          />
-          <button
-            ref={closeRef}
-            type="button"
-            aria-label="Close box score"
-            onClick={onClose}
-            className="h-7 w-7 shrink-0 border border-line text-ink-2 hover:border-accent hover:text-ink"
-          >
-            ×
-          </button>
+    <div className="border border-line bg-surface">
+      {/* ── Header ────────────────────────────────────────────── */}
+      <div className="flex items-center justify-between gap-3 border-b border-line px-3 py-2">
+        <div className="flex min-w-0 flex-1 items-center gap-4">
+          <HeaderSide side={game.away} />
+          <span className="text-[10px] text-ink-3">@</span>
+          <HeaderSide side={game.home} />
         </div>
-
-        {/* ── Body ────────────────────────────────────────────── */}
-        <div className="space-y-2 p-3">
-          {error ? (
-            <p className="py-8 text-center text-xs text-ink-3">
-              BOX SCORE UNAVAILABLE — MLB API UNREACHABLE
-            </p>
-          ) : !box ? (
-            <div className="space-y-2">
-              <Skeleton className="h-16 w-full" />
-              <Skeleton className="h-40 w-full" delay={0.15} />
-            </div>
-          ) : (
-            <>
-              <Linescore box={box} final={game.state === "Final"} />
-              {box.away.batters.length === 0 && box.home.batters.length === 0 ? (
-                <div className="border border-line px-3 py-6 text-center">
-                  <p className="text-xs text-ink-3">
-                    NOT STARTED — NO BOX SCORE YET
-                  </p>
-                  <p className="mt-2 text-[11px] text-ink-2">
-                    <PlayerLink id={game.away.probable?.id}>
-                      {game.away.probable?.name ?? "TBD"}
-                    </PlayerLink>
-                    <span className="mx-2 text-ink-3">vs</span>
-                    <PlayerLink id={game.home.probable?.id}>
-                      {game.home.probable?.name ?? "TBD"}
-                    </PlayerLink>
-                  </p>
-                </div>
-              ) : (
-                <>
-                  <SegmentedControl
-                    ariaLabel="Team"
-                    value={side}
-                    onChange={setSide}
-                    options={[
-                      { value: "away" as const, label: box.away.abbr },
-                      { value: "home" as const, label: box.home.abbr },
-                    ]}
-                  />
-                  <TeamLines team={side === "away" ? box.away : box.home} />
-                </>
-              )}
-            </>
+        <div className="shrink-0 text-right">
+          <p className={`text-[10px] tracking-widest ${tone}`}>
+            {st.tone === "live" && (
+              <span className="mr-1 inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-good align-middle" />
+            )}
+            {st.text}
+          </p>
+          {game.venue && (
+            <p className="hidden text-[10px] text-ink-3 sm:block">{game.venue}</p>
           )}
         </div>
-      </motion.div>
-    </motion.div>
+        {right}
+      </div>
+
+      {/* ── Body ──────────────────────────────────────────────── */}
+      <div className="space-y-2 p-3">
+        <Linescore box={box} final={game.state === "Final"} />
+        {box.away.batters.length === 0 && box.home.batters.length === 0 ? (
+          <div className="border border-line px-3 py-6 text-center">
+            <p className="text-xs text-ink-3">NOT STARTED — NO BOX SCORE YET</p>
+            <p className="mt-2 text-[11px] text-ink-2">
+              <PlayerLink id={game.away.probable?.id}>
+                {game.away.probable?.name ?? "TBD"}
+              </PlayerLink>
+              <span className="mx-2 text-ink-3">vs</span>
+              <PlayerLink id={game.home.probable?.id}>
+                {game.home.probable?.name ?? "TBD"}
+              </PlayerLink>
+            </p>
+          </div>
+        ) : (
+          <>
+            <SegmentedControl
+              ariaLabel="Team"
+              value={side}
+              onChange={setSide}
+              options={[
+                { value: "away" as const, label: box.away.abbr },
+                { value: "home" as const, label: box.home.abbr },
+              ]}
+            />
+            <TeamLines team={side === "away" ? box.away : box.home} />
+          </>
+        )}
+      </div>
+    </div>
   );
 }

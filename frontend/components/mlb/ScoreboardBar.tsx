@@ -1,11 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
 import { todayET, type Game } from "@/lib/mlb";
 import GameCard from "@/components/mlb/GameCard";
 import GameFeedLink from "@/components/mlb/GameFeedLink";
-import BoxScoreModal from "@/components/mlb/BoxScoreModal";
 import Calendar from "@/components/ui/Calendar";
 import { SkeletonGameCard } from "@/components/ui/Skeleton";
 
@@ -13,8 +13,9 @@ import { SkeletonGameCard } from "@/components/ui/Skeleton";
  * Global scoreboard strip under the header. One horizontal rail of the
  * chosen day's games, paged by the ‹ › arrows rather than a manual drag;
  * the date button opens a month calendar to jump to any day, and a card
- * opens that game's box score. Games load client-side from the same-origin
- * /api/games proxy, with motion skeletons so the strip never looks frozen.
+ * navigates to that game's box score page. Games load client-side from the
+ * same-origin /api/games proxy, with motion skeletons so the strip never
+ * looks frozen.
  */
 
 const STATE_ORDER: Record<string, number> = { Live: 0, Preview: 1, Final: 2 };
@@ -55,7 +56,6 @@ export default function ScoreboardBar() {
   const [games, setGames] = useState<Game[] | null>(null); // null = loading
   const [error, setError] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
-  const [openGame, setOpenGame] = useState<Game | null>(null);
   const [arrows, setArrows] = useState({ prev: false, next: false });
 
   const stripRef = useRef<HTMLDivElement>(null);
@@ -236,16 +236,15 @@ export default function ScoreboardBar() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.25, delay: Math.min(i * 0.03, 0.3) }}
             >
-              <button
-                type="button"
-                onClick={() => setOpenGame(g)}
+              <Link
+                href={`/game/${g.pk}`}
                 aria-label={`Box score — ${g.away.name} at ${g.home.name}`}
-                className="w-full text-left focus-visible:outline-2 focus-visible:outline-accent"
+                className="block focus-visible:outline-2 focus-visible:outline-accent"
               >
                 <GameCard game={g} className="hover:border-accent" />
-              </button>
-              {/* Overlaid rather than nested: an anchor inside that button
-                  would be invalid HTML and swallow the card's own click. */}
+              </Link>
+              {/* Overlaid rather than nested: an anchor inside the card's own
+                  anchor is invalid HTML. */}
               <GameFeedLink
                 pk={g.pk}
                 label={`${g.away.name} at ${g.home.name}`}
@@ -255,17 +254,6 @@ export default function ScoreboardBar() {
           ))
         )}
       </div>
-
-      {/* ── Box score ────────────────────────────────────────── */}
-      <AnimatePresence>
-        {openGame && (
-          <BoxScoreModal
-            key={openGame.pk}
-            game={openGame}
-            onClose={() => setOpenGame(null)}
-          />
-        )}
-      </AnimatePresence>
     </div>
   );
 }
