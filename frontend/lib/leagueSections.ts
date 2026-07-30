@@ -6,7 +6,8 @@
 export const LEAGUE_SECTIONS = [
   { id: "leaders", tab: "STAT LEADERS", title: "STAT LEADERS" },
   { id: "probables", tab: "PROBABLES", title: "PROBABLE PITCHERS — TODAY" },
-  { id: "standings", tab: "STANDINGS", title: "STANDINGS — BY DIVISION" },
+  { id: "standings", tab: "STANDINGS", title: "STANDINGS" },
+  { id: "teams", tab: "TEAM STATS", title: "TEAM STATISTICS" },
 ] as const;
 
 export type LeagueSection = (typeof LEAGUE_SECTIONS)[number]["id"];

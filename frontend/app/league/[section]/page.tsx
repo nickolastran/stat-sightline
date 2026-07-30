@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import Panel from "@/components/ui/Panel";
 import Standings from "@/components/mlb/Standings";
+import TeamStats from "@/components/mlb/TeamStats";
 import Leaderboards from "@/components/mlb/Leaderboards";
 import ProbablePitchers from "@/components/mlb/ProbablePitchers";
 import {
@@ -12,6 +13,7 @@ import {
 import {
   getSchedule,
   getStandings,
+  getTeamStats,
   getLeaderboards,
   todayET,
   seasonOf,
@@ -51,6 +53,8 @@ async function sectionBody(id: LeagueSection, date: string, season: number) {
         return <ProbablePitchers games={await getSchedule(date)} />;
       case "standings":
         return <Standings divisions={await getStandings(season)} />;
+      case "teams":
+        return <TeamStats tables={await getTeamStats(season)} />;
     }
   } catch {
     return (

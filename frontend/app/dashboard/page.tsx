@@ -76,7 +76,7 @@ export default async function DashboardPage() {
       )}
 
       {/* ── Standings ──────────────────────────────────────────── */}
-      <Panel title="STANDINGS — BY DIVISION">
+      <Panel title="STANDINGS">
         <Standings divisions={divisions} />
       </Panel>
 

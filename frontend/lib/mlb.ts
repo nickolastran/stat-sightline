@@ -16,6 +16,12 @@ const DIVISIONS: Record<number, string> = {
   205: "NL CENTRAL",
 };
 
+/** League id → display name. Fixed alongside the division ids above. */
+const LEAGUES: Record<number, string> = {
+  103: "AMERICAN LEAGUE",
+  104: "NATIONAL LEAGUE",
+};
+
 /** Team logo — degrades to alt text if unreachable. */
 export const teamLogo = (id: number) =>
   `https://www.mlbstatic.com/team-logos/${id}.svg`;
@@ -282,45 +288,325 @@ export async function getBoxScore(pk: number): Promise<BoxScore> {
 
 /* ── Standings ──────────────────────────────────────────────────────── */
 
+/**
+ * One club's line in the standings. Rank and games-back come in three
+ * flavours because the standings page shows the same rows grouped three ways
+ * (division / league / all MLB) — each scope reads its own pair, so a merged
+ * table never shows a division-relative GB next to a league-wide field.
+ * Every row carries its own division and league so it stays self-describing
+ * once lifted out of its division table.
+ */
 export interface StandingRow {
   id: number;
   name: string;
+  divisionId: number;
+  division: string;
+  leagueId: number;
+  league: string;
   wins: number;
   losses: number;
   pct: string;
   gb: string;
-  streak: string;
+  leagueGb: string;
+  sportGb: string;
   divRank: string;
+  leagueRank: string;
+  sportRank: string;
+  streak: string;
+  runsScored: number;
+  runsAllowed: number;
+  runDiff: number;
+  /** W-L over the club's last ten, and its home / road splits. */
+  last10: string;
+  home: string;
+  away: string;
+  /** "z"/"y"/"w" etc. when the club has clinched something; "" otherwise. */
+  clinch: string;
 }
 
 export interface Division {
   id: number;
   name: string;
+  leagueId: number;
+  league: string;
   teams: StandingRow[];
 }
 
+/** "54-27" for one of the API's split records, "—" when it isn't reported. */
+function splitRecord(splits: any[] | undefined, type: string): string {
+  const s = (splits ?? []).find((x: any) => x.type === type);
+  return s ? `${s.wins ?? 0}-${s.losses ?? 0}` : "—";
+}
+
 export async function getStandings(season: number): Promise<Division[]> {
+  // Hydrating the team gets full club names ("Tampa Bay Rays"); the bare
+  // payload carries only the nickname ("Rays"), which reads as ambiguous once
+  // rows are merged into a league-wide or all-MLB table.
   const data = await mlb(
-    `/standings?leagueId=103,104&season=${season}&standingsTypes=regularSeason`,
+    `/standings?leagueId=103,104&season=${season}&standingsTypes=regularSeason&hydrate=team`,
     1800
   );
   const records = (data.records ?? []) as any[];
   return records
-    .map((r): Division => ({
-      id: r.division?.id,
-      name: DIVISIONS[r.division?.id] ?? `DIV ${r.division?.id}`,
-      teams: (r.teamRecords ?? []).map((t: any): StandingRow => ({
-        id: t.team?.id,
-        name: t.team?.name ?? "—",
-        wins: t.wins ?? 0,
-        losses: t.losses ?? 0,
-        pct: t.winningPercentage ?? "—",
-        gb: t.gamesBack ?? "-",
-        streak: t.streak?.streakCode ?? "—",
-        divRank: t.divisionRank ?? "—",
-      })),
-    }))
+    .map((r): Division => {
+      const divisionId = r.division?.id;
+      const leagueId = r.league?.id;
+      const division = DIVISIONS[divisionId] ?? `DIV ${divisionId}`;
+      const league = LEAGUES[leagueId] ?? `LEAGUE ${leagueId}`;
+      return {
+        id: divisionId,
+        name: division,
+        leagueId,
+        league,
+        teams: (r.teamRecords ?? []).map((t: any): StandingRow => {
+          const splits = t.records?.splitRecords;
+          return {
+            id: t.team?.id,
+            name: t.team?.name ?? "—",
+            divisionId,
+            division,
+            leagueId,
+            league,
+            wins: t.wins ?? 0,
+            losses: t.losses ?? 0,
+            pct: t.winningPercentage ?? "—",
+            gb: t.gamesBack ?? "-",
+            leagueGb: t.leagueGamesBack ?? "-",
+            sportGb: t.sportGamesBack ?? "-",
+            divRank: t.divisionRank ?? "—",
+            leagueRank: t.leagueRank ?? "—",
+            sportRank: t.sportRank ?? "—",
+            streak: t.streak?.streakCode ?? "—",
+            runsScored: t.runsScored ?? 0,
+            runsAllowed: t.runsAllowed ?? 0,
+            runDiff: t.runDifferential ?? 0,
+            last10: splitRecord(splits, "lastTen"),
+            home: splitRecord(splits, "home"),
+            away: splitRecord(splits, "away"),
+            clinch: t.clinchIndicator ?? "",
+          };
+        }),
+      };
+    })
     .sort((a, b) => a.name.localeCompare(b.name));
+}
+
+/* ── Team statistics ────────────────────────────────────────────────── */
+
+/** A single team stat cell. Strings arrive pre-formatted (".265", "3.47"). */
+export type TeamStatValue = number | string | null;
+
+export interface TeamStatCol {
+  /** statsapi key inside the split's `stat` object. */
+  key: string;
+  label: string;
+}
+
+export interface TeamStatRow {
+  id: number;
+  name: string;
+  values: Record<string, TeamStatValue>;
+}
+
+export interface TeamStatTable {
+  group: "hitting" | "pitching";
+  columns: TeamStatCol[];
+  rows: TeamStatRow[];
+}
+
+/* Column order for the team tables — also the order the team page lists a
+ * single club's line in, so the two views stay in step. */
+export const TEAM_HITTING_COLS: TeamStatCol[] = [
+  { key: "gamesPlayed", label: "G" },
+  { key: "runs", label: "R" },
+  { key: "hits", label: "H" },
+  { key: "homeRuns", label: "HR" },
+  { key: "rbi", label: "RBI" },
+  { key: "doubles", label: "2B" },
+  { key: "triples", label: "3B" },
+  { key: "baseOnBalls", label: "BB" },
+  { key: "strikeOuts", label: "K" },
+  { key: "stolenBases", label: "SB" },
+  { key: "avg", label: "AVG" },
+  { key: "obp", label: "OBP" },
+  { key: "slg", label: "SLG" },
+  { key: "ops", label: "OPS" },
+];
+
+export const TEAM_PITCHING_COLS: TeamStatCol[] = [
+  { key: "gamesPlayed", label: "G" },
+  { key: "wins", label: "W" },
+  { key: "losses", label: "L" },
+  { key: "era", label: "ERA" },
+  { key: "whip", label: "WHIP" },
+  { key: "inningsPitched", label: "IP" },
+  { key: "hits", label: "H" },
+  { key: "runs", label: "R" },
+  { key: "earnedRuns", label: "ER" },
+  { key: "homeRuns", label: "HR" },
+  { key: "baseOnBalls", label: "BB" },
+  { key: "strikeOuts", label: "K" },
+  { key: "saves", label: "SV" },
+  { key: "shutouts", label: "SHO" },
+  { key: "avg", label: "OAVG" },
+  { key: "strikeoutsPer9Inn", label: "K/9" },
+];
+
+/** Display form of a stat cell — "—" for anything the API didn't report. */
+export const teamStatText = (v: TeamStatValue): string =>
+  v === null || v === undefined
+    ? "—"
+    : typeof v === "number"
+      ? v.toLocaleString()
+      : v;
+
+/**
+ * Sort key for a stat cell. Rate strings (".265", "3.47") parse cleanly;
+ * anything unparseable is null so the table can sink it to the bottom in
+ * both directions rather than sorting it as zero.
+ */
+export const teamStatNum = (v: TeamStatValue): number | null => {
+  if (v === null || v === undefined || v === "") return null;
+  const n = typeof v === "number" ? v : Number(v);
+  return Number.isFinite(n) ? n : null;
+};
+
+const cols = (group: "hitting" | "pitching") =>
+  group === "hitting" ? TEAM_HITTING_COLS : TEAM_PITCHING_COLS;
+
+async function teamStatTable(
+  group: "hitting" | "pitching",
+  season: number
+): Promise<TeamStatTable> {
+  const data = await mlb(
+    `/teams/stats?season=${season}&sportIds=1&group=${group}&stats=season`,
+    1800
+  );
+  const splits = (data.stats?.[0]?.splits ?? []) as any[];
+  const columns = cols(group);
+  return {
+    group,
+    columns,
+    rows: splits.map((s): TeamStatRow => {
+      const stat = s.stat ?? {};
+      return {
+        id: s.team?.id,
+        name: s.team?.name ?? "—",
+        values: Object.fromEntries(
+          columns.map((c) => [c.key, stat[c.key] ?? null])
+        ),
+      };
+    }),
+  };
+}
+
+/**
+ * Season hitting and pitching lines for all 30 clubs — the TEAM STATISTICS
+ * section, and the source the team page pulls its own club's line from, so
+ * both read the same cached pair of requests.
+ */
+export async function getTeamStats(season: number): Promise<TeamStatTable[]> {
+  return Promise.all([
+    teamStatTable("hitting", season),
+    teamStatTable("pitching", season),
+  ]);
+}
+
+/* ── One team ───────────────────────────────────────────────────────── */
+
+export interface RosterEntry {
+  id: number;
+  name: string;
+  number: string;
+  pos: string;
+  /** "Pitcher" / "Infielder" / … — the page groups the roster by this. */
+  posType: string;
+  status: string;
+}
+
+export interface TeamIdentity {
+  id: number;
+  name: string;
+  abbr: string;
+  league: string;
+  division: string;
+  venue: string;
+  firstYear: string;
+}
+
+/*
+ * The team page loads in four independent pieces rather than one bundle, so
+ * each panel streams in behind its own skeleton instead of the whole page
+ * waiting on the slowest request. Identity is deliberately the only one the
+ * route awaits directly: it is a single cheap request, and resolving it
+ * before anything is flushed is what lets an unknown id answer a real 404
+ * instead of a 200 with a not-found body.
+ */
+
+/** Identity and ballpark. Null for an unknown id so the route can 404. */
+export async function getTeamIdentity(
+  id: number,
+  season: number
+): Promise<TeamIdentity | null> {
+  const data = await mlb(`/teams/${id}?season=${season}`, 1800).catch(
+    (e: Error) => {
+      if (e.message.includes(" 404:")) return null;
+      throw e;
+    }
+  );
+  const t = data?.teams?.[0];
+  if (!t) return null;
+  return {
+    id: t.id,
+    name: t.name ?? "—",
+    abbr: t.abbreviation ?? "—",
+    league: LEAGUES[t.league?.id] ?? t.league?.name ?? "",
+    division: DIVISIONS[t.division?.id] ?? t.division?.name ?? "",
+    venue: t.venue?.name ?? "",
+    firstYear: t.firstYearOfPlay ?? "",
+  };
+}
+
+/**
+ * One club's standings line, off the same league-wide payload the standings
+ * section fetched. Null when it has no line for this season yet.
+ */
+export async function getTeamRecord(
+  id: number,
+  season: number
+): Promise<StandingRow | null> {
+  const divisions = await getStandings(season);
+  return divisions.flatMap((d) => d.teams).find((r) => r.id === id) ?? null;
+}
+
+/** One club's season lines, off the same payload the team-stats section uses. */
+export async function getTeamLines(
+  id: number,
+  season: number
+): Promise<{ hitting: TeamStatRow | null; pitching: TeamStatRow | null }> {
+  const stats = await getTeamStats(season);
+  const lineFor = (group: "hitting" | "pitching") =>
+    stats.find((s) => s.group === group)?.rows.find((r) => r.id === id) ?? null;
+  return { hitting: lineFor("hitting"), pitching: lineFor("pitching") };
+}
+
+/** One club's roster. Degrades to an empty list — the rest of the page stands. */
+export async function getTeamRoster(
+  id: number,
+  season: number
+): Promise<RosterEntry[]> {
+  const data = await mlb(
+    `/teams/${id}/roster?season=${season}&rosterType=fullSeason`,
+    1800
+  ).catch(() => null);
+  return ((data?.roster ?? []) as any[]).map((r): RosterEntry => ({
+    id: r.person?.id,
+    name: r.person?.fullName ?? "—",
+    number: r.jerseyNumber ?? "",
+    pos: r.position?.abbreviation ?? "",
+    posType: r.position?.type ?? "Other",
+    status: r.status?.description ?? "",
+  }));
 }
 
 /* ── Leaderboards ───────────────────────────────────────────────────── */

@@ -29,6 +29,78 @@ export function Skeleton({
   );
 }
 
+/** Panel chrome with a placeholder heading — the shell every loading state
+ *  shares, so a section fades into its real Panel rather than replacing it. */
+export function SkeletonPanel({
+  children,
+  delay = 0,
+  right = false,
+}: {
+  children: React.ReactNode;
+  delay?: number;
+  /** Reserve the header's right slot (a segmented toggle, a date stamp). */
+  right?: boolean;
+}) {
+  return (
+    <div className="border border-line bg-surface">
+      <div className="flex items-center justify-between border-b border-line px-3 py-2">
+        <Skeleton className="h-2.5 w-32" delay={delay} />
+        {right && <Skeleton className="h-2.5 w-20" delay={delay + 0.06} />}
+      </div>
+      <div className="p-3">{children}</div>
+    </div>
+  );
+}
+
+/** Placeholder shaped like one of the stat tables: heading, header strip, rows. */
+export function SkeletonTable({
+  rows = 5,
+  delay = 0,
+  heading = true,
+}: {
+  rows?: number;
+  delay?: number;
+  heading?: boolean;
+}) {
+  return (
+    <div className="border border-line bg-bg">
+      {heading && (
+        <div className="border-b border-line px-3 py-1.5">
+          <Skeleton className="h-2.5 w-24" delay={delay} />
+        </div>
+      )}
+      <div className="border-b border-line px-3 py-2">
+        <Skeleton className="h-2.5 w-full" delay={delay + 0.05} />
+      </div>
+      <div className="space-y-1.5 p-3">
+        {Array.from({ length: rows }).map((_, i) => (
+          <Skeleton key={i} className="h-3 w-full" delay={delay + i * 0.06} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/** Placeholder row of MetricCards. */
+export function SkeletonTiles({
+  count = 4,
+  delay = 0,
+}: {
+  count?: number;
+  delay?: number;
+}) {
+  return (
+    <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+      {Array.from({ length: count }).map((_, i) => (
+        <div key={i} className="border border-line bg-surface p-3">
+          <Skeleton className="h-2.5 w-12" delay={delay + i * 0.08} />
+          <Skeleton className="mt-3 h-6 w-14" delay={delay + i * 0.08 + 0.05} />
+        </div>
+      ))}
+    </div>
+  );
+}
+
 /** Placeholder shaped like a two-team GameCard. */
 export function SkeletonGameCard({ delay = 0 }: { delay?: number }) {
   return (

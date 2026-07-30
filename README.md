@@ -98,11 +98,17 @@ working set in memory rather than re-querying per control.
 - `/dashboard` — league overview: today's scoreboard, standings, stat leaders
   (live from the public MLB Stats API, server-rendered; each source fails
   independently)
+- `/league/[section]` — the reference sections pinned in the league bar:
+  `leaders`, `probables`, `standings` (division / league / all-MLB scopes, every
+  stat column click-sortable), `teams` (all 30 clubs' season hitting and
+  pitching lines, click-sortable)
+- `/team/[id]` — one club's season: standings line, team hitting and pitching
+  lines, and its roster, linking on to the player pages
 - `/pitcher/[id]` — pitch-level analysis: strike-zone scatter, filter panel,
   summary metrics. A non-numeric id falls back to the highest-workload pitcher.
 - `/api/games` — same-origin proxy for the schedule, used by the client
   scoreboard bar (a date-picker calendar + arrow-paged rail of the day's
-  games, present on every page via the root layout)
+  games, shown on the front page only)
 - `/api/games/{gamePk}` — same-origin proxy for one game's box score
   (linescore + both teams' batting/pitching lines), fetched when a card in
   that rail is clicked
