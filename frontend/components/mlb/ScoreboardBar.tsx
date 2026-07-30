@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { todayET, type Game } from "@/lib/mlb";
 import GameCard from "@/components/mlb/GameCard";
+import GameFeedLink from "@/components/mlb/GameFeedLink";
 import BoxScoreModal from "@/components/mlb/BoxScoreModal";
 import Calendar from "@/components/ui/Calendar";
 import { SkeletonGameCard } from "@/components/ui/Skeleton";
@@ -230,7 +231,7 @@ export default function ScoreboardBar() {
           sorted.map((g, i) => (
             <motion.div
               key={g.pk}
-              className="w-[220px] shrink-0"
+              className="relative w-[220px] shrink-0"
               initial={{ opacity: 0, y: 6 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.25, delay: Math.min(i * 0.03, 0.3) }}
@@ -241,11 +242,15 @@ export default function ScoreboardBar() {
                 aria-label={`Box score — ${g.away.name} at ${g.home.name}`}
                 className="w-full text-left focus-visible:outline-2 focus-visible:outline-accent"
               >
-                <GameCard
-                  game={g}
-                  className="transition-colors hover:border-accent"
-                />
+                <GameCard game={g} className="hover:border-accent" />
               </button>
+              {/* Overlaid rather than nested: an anchor inside that button
+                  would be invalid HTML and swallow the card's own click. */}
+              <GameFeedLink
+                pk={g.pk}
+                label={`${g.away.name} at ${g.home.name}`}
+                className="absolute right-1.5 top-1.5"
+              />
             </motion.div>
           ))
         )}

@@ -20,6 +20,9 @@ const DIVISIONS: Record<number, string> = {
 export const teamLogo = (id: number) =>
   `https://www.mlbstatic.com/team-logos/${id}.svg`;
 
+/** MLB's own live Gameday feed for a game — opened in its own tab. */
+export const gamedayUrl = (pk: number) => `https://www.mlb.com/gameday/${pk}`;
+
 /** Today's date in America/New_York (MLB's game day), as YYYY-MM-DD. */
 export function todayET(): string {
   return new Intl.DateTimeFormat("en-CA", {
@@ -364,4 +367,127 @@ export async function getLeaderboards(
   limit = 5
 ): Promise<Leaderboard[]> {
   return Promise.all(LEADER_SPECS.map((s) => oneBoard(s, season, limit)));
+}
+
+/* ── Player summary ─────────────────────────────────────────────────── */
+
+export interface StatLine {
+  group: "hitting" | "pitching";
+  team: string;
+  /** (label, value) in display order — the first four are the headline tiles. */
+  stats: [string, string][];
+}
+
+export interface PlayerSummary {
+  id: number;
+  name: string;
+  number: string;
+  pos: string;
+  team: string;
+  teamId: number | null;
+  bats: string;
+  throws: string;
+  age: number | null;
+  height: string;
+  weight: number | null;
+  debut: string;
+  /** Empty when the player has no line in this season (a two-way player has two). */
+  lines: StatLine[];
+}
+
+/* (label, statcast/statsapi key). Order matters: first four → MetricCards. */
+const HITTING_KEYS: [string, string][] = [
+  ["AVG", "avg"],
+  ["HR", "homeRuns"],
+  ["RBI", "rbi"],
+  ["OPS", "ops"],
+  ["G", "gamesPlayed"],
+  ["PA", "plateAppearances"],
+  ["AB", "atBats"],
+  ["H", "hits"],
+  ["2B", "doubles"],
+  ["3B", "triples"],
+  ["R", "runs"],
+  ["BB", "baseOnBalls"],
+  ["K", "strikeOuts"],
+  ["SB", "stolenBases"],
+  ["OBP", "obp"],
+  ["SLG", "slg"],
+];
+
+const PITCHING_KEYS: [string, string][] = [
+  ["ERA", "era"],
+  ["W-L", "record"], // synthesized below
+  ["K", "strikeOuts"],
+  ["WHIP", "whip"],
+  ["G", "gamesPlayed"],
+  ["GS", "gamesStarted"],
+  ["SV", "saves"],
+  ["IP", "inningsPitched"],
+  ["H", "hits"],
+  ["ER", "earnedRuns"],
+  ["HR", "homeRuns"],
+  ["BB", "baseOnBalls"],
+  ["K/9", "strikeoutsPer9Inn"],
+  ["BB/9", "walksPer9Inn"],
+  ["OAVG", "avg"],
+  ["P", "numberOfPitches"],
+];
+
+/**
+ * One player's identity plus their season hitting and/or pitching line, as
+ * rendered by /player/[id]. Returns null for an unknown id so the route can
+ * 404 instead of throwing. Season stats move once a day at most — long
+ * revalidate.
+ */
+export async function getPlayer(
+  id: number,
+  season: number
+): Promise<PlayerSummary | null> {
+  const data = await mlb(
+    `/people/${id}?hydrate=currentTeam,stats(group=[hitting,pitching],type=[season],season=${season})`,
+    1800
+  ).catch((e: Error) => {
+    // Unknown id → null so the route 404s; anything else is an outage and
+    // must surface as one, not as "no such player".
+    if (e.message.includes(" 404:")) return null;
+    throw e;
+  });
+  const p = data?.people?.[0];
+  if (!p) return null;
+
+  const lines: StatLine[] = [];
+  for (const s of (p.stats ?? []) as any[]) {
+    const group = s.group?.displayName;
+    if (group !== "hitting" && group !== "pitching") continue;
+    const split = s.splits?.[0];
+    if (!split) continue;
+    const stat = { ...split.stat };
+    stat.record = `${stat.wins ?? 0}-${stat.losses ?? 0}`;
+    const keys = group === "hitting" ? HITTING_KEYS : PITCHING_KEYS;
+    lines.push({
+      group,
+      team: split.team?.name ?? "",
+      stats: keys.map(([label, key]) => [
+        label,
+        stat[key] === undefined || stat[key] === null ? "—" : String(stat[key]),
+      ]),
+    });
+  }
+
+  return {
+    id: p.id,
+    name: p.fullName ?? "—",
+    number: p.primaryNumber ?? "",
+    pos: p.primaryPosition?.abbreviation ?? "",
+    team: p.currentTeam?.name ?? "",
+    teamId: p.currentTeam?.id ?? null,
+    bats: p.batSide?.code ?? "?",
+    throws: p.pitchHand?.code ?? "?",
+    age: p.currentAge ?? null,
+    height: p.height ?? "",
+    weight: p.weight ?? null,
+    debut: p.mlbDebutDate ?? "",
+    lines,
+  };
 }

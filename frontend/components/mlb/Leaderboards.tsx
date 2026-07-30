@@ -3,6 +3,7 @@
 import { useState } from "react";
 import type { Leaderboard } from "@/lib/mlb";
 import SegmentedControl from "@/components/ui/SegmentedControl";
+import PlayerLink from "@/components/mlb/PlayerLink";
 
 /*
  * Season stat leaders, split into hitting / pitching via a segmented toggle.
@@ -51,7 +52,7 @@ export default function Leaderboards({ boards }: { boards: Leaderboard[] }) {
                       {l.rank}
                     </span>
                     <span className="min-w-0 flex-1 truncate text-ink-2">
-                      {l.name}
+                      <PlayerLink id={l.personId}>{l.name}</PlayerLink>
                     </span>
                     <span className="w-14 text-right font-bold text-ink tabular-nums">
                       {l.value}

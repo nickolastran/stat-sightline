@@ -55,6 +55,31 @@ body {
   font-size: 14px;
 }
 
+/* One fade for every token-driven colour, everywhere: flipping data-theme
+   repaints the whole tree on the same 180ms curve, so no component can drift
+   to its own timing (or none at all). Hover states ride the same curve —
+   that is why no component declares `transition-colors` of its own.
+   Layout/opacity/transform are untouched, so framer-motion is unaffected. */
+*,
+*::before,
+*::after {
+  transition:
+    background-color 180ms ease,
+    border-color 180ms ease,
+    color 180ms ease,
+    fill 180ms ease,
+    stroke 180ms ease,
+    outline-color 180ms ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition: none;
+  }
+}
+
 ::selection {
   background: var(--color-accent);
   color: #ffffff;

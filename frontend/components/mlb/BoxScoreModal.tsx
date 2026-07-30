@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import {
   gameStatus,
+  gamedayUrl,
   teamLogo,
   type BoxBatter,
   type BoxPitcher,
@@ -12,6 +13,8 @@ import {
   type Game,
 } from "@/lib/mlb";
 import SegmentedControl from "@/components/ui/SegmentedControl";
+import PlayerLink from "@/components/mlb/PlayerLink";
+import GameFeedLink from "@/components/mlb/GameFeedLink";
 import { Skeleton } from "@/components/ui/Skeleton";
 
 /*
@@ -196,7 +199,7 @@ function TeamLines({ team }: { team: BoxTeam }) {
           label: (
             <span className={b.sub ? "pl-3" : ""}>
               {b.sub && <span className="text-ink-3">↳ </span>}
-              {b.name}
+              <PlayerLink id={b.id}>{b.name}</PlayerLink>
               <span className="ml-1.5 text-[10px] text-ink-3">{b.pos}</span>
             </span>
           ),
@@ -210,7 +213,7 @@ function TeamLines({ team }: { team: BoxTeam }) {
           key: p.id,
           label: (
             <span>
-              {p.name}
+              <PlayerLink id={p.id}>{p.name}</PlayerLink>
               {p.decision && (
                 <span className="ml-1.5 text-[10px] text-accent">
                   {p.decision}
@@ -330,6 +333,11 @@ export default function BoxScoreModal({
               <p className="hidden text-[10px] text-ink-3 sm:block">{game.venue}</p>
             )}
           </div>
+          <GameFeedLink
+            pk={game.pk}
+            label={`${game.away.name} at ${game.home.name}`}
+            className="h-7 w-7 shrink-0"
+          />
           <button
             ref={closeRef}
             type="button"
@@ -361,9 +369,13 @@ export default function BoxScoreModal({
                     NOT STARTED — NO BOX SCORE YET
                   </p>
                   <p className="mt-2 text-[11px] text-ink-2">
-                    {game.away.probable?.name ?? "TBD"}
+                    <PlayerLink id={game.away.probable?.id}>
+                      {game.away.probable?.name ?? "TBD"}
+                    </PlayerLink>
                     <span className="mx-2 text-ink-3">vs</span>
-                    {game.home.probable?.name ?? "TBD"}
+                    <PlayerLink id={game.home.probable?.id}>
+                      {game.home.probable?.name ?? "TBD"}
+                    </PlayerLink>
                   </p>
                 </div>
               ) : (
