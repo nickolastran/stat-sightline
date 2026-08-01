@@ -26,3 +26,8 @@ def database_url() -> str:
 
 STATCAST_CACHE_DIR = PROJECT_ROOT / os.getenv("STATCAST_CACHE_DIR", "data/raw")
 ETL_CHUNK_DAYS = int(os.getenv("ETL_CHUNK_DAYS", "3"))
+
+# Game results + trained model behind the standings projection. Separate from
+# the Statcast cache because this pipeline is DB-free: it reads the MLB Stats
+# API and writes flat files.
+STANDINGS_DIR = PROJECT_ROOT / os.getenv("STANDINGS_DATA_DIR", "data/standings")

@@ -36,6 +36,58 @@ export interface PitcherPitches {
   pitches: Pitch[];
 }
 
+/* ── Standings projection ───────────────────────────────────────────── */
+
+/** Chronological-holdout quality of the projection model. */
+export interface ProjectionModel {
+  holdout_season: number | null;
+  holdout_games: number | null;
+  train_games: number | null;
+  accuracy: number | null;
+  /** Always-pick-the-home-team accuracy — the bar the model has to clear. */
+  home_baseline: number | null;
+  log_loss: number | null;
+  run_diff_mae: number | null;
+  trained_at: string | null;
+}
+
+export interface TeamProjection {
+  team_id: number; // MLB team id — joins to StandingRow.id
+  name: string;
+  wins: number;
+  losses: number;
+  games_played: number;
+  games_remaining: number;
+  projected_wins: number;
+  projected_losses: number;
+  pace_wins: number;
+  pace_162: number;
+}
+
+export interface StandingsProjection {
+  season: number;
+  as_of: string | null;
+  model: ProjectionModel;
+  teams: TeamProjection[];
+}
+
+/**
+ * Projected final standings for a season.
+ *
+ * Called from server components. Cached for half an hour, matching the
+ * standings themselves: the projection only moves as games go final, and it
+ * scores every remaining game on the schedule to answer.
+ */
+export async function getProjections(
+  season: number
+): Promise<StandingsProjection> {
+  const res = await fetch(`${API_URL}/api/standings/projections?season=${season}`, {
+    next: { revalidate: 1800 },
+  });
+  if (!res.ok) throw new Error(`getProjections failed: ${res.status}`);
+  return res.json();
+}
+
 export async function searchPitchers(q = "", limit = 25): Promise<Pitcher[]> {
   const params = new URLSearchParams({ q, limit: String(limit) });
   const res = await fetch(`${API_URL}/api/pitchers?${params}`, {

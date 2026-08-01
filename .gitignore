@@ -24,6 +24,8 @@ env/
 # data & model artifacts (keep dirs via .gitkeep if desired)
 data/raw/
 data/processed/
+# game results + model behind the standings projection
+data/standings/
 *.parquet
 *.joblib
 *.pkl
