@@ -6,6 +6,7 @@ import SortHeader from "@/components/ui/SortHeader";
 import TeamLink from "@/components/mlb/TeamLink";
 import { sortRows, toggleSort, type Sort } from "@/lib/sortTable";
 import type { Division, StandingRow } from "@/lib/mlb";
+import type { StandingsProjection, TeamProjection } from "@/lib/api";
 
 /*
  * Standings at three scopes — by division, by league, and all of MLB — off a
@@ -16,6 +17,10 @@ import type { Division, StandingRow } from "@/lib/mlb";
  * state lives here rather than in each table, so ordering by HOME RUNS at
  * division scope orders all six tables the same way and the columns stay
  * comparable across groups.
+ *
+ * When the projection service answers, three more columns join on team id —
+ * projected final wins, and the two paces. They are dropped entirely rather
+ * than shown empty if it doesn't, so the standings never depend on it.
  */
 
 type Scope = "division" | "league" | "mlb";
@@ -42,12 +47,15 @@ const streakNum = (s: string) => {
   return s.startsWith("L") ? -n : n;
 };
 
+/** A standings line with its projection attached, if there is one. */
+type Row = StandingRow & { proj: TeamProjection | null };
+
 interface Col {
   key: string;
   label: string;
   title: string;
-  text: (r: StandingRow, scope: Scope) => string;
-  num: (r: StandingRow, scope: Scope) => number | null;
+  text: (r: Row, scope: Scope) => string;
+  num: (r: Row, scope: Scope) => number | null;
 }
 
 /*
@@ -139,24 +147,57 @@ const COLS: Col[] = [
   },
 ];
 
+/*
+ * The projection columns. A club with no projection reads "—" and sorts to the
+ * bottom in both directions, the same as any other missing stat.
+ */
+const PROJ_COLS: Col[] = [
+  {
+    key: "proj",
+    label: "PROJ",
+    title:
+      "Projected final wins — actual wins plus the win probability of every remaining game",
+    text: (r) => (r.proj ? r.proj.projected_wins.toFixed(1) : "—"),
+    num: (r) => r.proj?.projected_wins ?? null,
+  },
+  {
+    key: "pace",
+    label: "PACE",
+    title:
+      "Wins the projection expects by this point in the schedule — more actual wins than this means the club is outrunning the model",
+    text: (r) => (r.proj ? r.proj.pace_wins.toFixed(1) : "—"),
+    num: (r) => r.proj?.pace_wins ?? null,
+  },
+  {
+    key: "p162",
+    label: "P162",
+    title: "Current win rate stretched over a full 162-game season",
+    text: (r) => (r.proj ? r.proj.pace_162.toFixed(1) : "—"),
+    num: (r) => r.proj?.pace_162 ?? null,
+  },
+];
+
 const DEFAULT_SORT: Sort = { key: "pct", dir: "desc" };
 
 interface Group {
   id: string;
   name: string;
-  teams: StandingRow[];
+  teams: Row[];
 }
 
 /** The six division tables regrouped for the active scope. */
-function groupsFor(divisions: Division[], scope: Scope): Group[] {
+function groupsFor(divisions: Division[], scope: Scope, proj: Map<number, TeamProjection>): Group[] {
+  const withProj = (teams: StandingRow[]): Row[] =>
+    teams.map((t) => ({ ...t, proj: proj.get(t.id) ?? null }));
+
   if (scope === "division")
     return divisions.map((d) => ({
       id: String(d.id),
       name: d.name,
-      teams: d.teams,
+      teams: withProj(d.teams),
     }));
 
-  const all = divisions.flatMap((d) => d.teams);
+  const all = withProj(divisions.flatMap((d) => d.teams));
   if (scope === "mlb") return [{ id: "mlb", name: "MAJOR LEAGUE BASEBALL", teams: all }];
 
   const leagues = [...new Set(divisions.map((d) => d.leagueId))].sort();
@@ -170,15 +211,21 @@ function groupsFor(divisions: Division[], scope: Scope): Group[] {
 function StandingsTable({
   group,
   scope,
+  cols,
   sort,
   onSort,
 }: {
   group: Group;
   scope: Scope;
+  cols: Col[];
   sort: Sort;
   onSort: (key: string) => void;
 }) {
-  const col = COLS.find((c) => c.key === sort.key)!;
+  // A sort can outlive its column — order by PROJ, then have the projection go
+  // away on the next render — so fall back to the default rather than crash.
+  const col =
+    cols.find((c) => c.key === sort.key) ??
+    cols.find((c) => c.key === DEFAULT_SORT.key)!;
   const teams = useMemo(
     () => sortRows(group.teams, sort.dir, (r) => col.num(r, scope)),
     [group.teams, sort.dir, col, scope]
@@ -190,7 +237,11 @@ function StandingsTable({
         {group.name}
       </h3>
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[46rem] text-xs">
+        <table
+          className={`w-full text-xs ${
+            cols.length > COLS.length ? "min-w-[58rem]" : "min-w-[46rem]"
+          }`}
+        >
           <thead>
             <tr>
               <th
@@ -207,7 +258,7 @@ function StandingsTable({
                   DIV
                 </th>
               )}
-              {COLS.map((c) => (
+              {cols.map((c) => (
                 <SortHeader
                   key={c.key}
                   label={c.label}
@@ -233,7 +284,7 @@ function StandingsTable({
                     {t.division}
                   </td>
                 )}
-                {COLS.map((c) => (
+                {cols.map((c) => (
                   <td
                     key={c.key}
                     className={`px-2 py-1.5 text-right tabular-nums ${
@@ -252,9 +303,40 @@ function StandingsTable({
   );
 }
 
-export default function Standings({ divisions }: { divisions: Division[] }) {
+/**
+ * How well the model behind the projection actually predicts, stated next to
+ * the numbers it produces — including when it fails to beat always picking the
+ * home team, which on team form alone it sometimes does.
+ */
+function ModelNote({ model, asOf }: { model: StandingsProjection["model"]; asOf: string | null }) {
+  if (model.accuracy == null) return null;
+  const pct = (v: number) => `${(v * 100).toFixed(1)}%`;
+  return (
+    <p className="text-[10px] leading-relaxed text-ink-3">
+      PROJECTION · {pct(model.accuracy)} ACCURACY ON {model.holdout_season} HOLDOUT
+      {model.home_baseline != null && ` (ALWAYS-HOME ${pct(model.home_baseline)})`}
+      {model.log_loss != null && ` · LOG LOSS ${model.log_loss.toFixed(3)}`}
+      {model.train_games != null && ` · FIT ON ${model.train_games.toLocaleString()} GAMES`}
+      {asOf && ` · RESULTS THROUGH ${asOf}`}
+    </p>
+  );
+}
+
+export default function Standings({
+  divisions,
+  projection = null,
+}: {
+  divisions: Division[];
+  /** Projected finishes, when the projection service answered. */
+  projection?: StandingsProjection | null;
+}) {
   const [scope, setScope] = useState<Scope>("division");
   const [sort, setSort] = useState<Sort>(DEFAULT_SORT);
+
+  const byTeam = useMemo(
+    () => new Map((projection?.teams ?? []).map((t) => [t.team_id, t])),
+    [projection]
+  );
 
   if (divisions.length === 0)
     return (
@@ -263,7 +345,8 @@ export default function Standings({ divisions }: { divisions: Division[] }) {
       </p>
     );
 
-  const groups = groupsFor(divisions, scope);
+  const cols = projection ? [...COLS, ...PROJ_COLS] : COLS;
+  const groups = groupsFor(divisions, scope, byTeam);
 
   return (
     <div className="space-y-3">
@@ -281,10 +364,13 @@ export default function Standings({ divisions }: { divisions: Division[] }) {
           key={g.id}
           group={g}
           scope={scope}
+          cols={cols}
           sort={sort}
           onSort={(key) => setSort((s) => toggleSort(s, key))}
         />
       ))}
+
+      {projection && <ModelNote model={projection.model} asOf={projection.as_of} />}
     </div>
   );
 }

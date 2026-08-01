@@ -40,3 +40,36 @@ class PitcherPitches(BaseModel):
     pitcher: Pitcher
     count: int
     pitches: list[Pitch]
+
+
+class ModelInfo(BaseModel):
+    """Chronological-holdout quality of the standings model, so the projection
+    is shown next to how well it actually predicts."""
+    holdout_season: int | None = None
+    holdout_games: int | None = None
+    train_games: int | None = None
+    accuracy: float | None = None
+    home_baseline: float | None = None  # always-pick-home, the bar to clear
+    log_loss: float | None = None
+    run_diff_mae: float | None = None
+    trained_at: str | None = None
+
+
+class TeamProjection(BaseModel):
+    team_id: int                 # MLB team id, joins to the standings row
+    name: str
+    wins: int
+    losses: int
+    games_played: int
+    games_remaining: int
+    projected_wins: float        # actual + summed win probability remaining
+    projected_losses: float
+    pace_wins: float             # the projection prorated to games played
+    pace_162: float              # current win rate over a full 162
+
+
+class StandingsProjection(BaseModel):
+    season: int
+    as_of: str | None = None     # date of the latest result counted
+    model: ModelInfo
+    teams: list[TeamProjection]

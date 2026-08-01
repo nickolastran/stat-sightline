@@ -16,26 +16,31 @@ import {
   type Division,
   type Leaderboard,
 } from "@/lib/mlb";
+import { getProjections, type StandingsProjection } from "@/lib/api";
 
 /*
  * League overview: today's scoreboard, probable pitchers, standings, and
- * season stat leaders — all from the MLB Stats API, fetched server-side.
- * allSettled keeps one failing source from blanking the whole page.
+ * season stat leaders — from the MLB Stats API, plus our own projected
+ * standings, all fetched server-side. allSettled keeps one failing source from
+ * blanking the whole page: no projection just means fewer standings columns.
  */
 export default async function DashboardPage() {
   const date = todayET();
   const season = seasonOf(date);
 
-  const [sched, stand, boards] = await Promise.allSettled([
+  const [sched, stand, boards, proj] = await Promise.allSettled([
     getSchedule(date),
     getStandings(season),
     getLeaderboards(season, 5),
+    getProjections(season),
   ]);
 
   const games: Game[] = sched.status === "fulfilled" ? sched.value : [];
   const divisions: Division[] = stand.status === "fulfilled" ? stand.value : [];
   const leaderboards: Leaderboard[] =
     boards.status === "fulfilled" ? boards.value : [];
+  const projection: StandingsProjection | null =
+    proj.status === "fulfilled" ? proj.value : null;
 
   const live = games.filter((g) => g.state === "Live").length;
   const final = games.filter((g) => g.state === "Final").length;
@@ -77,7 +82,7 @@ export default async function DashboardPage() {
 
       {/* ── Standings ──────────────────────────────────────────── */}
       <Panel title="STANDINGS">
-        <Standings divisions={divisions} />
+        <Standings divisions={divisions} projection={projection} />
       </Panel>
 
       {/* ── Leaderboards ───────────────────────────────────────── */}

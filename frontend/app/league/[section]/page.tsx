@@ -18,12 +18,17 @@ import {
   todayET,
   seasonOf,
 } from "@/lib/mlb";
+import { getProjections, type StandingsProjection } from "@/lib/api";
 
 /*
  * One league reference section per route — the targets the league bar opens
  * in their own tabs. Data comes from the same cached lib/mlb helpers the
  * dashboard uses; a dead source degrades to an inline notice rather than
  * throwing, so an unreachable MLB API never blanks the tab.
+ *
+ * The projection columns are the one piece served by our own API rather than
+ * MLB's, so they are fetched separately and dropped on failure: standings
+ * still render in full when the model hasn't been built or the API is down.
  */
 
 export function generateStaticParams() {
@@ -44,6 +49,11 @@ export async function generateMetadata({
   };
 }
 
+/** The projection, or null if it isn't available — never a thrown error. */
+async function projectionOrNull(season: number): Promise<StandingsProjection | null> {
+  return getProjections(season).catch(() => null);
+}
+
 async function sectionBody(id: LeagueSection, date: string, season: number) {
   try {
     switch (id) {
@@ -51,8 +61,13 @@ async function sectionBody(id: LeagueSection, date: string, season: number) {
         return <Leaderboards boards={await getLeaderboards(season, 5)} />;
       case "probables":
         return <ProbablePitchers games={await getSchedule(date)} />;
-      case "standings":
-        return <Standings divisions={await getStandings(season)} />;
+      case "standings": {
+        const [divisions, projection] = await Promise.all([
+          getStandings(season),
+          projectionOrNull(season),
+        ]);
+        return <Standings divisions={divisions} projection={projection} />;
+      }
       case "teams":
         return <TeamStats tables={await getTeamStats(season)} />;
     }

@@ -12,7 +12,7 @@ import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from api.routers import pitches
+from api.routers import pitches, standings
 
 app = FastAPI(title="Stat Sightline API", version="0.1.0")
 
@@ -26,6 +26,7 @@ app.add_middleware(
 )
 
 app.include_router(pitches.router)
+app.include_router(standings.router)
 
 
 @app.get("/health", tags=["meta"])
