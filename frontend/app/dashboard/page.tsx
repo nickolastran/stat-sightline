@@ -75,7 +75,7 @@ async function StandingsSection({ season }: { season: number }) {
 }
 
 async function LeadersSection({ season }: { season: number }) {
-  const boards = await getLeaderboards(season, 5).catch(() => []);
+  const boards = await getLeaderboards(season).catch(() => []);
   return (
     <Panel title="STAT LEADERS">
       <Leaderboards boards={boards} />
