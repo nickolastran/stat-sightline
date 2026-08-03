@@ -116,10 +116,7 @@ export default function Leaderboards({ boards }: { boards: Leaderboard[] }) {
 
   return (
     <div className="space-y-3">
-      <div className="flex items-center justify-between">
-        <p className="text-[10px] tracking-[0.25em] text-ink-3">
-          {shown.length} CATEGORIES · {group.toUpperCase()}
-        </p>
+      <div className="flex items-center justify-end">
         <SegmentedControl<"hitting" | "pitching">
           ariaLabel="Stat group"
           value={group}

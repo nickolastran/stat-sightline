@@ -6,6 +6,7 @@ import SectionSkeleton from "@/components/ui/SectionSkeleton";
 import Standings from "@/components/mlb/Standings";
 import TeamStats from "@/components/mlb/TeamStats";
 import Leaderboards from "@/components/mlb/Leaderboards";
+import SeasonSelect from "@/components/mlb/SeasonSelect";
 import ProbablePitchers from "@/components/mlb/ProbablePitchers";
 import {
   LEAGUE_SECTIONS,
@@ -19,6 +20,7 @@ import {
   getLeaderboards,
   todayET,
   seasonOf,
+  FIRST_SEASON,
 } from "@/lib/mlb";
 import { getProjections, type StandingsProjection } from "@/lib/api";
 
@@ -52,6 +54,12 @@ export async function generateMetadata({
       ? `${found.title} — STAT//SIGHTLINE`
       : "STAT//SIGHTLINE",
   };
+}
+
+/** A `?season=` the boards can actually serve, else the running season. */
+function pickSeason(raw: string | undefined, current: number): number {
+  const n = Number(raw);
+  return Number.isInteger(n) && n >= FIRST_SEASON && n <= current ? n : current;
 }
 
 /** The projection, or null if it isn't available — never a thrown error. */
@@ -95,27 +103,43 @@ async function SectionBody({
 
 export default async function LeagueSectionPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ section: string }>;
+  searchParams: Promise<{ season?: string }>;
 }) {
   const { section } = await params;
   const found = findSection(section);
   if (!found) notFound();
 
   const date = todayET();
-  const season = seasonOf(date);
+  const current = seasonOf(date);
+  /* Only the leader boards read back through history, so only they touch
+     searchParams — the other sections stay statically prerenderable. */
+  const leaders = found.id === "leaders";
+  const season = leaders
+    ? pickSeason((await searchParams).season, current)
+    : current;
 
   return (
     <div className="mx-auto max-w-7xl space-y-3 p-3">
       <Panel
         title={found.title}
         right={
-          <span className="text-[10px] text-ink-3">
-            {date} · SEASON {season}
-          </span>
+          leaders ? (
+            <SeasonSelect value={season} first={FIRST_SEASON} last={current} />
+          ) : (
+            /* Every other section is a snapshot, so it carries the day it
+               was read; a season total doesn't. */
+            <span className="text-[10px] text-ink-3">
+              {date} · SEASON {season}
+            </span>
+          )
         }
       >
-        <Suspense fallback={<SectionSkeleton section={found.id} />}>
+        {/* Keyed on the season so switching years re-suspends into the
+            skeleton rather than holding the previous year's board. */}
+        <Suspense key={season} fallback={<SectionSkeleton section={found.id} />}>
           <SectionBody id={found.id} date={date} season={season} />
         </Suspense>
       </Panel>

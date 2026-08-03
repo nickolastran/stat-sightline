@@ -46,6 +46,13 @@ export function todayET(): string {
 
 export const seasonOf = (isoDate: string) => Number(isoDate.slice(0, 4));
 
+/**
+ * MLB's first season, and the floor of the leader boards' season picker —
+ * the StatsAPI carries league leaders the whole way back, so 1876 is a real
+ * bound rather than an arbitrary one.
+ */
+export const FIRST_SEASON = 1876;
+
 async function mlb(path: string, revalidate: number): Promise<any> {
   const res = await fetch(`${BASE}${path}`, { next: { revalidate } });
   if (!res.ok) throw new Error(`MLB API ${res.status}: ${path}`);
@@ -628,25 +635,39 @@ export interface LeaderRow {
 }
 
 export interface Leaderboard {
+  /** "group.category" — a category like strikeouts runs in both groups. */
   code: string;
   label: string;
   group: "hitting" | "pitching";
   leaders: LeaderRow[];
 }
 
-/** (category, statGroup, display label) for each board we surface. */
+/**
+ * (category, statGroup, display label) for each board we surface, in the
+ * order they fill the grid. WAR has no place here — the StatsAPI publishes
+ * no such leader category, since the figure is a third-party derivation
+ * (bWAR, fWAR) rather than an official MLB stat.
+ */
 const LEADER_SPECS: { cat: string; group: "hitting" | "pitching"; label: string }[] = [
-  { cat: "homeRuns", group: "hitting", label: "HOME RUNS" },
   { cat: "battingAverage", group: "hitting", label: "AVG" },
-  { cat: "runsBattedIn", group: "hitting", label: "RBI" },
   { cat: "onBasePlusSlugging", group: "hitting", label: "OPS" },
-  { cat: "stolenBases", group: "hitting", label: "STOLEN BASES" },
   { cat: "hits", group: "hitting", label: "HITS" },
+  { cat: "doubles", group: "hitting", label: "DOUBLES" },
+  { cat: "triples", group: "hitting", label: "TRIPLES" },
+  { cat: "homeRuns", group: "hitting", label: "HOME RUNS" },
+  { cat: "runsBattedIn", group: "hitting", label: "RBI" },
+  { cat: "strikeouts", group: "hitting", label: "STRIKEOUTS" },
+  { cat: "walks", group: "hitting", label: "WALKS" },
+  { cat: "stolenBases", group: "hitting", label: "STOLEN BASES" },
   { cat: "earnedRunAverage", group: "pitching", label: "ERA" },
-  { cat: "strikeouts", group: "pitching", label: "STRIKEOUTS" },
   { cat: "wins", group: "pitching", label: "WINS" },
-  { cat: "saves", group: "pitching", label: "SAVES" },
+  { cat: "losses", group: "pitching", label: "LOSSES" },
+  { cat: "inningsPitched", group: "pitching", label: "INNINGS PITCHED" },
+  { cat: "strikeouts", group: "pitching", label: "STRIKEOUTS" },
+  { cat: "walks", group: "pitching", label: "WALKS" },
+  { cat: "earnedRun", group: "pitching", label: "EARNED RUNS" },
   { cat: "whip", group: "pitching", label: "WHIP" },
+  { cat: "saves", group: "pitching", label: "SAVES" },
 ];
 
 async function oneBoard(
@@ -660,7 +681,7 @@ async function oneBoard(
   );
   const leaders = (data.leagueLeaders?.[0]?.leaders ?? []) as any[];
   return {
-    code: spec.cat,
+    code: `${spec.group}.${spec.cat}`,
     label: spec.label,
     group: spec.group,
     leaders: leaders.map((l): LeaderRow => ({
