@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import type { Leaderboard } from "@/lib/mlb";
+import type { Leaderboard, LeaderRow } from "@/lib/mlb";
 import SegmentedControl from "@/components/ui/SegmentedControl";
 import PlayerLink from "@/components/mlb/PlayerLink";
 
@@ -10,6 +10,17 @@ import PlayerLink from "@/components/mlb/PlayerLink";
  * Each category renders a compact ranked list. Data is fetched server-side
  * and passed in whole; this component only picks which group to show.
  */
+
+/**
+ * The ranks more than one leader holds — shown as "T-3" rather than three
+ * players each reading a bare 3. The API hands out the same rank to everyone
+ * tied (and returns the whole tie group even when that overruns the limit),
+ * so a repeat in the rendered rows is the tie.
+ */
+const tiedRanks = (leaders: LeaderRow[]) =>
+  new Set(
+    leaders.map((l) => l.rank).filter((r, i, all) => all.indexOf(r) !== i)
+  );
 export default function Leaderboards({ boards }: { boards: Leaderboard[] }) {
   const [group, setGroup] = useState<"hitting" | "pitching">("hitting");
   const shown = boards.filter((b) => b.group === group && b.leaders.length > 0);
@@ -37,31 +48,34 @@ export default function Leaderboards({ boards }: { boards: Leaderboard[] }) {
         </p>
       ) : (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
-          {shown.map((b) => (
-            <div key={b.code} className="border border-line bg-bg">
-              <h3 className="border-b border-line px-3 py-1.5 text-[10px] tracking-[0.2em] text-ink-2">
-                {b.label}
-              </h3>
-              <ol>
-                {b.leaders.map((l) => (
-                  <li
-                    key={l.personId}
-                    className="flex items-center gap-2 border-b border-grid px-3 py-1.5 text-xs last:border-b-0"
-                  >
-                    <span className="w-4 text-right text-[10px] text-ink-3 tabular-nums">
-                      {l.rank}
-                    </span>
-                    <span className="min-w-0 flex-1 truncate text-ink-2">
-                      <PlayerLink id={l.personId}>{l.name}</PlayerLink>
-                    </span>
-                    <span className="w-14 text-right font-bold text-ink tabular-nums">
-                      {l.value}
-                    </span>
-                  </li>
-                ))}
-              </ol>
-            </div>
-          ))}
+          {shown.map((b) => {
+            const tied = tiedRanks(b.leaders);
+            return (
+              <div key={b.code} className="border border-line bg-bg">
+                <h3 className="border-b border-line px-3 py-1.5 text-[10px] tracking-[0.2em] text-ink-2">
+                  {b.label}
+                </h3>
+                <ol>
+                  {b.leaders.map((l) => (
+                    <li
+                      key={l.personId}
+                      className="flex items-center gap-2 border-b border-grid px-3 py-1.5 text-xs last:border-b-0"
+                    >
+                      <span className="w-6 text-right text-[10px] text-ink-3 tabular-nums">
+                        {tied.has(l.rank) ? `T-${l.rank}` : l.rank}
+                      </span>
+                      <span className="min-w-0 flex-1 truncate text-ink-2">
+                        <PlayerLink id={l.personId}>{l.name}</PlayerLink>
+                      </span>
+                      <span className="w-14 text-right font-bold text-ink tabular-nums">
+                        {l.value}
+                      </span>
+                    </li>
+                  ))}
+                </ol>
+              </div>
+            );
+          })}
         </div>
       )}
     </div>

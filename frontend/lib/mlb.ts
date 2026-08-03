@@ -26,6 +26,14 @@ const LEAGUES: Record<number, string> = {
 export const teamLogo = (id: number) =>
   `https://www.mlbstatic.com/team-logos/${id}.svg`;
 
+/**
+ * Player headshot, square. MLB's own CDN answers with a generic silhouette
+ * for anyone it has no photo of, so a missing headshot needs no fallback of
+ * ours — every id returns an image.
+ */
+export const playerHeadshot = (id: number, size = 60) =>
+  `https://midfield.mlbstatic.com/v1/people/${id}/spots/${size}`;
+
 /** MLB's own live Gameday feed for a game — opened in its own tab. */
 export const gamedayUrl = (pk: number) => `https://www.mlb.com/gameday/${pk}`;
 

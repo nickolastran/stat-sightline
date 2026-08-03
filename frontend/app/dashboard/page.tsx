@@ -1,5 +1,8 @@
+import { Suspense } from "react";
 import Panel from "@/components/ui/Panel";
 import MetricCard from "@/components/ui/MetricCard";
+import { SkeletonPanel, SkeletonTiles } from "@/components/ui/Skeleton";
+import SectionSkeleton from "@/components/ui/SectionSkeleton";
 import Standings from "@/components/mlb/Standings";
 import Leaderboards from "@/components/mlb/Leaderboards";
 import ProbablePitchers, {
@@ -13,38 +16,78 @@ import {
   todayET,
   seasonOf,
   type Game,
-  type Division,
-  type Leaderboard,
 } from "@/lib/mlb";
-import { getProjections, type StandingsProjection } from "@/lib/api";
+import { getProjections } from "@/lib/api";
 
 /*
  * League overview: today's scoreboard, probable pitchers, standings, and
  * season stat leaders — from the MLB Stats API, plus our own projected
- * standings, all fetched server-side. allSettled keeps one failing source from
- * blanking the whole page: no projection just means fewer standings columns.
+ * standings, all fetched server-side.
+ *
+ * Each section fetches and streams on its own, behind a skeleton of its own
+ * shape, so the header lands immediately and the slowest source only holds
+ * back its own panel. A failing source degrades to empty rather than throwing:
+ * no projection just means fewer standings columns, and a dead schedule leaves
+ * the standings intact.
  */
-export default async function DashboardPage() {
-  const date = todayET();
-  const season = seasonOf(date);
 
-  const [sched, stand, boards, proj] = await Promise.allSettled([
-    getSchedule(date),
-    getStandings(season),
-    getLeaderboards(season, 5),
-    getProjections(season),
-  ]);
+/* ── Sections ───────────────────────────────────────────────────────── */
 
-  const games: Game[] = sched.status === "fulfilled" ? sched.value : [];
-  const divisions: Division[] = stand.status === "fulfilled" ? stand.value : [];
-  const leaderboards: Leaderboard[] =
-    boards.status === "fulfilled" ? boards.value : [];
-  const projection: StandingsProjection | null =
-    proj.status === "fulfilled" ? proj.value : null;
-
+/** Snapshot metrics and today's probables — both read the same slate. */
+async function ScheduleSections({ date }: { date: string }) {
+  const games: Game[] = await getSchedule(date).catch(() => []);
   const live = games.filter((g) => g.state === "Live").length;
   const final = games.filter((g) => g.state === "Final").length;
   const probables = probableGames(games);
+
+  return (
+    <>
+      <div className="grid grid-cols-2 gap-px sm:grid-cols-4">
+        <MetricCard label="GAMES TODAY" value={String(games.length)} sub={date} />
+        <MetricCard label="LIVE NOW" value={String(live)} sub="IN PROGRESS" />
+        <MetricCard label="FINAL" value={String(final)} sub="COMPLETED" />
+        <MetricCard
+          label="PROBABLES SET"
+          value={String(probables.length)}
+          sub="ANNOUNCED MATCHUPS"
+        />
+      </div>
+
+      {probables.length > 0 && (
+        <Panel title="PROBABLE PITCHERS — TODAY">
+          <ProbablePitchers games={games} />
+        </Panel>
+      )}
+    </>
+  );
+}
+
+async function StandingsSection({ season }: { season: number }) {
+  const [divisions, projection] = await Promise.all([
+    getStandings(season).catch(() => []),
+    getProjections(season).catch(() => null),
+  ]);
+  return (
+    <Panel title="STANDINGS">
+      <Standings divisions={divisions} projection={projection} />
+    </Panel>
+  );
+}
+
+async function LeadersSection({ season }: { season: number }) {
+  const boards = await getLeaderboards(season, 5).catch(() => []);
+  return (
+    <Panel title="STAT LEADERS">
+      <Leaderboards boards={boards} />
+    </Panel>
+  );
+}
+
+/* ── Page ───────────────────────────────────────────────────────────── */
+
+export default async function DashboardPage() {
+  const date = todayET();
+  const season = seasonOf(date);
 
   return (
     <div className="mx-auto max-w-7xl space-y-3 p-3">
@@ -61,34 +104,38 @@ export default async function DashboardPage() {
         </div>
       </div>
 
-      {/* ── Snapshot metrics ───────────────────────────────────── */}
-      <div className="grid grid-cols-2 gap-px sm:grid-cols-4">
-        <MetricCard label="GAMES TODAY" value={String(games.length)} sub={date} />
-        <MetricCard label="LIVE NOW" value={String(live)} sub="IN PROGRESS" />
-        <MetricCard label="FINAL" value={String(final)} sub="COMPLETED" />
-        <MetricCard
-          label="PROBABLES SET"
-          value={String(probables.length)}
-          sub="ANNOUNCED MATCHUPS"
-        />
-      </div>
+      <Suspense
+        fallback={
+          <>
+            <SkeletonTiles />
+            <SkeletonPanel>
+              <SectionSkeleton section="probables" />
+            </SkeletonPanel>
+          </>
+        }
+      >
+        <ScheduleSections date={date} />
+      </Suspense>
 
-      {/* ── Probable pitchers ──────────────────────────────────── */}
-      {probables.length > 0 && (
-        <Panel title="PROBABLE PITCHERS — TODAY">
-          <ProbablePitchers games={games} />
-        </Panel>
-      )}
+      <Suspense
+        fallback={
+          <SkeletonPanel delay={0.08}>
+            <SectionSkeleton section="standings" />
+          </SkeletonPanel>
+        }
+      >
+        <StandingsSection season={season} />
+      </Suspense>
 
-      {/* ── Standings ──────────────────────────────────────────── */}
-      <Panel title="STANDINGS">
-        <Standings divisions={divisions} projection={projection} />
-      </Panel>
-
-      {/* ── Leaderboards ───────────────────────────────────────── */}
-      <Panel title="STAT LEADERS">
-        <Leaderboards boards={leaderboards} />
-      </Panel>
+      <Suspense
+        fallback={
+          <SkeletonPanel delay={0.16}>
+            <SectionSkeleton section="leaders" />
+          </SkeletonPanel>
+        }
+      >
+        <LeadersSection season={season} />
+      </Suspense>
     </div>
   );
 }

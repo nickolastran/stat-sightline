@@ -4,6 +4,7 @@ import Panel from "@/components/ui/Panel";
 import MetricCard from "@/components/ui/MetricCard";
 import {
   getPlayer,
+  playerHeadshot,
   seasonOf,
   teamLogo,
   todayET,
@@ -41,6 +42,14 @@ function Identity({ p }: { p: PlayerSummary }) {
 
   return (
     <div className="flex items-center gap-3 border border-line bg-surface px-3 py-3">
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={playerHeadshot(p.id, 120)}
+        alt=""
+        width={56}
+        height={56}
+        className="h-14 w-14 shrink-0 rounded-full bg-surface-2"
+      />
       {p.teamId && (
         /* eslint-disable-next-line @next/next/no-img-element */
         <img
