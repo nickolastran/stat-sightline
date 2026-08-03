@@ -71,7 +71,7 @@ async function SectionBody({
   try {
     switch (id) {
       case "leaders":
-        return <Leaderboards boards={await getLeaderboards(season, 5)} />;
+        return <Leaderboards boards={await getLeaderboards(season)} />;
       case "probables":
         return <ProbablePitchers games={await getSchedule(date)} />;
       case "standings": {

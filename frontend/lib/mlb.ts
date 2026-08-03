@@ -675,7 +675,7 @@ async function oneBoard(
 
 export async function getLeaderboards(
   season: number,
-  limit = 5
+  limit = 20
 ): Promise<Leaderboard[]> {
   return Promise.all(LEADER_SPECS.map((s) => oneBoard(s, season, limit)));
 }
