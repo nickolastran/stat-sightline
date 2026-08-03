@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import SegmentedControl from "@/components/ui/SegmentedControl";
 import SortHeader from "@/components/ui/SortHeader";
 import TeamLink from "@/components/mlb/TeamLink";
@@ -15,6 +16,11 @@ import { teamStatNum, teamStatText, type TeamStatTable } from "@/lib/mlb";
  *
  * Sort state is keyed per group, so flipping to PITCHING doesn't try to sort
  * by a hitting column that isn't in the table.
+ *
+ * Which group is showing lives in the URL rather than in state, so a reload
+ * lands back on the table you were reading — and the link you send someone
+ * opens on it too. Anything but "pitching" reads as hitting, so a hand-edited
+ * value can't produce an empty table.
  */
 
 const DEFAULT_SORT: Record<"hitting" | "pitching", Sort> = {
@@ -23,7 +29,9 @@ const DEFAULT_SORT: Record<"hitting" | "pitching", Sort> = {
 };
 
 export default function TeamStats({ tables }: { tables: TeamStatTable[] }) {
-  const [group, setGroup] = useState<"hitting" | "pitching">("hitting");
+  const router = useRouter();
+  const group =
+    useSearchParams().get("group") === "pitching" ? "pitching" : "hitting";
   const [sorts, setSorts] = useState(DEFAULT_SORT);
 
   const table = tables.find((t) => t.group === group);
@@ -43,7 +51,7 @@ export default function TeamStats({ tables }: { tables: TeamStatTable[] }) {
         <SegmentedControl<"hitting" | "pitching">
           ariaLabel="Stat group"
           value={group}
-          onChange={setGroup}
+          onChange={(g) => router.replace(`?group=${g}`, { scroll: false })}
           options={[
             { value: "hitting", label: "HITTING" },
             { value: "pitching", label: "PITCHING" },

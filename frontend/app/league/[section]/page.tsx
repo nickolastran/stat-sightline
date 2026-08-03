@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import { notFound } from "next/navigation";
 import Panel from "@/components/ui/Panel";
+import SectionSkeleton from "@/components/ui/SectionSkeleton";
 import Standings from "@/components/mlb/Standings";
 import TeamStats from "@/components/mlb/TeamStats";
 import Leaderboards from "@/components/mlb/Leaderboards";
@@ -29,6 +31,9 @@ import { getProjections, type StandingsProjection } from "@/lib/api";
  * The projection columns are the one piece served by our own API rather than
  * MLB's, so they are fetched separately and dropped on failure: standings
  * still render in full when the model hasn't been built or the API is down.
+ *
+ * The panel is flushed before its body is fetched, so the section streams in
+ * behind a skeleton of its own shape rather than the tab sitting blank.
  */
 
 export function generateStaticParams() {
@@ -54,7 +59,15 @@ async function projectionOrNull(season: number): Promise<StandingsProjection | n
   return getProjections(season).catch(() => null);
 }
 
-async function sectionBody(id: LeagueSection, date: string, season: number) {
+async function SectionBody({
+  id,
+  date,
+  season,
+}: {
+  id: LeagueSection;
+  date: string;
+  season: number;
+}) {
   try {
     switch (id) {
       case "leaders":
@@ -91,7 +104,6 @@ export default async function LeagueSectionPage({
 
   const date = todayET();
   const season = seasonOf(date);
-  const body = await sectionBody(found.id, date, season);
 
   return (
     <div className="mx-auto max-w-7xl space-y-3 p-3">
@@ -103,7 +115,9 @@ export default async function LeagueSectionPage({
           </span>
         }
       >
-        {body}
+        <Suspense fallback={<SectionSkeleton section={found.id} />}>
+          <SectionBody id={found.id} date={date} season={season} />
+        </Suspense>
       </Panel>
     </div>
   );

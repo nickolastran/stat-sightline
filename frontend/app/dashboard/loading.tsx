@@ -1,14 +1,15 @@
 import {
   Skeleton,
   SkeletonPanel,
-  SkeletonTable,
+  SkeletonTiles,
 } from "@/components/ui/Skeleton";
+import SectionSkeleton from "@/components/ui/SectionSkeleton";
 
 /*
- * Motion skeleton for the overview while the server fetches standings /
- * leaders / probables. Mirrors the real layout (header, metric row, stacked
- * standings tables, leader card grid) so the page has shape immediately and
- * reads as loading, not stuck.
+ * Motion skeleton for the overview during a client-side navigation, before
+ * the page shell itself is flushed. Mirrors the real layout — header, metric
+ * row, probables, standings, leaders — using the same section placeholders the
+ * page's own Suspense boundaries stream behind.
  */
 export default function DashboardLoading() {
   return (
@@ -19,41 +20,18 @@ export default function DashboardLoading() {
         <Skeleton className="h-8 w-72" delay={0.15} />
       </div>
 
-      {/* metric row */}
-      <div className="grid grid-cols-2 gap-px sm:grid-cols-4">
-        {Array.from({ length: 4 }).map((_, i) => (
-          <div key={i} className="border border-line bg-surface p-3">
-            <Skeleton className="h-2.5 w-20" delay={i * 0.08} />
-            <Skeleton className="mt-3 h-6 w-10" delay={i * 0.08 + 0.05} />
-            <Skeleton className="mt-3 h-2 w-16" delay={i * 0.08 + 0.1} />
-          </div>
-        ))}
-      </div>
+      <SkeletonTiles />
 
-      {/* standings — scope toggle over stacked division tables */}
       <SkeletonPanel>
-        <div className="space-y-3">
-          <div className="flex justify-end">
-            <Skeleton className="h-6 w-40" />
-          </div>
-          {[0, 1, 2].map((i) => (
-            <SkeletonTable key={i} rows={5} delay={i * 0.12} />
-          ))}
-        </div>
+        <SectionSkeleton section="probables" />
       </SkeletonPanel>
 
-      {/* stat leaders — group toggle over a grid of category cards */}
-      <SkeletonPanel delay={0.1}>
-        <div className="space-y-3">
-          <div className="flex justify-end">
-            <Skeleton className="h-6 w-32" />
-          </div>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
-            {Array.from({ length: 6 }).map((_, i) => (
-              <SkeletonTable key={i} rows={5} delay={i * 0.08} />
-            ))}
-          </div>
-        </div>
+      <SkeletonPanel delay={0.08}>
+        <SectionSkeleton section="standings" />
+      </SkeletonPanel>
+
+      <SkeletonPanel delay={0.16}>
+        <SectionSkeleton section="leaders" />
       </SkeletonPanel>
     </div>
   );

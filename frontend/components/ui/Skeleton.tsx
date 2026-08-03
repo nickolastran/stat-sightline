@@ -57,10 +57,13 @@ export function SkeletonTable({
   rows = 5,
   delay = 0,
   heading = true,
+  avatar = false,
 }: {
   rows?: number;
   delay?: number;
   heading?: boolean;
+  /** Lead each row with a circle, for the lists that carry a headshot. */
+  avatar?: boolean;
 }) {
   return (
     <div className="border border-line bg-bg">
@@ -74,7 +77,15 @@ export function SkeletonTable({
       </div>
       <div className="space-y-1.5 p-3">
         {Array.from({ length: rows }).map((_, i) => (
-          <Skeleton key={i} className="h-3 w-full" delay={delay + i * 0.06} />
+          <div key={i} className="flex items-center gap-2">
+            {avatar && (
+              <Skeleton
+                className="h-5 w-5 shrink-0 rounded-full"
+                delay={delay + i * 0.06}
+              />
+            )}
+            <Skeleton className="h-3 flex-1" delay={delay + i * 0.06} />
+          </div>
         ))}
       </div>
     </div>

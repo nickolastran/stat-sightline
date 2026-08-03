@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { searchPitchers, type Pitcher } from "@/lib/api";
+import { playerHeadshot } from "@/lib/mlb";
 
 /*
  * Debounced player typeahead. Selecting a result routes to the dashboard
@@ -127,7 +128,20 @@ export default function PlayerSearch({
                   i === active ? "bg-surface-2 text-ink" : "text-ink-2"
                 }`}
               >
-                <span>{p.full_name ?? `#${p.player_id}`}</span>
+                <span className="flex min-w-0 items-center gap-2">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={playerHeadshot(p.player_id)}
+                    alt=""
+                    width={20}
+                    height={20}
+                    loading="lazy"
+                    className="h-5 w-5 shrink-0 rounded-full bg-surface-2"
+                  />
+                  <span className="truncate">
+                    {p.full_name ?? `#${p.player_id}`}
+                  </span>
+                </span>
                 <span className="text-ink-3">
                   {p.throws ?? "?"}HP · {p.pitches?.toLocaleString()} P
                 </span>
