@@ -179,6 +179,19 @@ const PROJ_COLS: Col[] = [
 
 const DEFAULT_SORT: Sort = { key: "pct", dir: "desc" };
 
+/*
+ * Column widths in rem, shared by every table on the page. TEAM fits the
+ * longest club name before TeamLink truncates it, DIV fits "AL CENTRAL", and
+ * one width covers every stat — the widest cell any of them holds is a record
+ * like "34–21". Below the total the table scrolls rather than squeezing.
+ */
+const TEAM_W = 12;
+const DIV_W = 5.5;
+const STAT_W = 3.5;
+
+const gridWidth = (scope: Scope, cols: Col[]) =>
+  TEAM_W + (scope === "division" ? 0 : DIV_W) + cols.length * STAT_W;
+
 interface Group {
   id: string;
   name: string;
@@ -238,10 +251,20 @@ function StandingsTable({
       </h3>
       <div className="overflow-x-auto">
         <table
-          className={`w-full text-xs ${
-            cols.length > COLS.length ? "min-w-[58rem]" : "min-w-[46rem]"
-          }`}
+          className="w-full table-fixed text-xs"
+          style={{ minWidth: `${gridWidth(scope, cols)}rem` }}
         >
+          {/* Every scope renders one table per group, and auto layout would
+              size each to its own longest team name — so the AL East stats
+              would sit a few pixels off the AL West ones. Fixed widths put
+              all of them on one grid. */}
+          <colgroup>
+            <col style={{ width: `${TEAM_W}rem` }} />
+            {scope !== "division" && <col style={{ width: `${DIV_W}rem` }} />}
+            {cols.map((c) => (
+              <col key={c.key} style={{ width: `${STAT_W}rem` }} />
+            ))}
+          </colgroup>
           <thead>
             <tr>
               <th
@@ -266,6 +289,7 @@ function StandingsTable({
                   sortKey={c.key}
                   sort={sort}
                   onSort={onSort}
+                  align="center"
                 />
               ))}
             </tr>
@@ -280,14 +304,14 @@ function StandingsTable({
                   <TeamLink id={t.id} name={t.name} />
                 </td>
                 {scope !== "division" && (
-                  <td className="px-2 py-1.5 text-[10px] tracking-wider text-ink-3">
+                  <td className="whitespace-nowrap px-2 py-1.5 text-[10px] tracking-wider text-ink-3">
                     {t.division}
                   </td>
                 )}
                 {cols.map((c) => (
                   <td
                     key={c.key}
-                    className={`px-2 py-1.5 text-right tabular-nums ${
+                    className={`whitespace-nowrap px-2 py-1.5 text-center tabular-nums ${
                       c.key === "w" ? "font-bold text-ink" : ""
                     } ${sort.key === c.key ? "text-ink" : ""}`}
                   >

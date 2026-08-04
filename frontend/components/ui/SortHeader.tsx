@@ -2,6 +2,12 @@
 
 import type { Sort } from "@/lib/sortTable";
 
+const ALIGN = {
+  left: "text-left",
+  center: "text-center",
+  right: "text-right",
+} as const;
+
 /*
  * One clickable column heading for the stat tables. Carries the same ▼/▲
  * affordance and aria-sort contract as DataTable's header, so a sortable
@@ -22,7 +28,8 @@ export default function SortHeader({
   sortKey: string;
   sort: Sort | null;
   onSort: (key: string) => void;
-  align?: "left" | "right";
+  /** Must match the alignment of the cells below, or the label drifts off them. */
+  align?: "left" | "center" | "right";
   className?: string;
 }) {
   const active = sort?.key === sortKey;
@@ -32,21 +39,28 @@ export default function SortHeader({
       aria-sort={
         active ? (sort!.dir === "asc" ? "ascending" : "descending") : undefined
       }
-      className={`border-b border-line bg-surface p-0 font-normal ${
-        align === "right" ? "text-right" : "text-left"
-      } ${className}`}
+      className={`border-b border-line bg-surface p-0 font-normal ${ALIGN[align]} ${className}`}
     >
       <button
         type="button"
         onClick={() => onSort(sortKey)}
         title={title ?? label}
         className={`w-full px-2 py-1.5 text-[10px] tracking-widest ${
-          align === "right" ? "text-right" : "text-left"
+          ALIGN[align]
         } ${active ? "text-ink" : "text-ink-3 hover:text-ink"}`}
       >
-        {label}
-        <span className="ml-0.5 inline-block w-2">
-          {active ? (sort!.dir === "desc" ? "▼" : "▲") : ""}
+        {/*
+         * The sort marker hangs in the cell padding rather than taking width in
+         * the flow, so the label lands on the numbers below it instead of
+         * sitting a marker-width to their left — and doesn't shift on sort.
+         * The negative margin cancels the trailing letter-space `tracking`
+         * adds after the last character, which the numbers don't carry.
+         */}
+        <span className="relative inline-block -mr-[0.1em]">
+          {label}
+          <span className="absolute left-full top-1/2 ml-1 w-2.5 -translate-y-1/2 text-center text-[11px] leading-none">
+            {active ? (sort!.dir === "desc" ? "▼" : "▲") : ""}
+          </span>
         </span>
       </button>
     </th>

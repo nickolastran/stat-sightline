@@ -823,3 +823,33 @@ export async function getPlayer(
     lines,
   };
 }
+
+/**
+ * Every major-league season the player has a hitting or pitching line in,
+ * newest first — the seasons /player/[id] will actually find stats for. A
+ * traded player has one split per club in a season, so the years are deduped.
+ * Empty for an unknown id or a player who has never appeared in one, which
+ * the page reads as "current season only". A career only gains a season a
+ * year, so this caches for a day.
+ */
+export async function getPlayerSeasons(id: number): Promise<number[]> {
+  const data = await mlb(
+    `/people/${id}/stats?stats=yearByYear&group=hitting,pitching&sportId=1`,
+    86400
+  ).catch((e: Error) => {
+    if (e.message.includes(" 404:")) return null;
+    throw e;
+  });
+
+  const seasons = new Set<number>();
+  for (const s of (data?.stats ?? []) as any[]) {
+    for (const split of (s.splits ?? []) as any[]) {
+      // sportId above filters the request, but a hydrated split can still
+      // carry a minor-league team — keep only what the MLB pages can show.
+      if (split.sport?.id !== undefined && split.sport.id !== 1) continue;
+      const year = Number(split.season);
+      if (Number.isInteger(year)) seasons.add(year);
+    }
+  }
+  return [...seasons].sort((a, b) => b - a);
+}
