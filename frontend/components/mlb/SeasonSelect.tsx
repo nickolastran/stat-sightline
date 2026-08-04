@@ -4,26 +4,32 @@ import { useTransition } from "react";
 import { useRouter } from "next/navigation";
 
 /*
- * Season picker for the leader boards. The choice lives in the URL rather
- * than in component state, because the boards are fetched on the server:
- * picking a year is a navigation, so a season is linkable and the page
- * streams the new one in behind its own skeleton. `replace` keeps a browsing
- * session from stacking one history entry per year tried.
+ * Season picker for the leader boards and the player page. The choice lives
+ * in the URL rather than in component state, because both are fetched on the
+ * server: picking a year is a navigation, so a season is linkable and the
+ * page streams the new one in behind its own skeleton. `replace` keeps a
+ * browsing session from stacking one history entry per year tried.
+ *
+ * A caller either names a contiguous range — the boards run from the first
+ * season on record — or hands over the exact years to offer, since a career
+ * skips the seasons a player missed.
  */
-export default function SeasonSelect({
-  value,
-  first,
-  last,
-}: {
-  value: number;
-  /** Oldest and newest selectable season, inclusive. */
-  first: number;
-  last: number;
-}) {
+type Props = { value: number } & (
+  | { first: number; last: number; seasons?: undefined }
+  | { seasons: number[]; first?: undefined; last?: undefined }
+);
+
+/* Newest first — the current season is the one most people want. */
+function yearsOf(p: Props): number[] {
+  if (p.seasons) return p.seasons;
+  return Array.from({ length: p.last - p.first + 1 }, (_, i) => p.last - i);
+}
+
+export default function SeasonSelect(props: Props) {
+  const { value } = props;
   const router = useRouter();
   const [pending, startTransition] = useTransition();
-  /* Newest first — the current season is the one most people want. */
-  const seasons = Array.from({ length: last - first + 1 }, (_, i) => last - i);
+  const years = yearsOf(props);
 
   return (
     <label className="flex items-center gap-1.5 text-[10px] tracking-[0.2em] text-ink-3">
@@ -40,7 +46,7 @@ export default function SeasonSelect({
           pending ? "opacity-50" : ""
         }`}
       >
-        {seasons.map((s) => (
+        {years.map((s) => (
           <option key={s} value={s}>
             {s}
           </option>

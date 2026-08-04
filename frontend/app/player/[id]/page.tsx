@@ -2,8 +2,10 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import Panel from "@/components/ui/Panel";
 import MetricCard from "@/components/ui/MetricCard";
+import SeasonSelect from "@/components/mlb/SeasonSelect";
 import {
   getPlayer,
+  getPlayerSeasons,
   playerHeadshot,
   seasonOf,
   teamLogo,
@@ -30,7 +32,7 @@ export async function generateMetadata({
   return { title: p ? `${p.name} — STAT//SIGHTLINE` : "STAT//SIGHTLINE" };
 }
 
-function Identity({ p }: { p: PlayerSummary }) {
+function Identity({ p, right }: { p: PlayerSummary; right?: React.ReactNode }) {
   const facts = [
     p.pos,
     p.number && `#${p.number}`,
@@ -68,6 +70,7 @@ function Identity({ p }: { p: PlayerSummary }) {
           {[p.team.toUpperCase(), ...facts].join(" · ")}
         </p>
       </div>
+      {right && <div className="ml-auto shrink-0">{right}</div>}
     </div>
   );
 }
@@ -103,15 +106,38 @@ function GroupPanel({ line, season }: { line: StatLine; season: number }) {
   );
 }
 
+/*
+ * The season to show: whatever `?season=` names, as long as the player has a
+ * line in it — a hand-edited year they never played would render an empty
+ * page. Otherwise their latest season, which for an active player is the
+ * running one and for a retired player is their last.
+ */
+function pickSeason(
+  raw: string | undefined,
+  seasons: number[],
+  current: number
+): number {
+  const n = Number(raw);
+  if (Number.isInteger(n) && seasons.includes(n)) return n;
+  return seasons[0] ?? current;
+}
+
 export default async function PlayerPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ season?: string }>;
 }) {
   const { id } = await params;
   const playerId = Number(id);
   if (!Number.isFinite(playerId)) notFound();
-  const season = seasonOf(todayET());
+  const current = seasonOf(todayET());
+
+  // A career that can't be read is only the season picker missing, not the
+  // page — fall back to the running season and carry on.
+  const seasons = await getPlayerSeasons(playerId).catch(() => []);
+  const season = pickSeason((await searchParams).season, seasons, current);
 
   let player: PlayerSummary | null;
   try {
@@ -129,7 +155,14 @@ export default async function PlayerPage({
 
   return (
     <div className="mx-auto max-w-7xl space-y-3 p-3">
-      <Identity p={player} />
+      <Identity
+        p={player}
+        right={
+          seasons.length > 1 ? (
+            <SeasonSelect value={season} seasons={seasons} />
+          ) : undefined
+        }
+      />
       {player.lines.length === 0 ? (
         <p className="border border-line bg-bg px-3 py-6 text-center text-xs text-ink-3">
           NO {season} SEASON STATS FOR THIS PLAYER
