@@ -81,6 +81,7 @@ export default function TeamStats({ tables }: { tables: TeamStatTable[] }) {
                     sortKey={c.key}
                     sort={sort}
                     onSort={onSort}
+                    align="center"
                   />
                 ))}
               </tr>
@@ -99,7 +100,7 @@ export default function TeamStats({ tables }: { tables: TeamStatTable[] }) {
                   {table!.columns.map((c) => (
                     <td
                       key={c.key}
-                      className={`px-2 py-1.5 text-right tabular-nums ${
+                      className={`px-2 py-1.5 text-center tabular-nums ${
                         sort.key === c.key ? "font-bold text-ink" : ""
                       }`}
                     >
