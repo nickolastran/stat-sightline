@@ -135,6 +135,18 @@ export async function getGame(pk: number): Promise<Game | null> {
   return g ? toGame(g) : null;
 }
 
+/** Scoreboard order — live first, then upcoming, then finals; earliest first. */
+const STATE_ORDER: Record<string, number> = { Live: 0, Preview: 1, Final: 2 };
+
+export const sortGames = (games: Game[]): Game[] =>
+  games
+    .slice()
+    .sort(
+      (a, b) =>
+        (STATE_ORDER[a.state] ?? 3) - (STATE_ORDER[b.state] ?? 3) ||
+        a.startTime.localeCompare(b.startTime)
+    );
+
 /**
  * The one-line status a game shows everywhere: half-inning while live, the
  * detailed state once final, otherwise first pitch. `tone` picks the colour
@@ -153,8 +165,11 @@ export function gameStatus(g: Game): {
     const half = g.inningState ? g.inningState.slice(0, 3).toUpperCase() : "";
     return { text: `${half} ${g.inning ?? ""}`.trim(), tone: "live" };
   }
-  if (g.state === "Final")
-    return { text: g.detailedState.toUpperCase(), tone: "final" };
+  if (g.state === "Final") {
+    /* Extra innings carry the inning it ended in — "FINAL/10". */
+    const extra = g.inning && g.inning > 9 ? `/${g.inning}` : "";
+    return { text: g.detailedState.toUpperCase() + extra, tone: "final" };
+  }
   const t = new Intl.DateTimeFormat("en-US", {
     hour: "numeric",
     minute: "2-digit",
@@ -169,16 +184,19 @@ export interface BoxBatter {
   id: number;
   name: string;
   pos: string;
+  /** Spot in the order, 1-9. */
+  order: number;
   /** Entered mid-game — indented under the starter it replaced, savant-style. */
   sub: boolean;
   ab: number;
   r: number;
   h: number;
   rbi: number;
+  hr: number;
   bb: number;
   k: number;
   avg: string; // season, not game
-  summary: string;
+  ops: string; // season, not game
 }
 
 export interface BoxPitcher {
@@ -238,30 +256,37 @@ function boxTeam(raw: any, line: any): BoxTeam {
     hits: line?.hits ?? null,
     errors: line?.errors ?? null,
     lob: line?.leftOnBase ?? null,
-    batters: (raw.batters ?? []).map((id: number): BoxBatter => {
-      const p = at(id);
-      const s = p.stats?.batting ?? {};
-      return {
-        id,
-        name: p.person?.boxscoreName ?? p.person?.fullName ?? "—",
-        pos: p.position?.abbreviation ?? "",
-        sub: isSub(p.battingOrder),
-        ab: s.atBats ?? 0,
-        r: s.runs ?? 0,
-        h: s.hits ?? 0,
-        rbi: s.rbi ?? 0,
-        bb: s.baseOnBalls ?? 0,
-        k: s.strikeOuts ?? 0,
-        avg: p.seasonStats?.batting?.avg ?? "—",
-        summary: s.summary ?? "",
-      };
-    }),
+    /* `batters` also carries every pitcher who appeared, batting order or not.
+       No battingOrder means the club never sent them to the plate, so they are
+       not part of the batting line. */
+    batters: (raw.batters ?? [])
+      .filter((id: number) => at(id).battingOrder)
+      .map((id: number): BoxBatter => {
+        const p = at(id);
+        const s = p.stats?.batting ?? {};
+        return {
+          id,
+          name: p.person?.fullName ?? "—",
+          pos: p.position?.abbreviation ?? "",
+          order: Math.floor(Number(p.battingOrder) / 100),
+          sub: isSub(p.battingOrder),
+          ab: s.atBats ?? 0,
+          r: s.runs ?? 0,
+          h: s.hits ?? 0,
+          rbi: s.rbi ?? 0,
+          hr: s.homeRuns ?? 0,
+          bb: s.baseOnBalls ?? 0,
+          k: s.strikeOuts ?? 0,
+          avg: p.seasonStats?.batting?.avg ?? "—",
+          ops: p.seasonStats?.batting?.ops ?? "—",
+        };
+      }),
     pitchers: (raw.pitchers ?? []).map((id: number): BoxPitcher => {
       const p = at(id);
       const s = p.stats?.pitching ?? {};
       return {
         id,
-        name: p.person?.boxscoreName ?? p.person?.fullName ?? "—",
+        name: p.person?.fullName ?? "—",
         decision: s.note ?? "",
         ip: s.inningsPitched ?? "0.0",
         h: s.hits ?? 0,
@@ -795,6 +820,9 @@ export async function getPlayer(
     const split = s.splits?.[0];
     if (!split) continue;
     const stat = { ...split.stat };
+    // A pitcher who never came to the plate still gets an all-zero hitting
+    // split back. No plate appearances, no hitting line.
+    if (group === "hitting" && !stat.plateAppearances) continue;
     stat.record = `${stat.wins ?? 0}-${stat.losses ?? 0}`;
     const keys = group === "hitting" ? HITTING_KEYS : PITCHING_KEYS;
     lines.push({

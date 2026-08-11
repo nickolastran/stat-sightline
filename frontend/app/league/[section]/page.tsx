@@ -8,6 +8,8 @@ import TeamStats from "@/components/mlb/TeamStats";
 import Leaderboards from "@/components/mlb/Leaderboards";
 import SeasonSelect from "@/components/mlb/SeasonSelect";
 import ProbablePitchers from "@/components/mlb/ProbablePitchers";
+import GameGrid from "@/components/mlb/GameGrid";
+import ScoreboardDate from "@/components/mlb/ScoreboardDate";
 import {
   LEAGUE_SECTIONS,
   findSection,
@@ -62,6 +64,19 @@ function pickSeason(raw: string | undefined, current: number): number {
   return Number.isInteger(n) && n >= FIRST_SEASON && n <= current ? n : current;
 }
 
+/**
+ * A `?date=` that names a real calendar day, else today. This goes straight
+ * into an MLB API query, and "2025-02-31" parses into March — round-tripping
+ * through ISO is what rejects it.
+ */
+function pickDate(raw: string | undefined, today: string): string {
+  if (!raw || !/^\d{4}-\d{2}-\d{2}$/.test(raw)) return today;
+  const d = new Date(`${raw}T00:00:00Z`);
+  return !Number.isNaN(d.getTime()) && d.toISOString().startsWith(raw)
+    ? raw
+    : today;
+}
+
 /** The projection, or null if it isn't available — never a thrown error. */
 async function projectionOrNull(season: number): Promise<StandingsProjection | null> {
   return getProjections(season).catch(() => null);
@@ -78,6 +93,8 @@ async function SectionBody({
 }) {
   try {
     switch (id) {
+      case "scoreboard":
+        return <GameGrid games={await getSchedule(date)} />;
       case "leaders":
         return <Leaderboards boards={await getLeaderboards(season)} />;
       case "probables":
@@ -106,27 +123,31 @@ export default async function LeagueSectionPage({
   searchParams,
 }: {
   params: Promise<{ section: string }>;
-  searchParams: Promise<{ season?: string }>;
+  searchParams: Promise<{ season?: string; date?: string }>;
 }) {
   const { section } = await params;
   const found = findSection(section);
   if (!found) notFound();
 
-  const date = todayET();
-  const current = seasonOf(date);
-  /* Only the leader boards read back through history, so only they touch
-     searchParams — the other sections stay statically prerenderable. */
+  const today = todayET();
+  const current = seasonOf(today);
+  /* Only the boards and the scoreboard read off today — the leader boards back
+     through history, the scoreboard to any game day. The sections that don't
+     touch searchParams stay statically prerenderable. */
   const leaders = found.id === "leaders";
-  const season = leaders
-    ? pickSeason((await searchParams).season, current)
-    : current;
+  const scoreboard = found.id === "scoreboard";
+  const sp = leaders || scoreboard ? await searchParams : {};
+  const season = leaders ? pickSeason(sp.season, current) : current;
+  const date = scoreboard ? pickDate(sp.date, today) : today;
 
   return (
     <div className="mx-auto max-w-7xl space-y-3 p-3">
       <Panel
         title={found.title}
         right={
-          leaders ? (
+          scoreboard ? (
+            <ScoreboardDate value={date} today={today} />
+          ) : leaders ? (
             <SeasonSelect value={season} first={FIRST_SEASON} last={current} />
           ) : (
             /* Every other section is a snapshot, so it carries the day it
@@ -137,9 +158,12 @@ export default async function LeagueSectionPage({
           )
         }
       >
-        {/* Keyed on the season so switching years re-suspends into the
-            skeleton rather than holding the previous year's board. */}
-        <Suspense key={season} fallback={<SectionSkeleton section={found.id} />}>
+        {/* Keyed on what the section is showing, so switching year or day
+            re-suspends into the skeleton rather than holding the last one. */}
+        <Suspense
+          key={`${season}-${date}`}
+          fallback={<SectionSkeleton section={found.id} />}
+        >
           <SectionBody id={found.id} date={date} season={season} />
         </Suspense>
       </Panel>

@@ -4,6 +4,7 @@
  * `tab` is the short bar label; `title` is the panel heading on the page.
  */
 export const LEAGUE_SECTIONS = [
+  { id: "scoreboard", tab: "SCOREBOARD", title: "SCOREBOARD" },
   { id: "leaders", tab: "STAT LEADERS", title: "STAT LEADERS" },
   { id: "probables", tab: "PROBABLES", title: "PROBABLE PITCHERS — TODAY" },
   { id: "standings", tab: "STANDINGS", title: "STANDINGS" },

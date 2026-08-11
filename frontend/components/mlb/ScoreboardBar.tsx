@@ -2,11 +2,11 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { AnimatePresence, motion } from "framer-motion";
-import { todayET, type Game } from "@/lib/mlb";
+import { motion } from "framer-motion";
+import { sortGames, todayET, type Game } from "@/lib/mlb";
 import GameCard from "@/components/mlb/GameCard";
 import GameFeedLink from "@/components/mlb/GameFeedLink";
-import Calendar from "@/components/ui/Calendar";
+import DatePicker from "@/components/ui/DatePicker";
 import { SkeletonGameCard } from "@/components/ui/Skeleton";
 
 /*
@@ -18,15 +18,7 @@ import { SkeletonGameCard } from "@/components/ui/Skeleton";
  * looks frozen.
  */
 
-const STATE_ORDER: Record<string, number> = { Live: 0, Preview: 1, Final: 2 };
 const CARD_W = 228; // 220px card + 8px gap — the minimum arrow step
-
-const CalendarIcon = () => (
-  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" aria-hidden>
-    <rect x="3" y="4" width="18" height="17" stroke="currentColor" strokeWidth="2" />
-    <path d="M3 9h18M8 2v4M16 2v4" stroke="currentColor" strokeWidth="2" />
-  </svg>
-);
 
 const ArrowButton = ({
   label,
@@ -55,11 +47,9 @@ export default function ScoreboardBar() {
   const [date, setDate] = useState(today);
   const [games, setGames] = useState<Game[] | null>(null); // null = loading
   const [error, setError] = useState(false);
-  const [pickerOpen, setPickerOpen] = useState(false);
   const [arrows, setArrows] = useState({ prev: false, next: false });
 
   const stripRef = useRef<HTMLDivElement>(null);
-  const pickerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     let alive = true;
@@ -109,38 +99,8 @@ export default function ScoreboardBar() {
     el.scrollBy({ left: dir * step, behavior: "smooth" });
   };
 
-  /* ── Date picker dismissal ────────────────────────────────── */
-
-  useEffect(() => {
-    if (!pickerOpen) return;
-    const onDown = (e: MouseEvent) => {
-      if (!pickerRef.current?.contains(e.target as Node)) setPickerOpen(false);
-    };
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setPickerOpen(false);
-    document.addEventListener("mousedown", onDown);
-    document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("mousedown", onDown);
-      document.removeEventListener("keydown", onKey);
-    };
-  }, [pickerOpen]);
-
   const loading = games === null;
-  const sorted = (games ?? [])
-    .slice()
-    .sort(
-      (a, b) =>
-        (STATE_ORDER[a.state] ?? 3) - (STATE_ORDER[b.state] ?? 3) ||
-        a.startTime.localeCompare(b.startTime)
-    );
-
-  const dateLabel = new Intl.DateTimeFormat("en-US", {
-    timeZone: "UTC",
-    weekday: "short",
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  }).format(new Date(`${date}T00:00:00Z`));
+  const sorted = sortGames(games ?? []);
 
   return (
     <div className="border-b border-line bg-bg">
@@ -150,42 +110,7 @@ export default function ScoreboardBar() {
           SCOREBOARD
         </span>
 
-        <div ref={pickerRef} className="relative shrink-0">
-          <button
-            type="button"
-            aria-haspopup="dialog"
-            aria-expanded={pickerOpen}
-            onClick={() => setPickerOpen((o) => !o)}
-            className={`flex h-7 items-center gap-1.5 border px-2 text-[10px] tracking-wider ${
-              pickerOpen
-                ? "border-accent bg-accent/15 text-ink"
-                : "border-line text-ink-2 hover:border-accent hover:text-ink"
-            }`}
-          >
-            <CalendarIcon />
-            {dateLabel.toUpperCase()}
-          </button>
-          <AnimatePresence>
-            {pickerOpen && (
-              <motion.div
-                initial={{ opacity: 0, y: -4 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -4 }}
-                transition={{ duration: 0.15 }}
-                className="absolute left-0 top-full z-50 mt-1"
-              >
-                <Calendar
-                  value={date}
-                  today={today}
-                  onSelect={(d) => {
-                    setDate(d);
-                    setPickerOpen(false);
-                  }}
-                />
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
+        <DatePicker value={date} today={today} onSelect={setDate} />
 
         <span className="shrink-0 text-[10px] text-ink-3">
           {loading ? "…" : `${sorted.length} GAMES`}

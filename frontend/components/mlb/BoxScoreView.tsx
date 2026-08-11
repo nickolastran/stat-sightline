@@ -20,21 +20,39 @@ import PlayerLink from "@/components/mlb/PlayerLink";
  * and the local-timezone first-pitch label need the browser.
  */
 
-const BAT_COLS = ["AB", "R", "H", "RBI", "BB", "K", "AVG"] as const;
-const PIT_COLS = ["IP", "H", "R", "ER", "BB", "K", "HR", "P-S", "ERA"] as const;
+/* Both lines run nine stat columns, so batting and pitching sit on the same
+   grid and the columns hold still when you flip teams. */
+const BAT_COLS = ["AB", "R", "H", "RBI", "HR", "BB", "K", "AVG", "OPS"] as const;
+const PIT_COLS = ["IP", "H", "R", "ER", "K", "BB", "HR", "P-S", "ERA"] as const;
 
-const batCells = (b: BoxBatter) => [b.ab, b.r, b.h, b.rbi, b.bb, b.k, b.avg];
+const batCells = (b: BoxBatter) => [
+  b.ab,
+  b.r,
+  b.h,
+  b.rbi,
+  b.hr,
+  b.bb,
+  b.k,
+  b.avg,
+  b.ops,
+];
 const pitCells = (p: BoxPitcher) => [
   p.ip,
   p.h,
   p.r,
   p.er,
-  p.bb,
   p.k,
+  p.bb,
   p.hr,
   `${p.pitches}-${p.strikes}`,
   p.era,
 ];
+
+/* A pitcher's note can carry more than one decision — "(W, 3-6)(BS, 6)". A
+   loss or a blown save is a bad outcome, so it reads red instead of the accent
+   the earned decisions use. */
+const decisions = (note: string) => note.match(/\([^)]*\)/g) ?? [note];
+const isBad = (d: string) => /^\((L|BS)\b/.test(d);
 
 /* ── Linescore ───────────────────────────────────────────────────────── */
 
@@ -131,7 +149,15 @@ function StatTable({
 }) {
   return (
     <div className="overflow-x-auto border border-line">
-      <table className="w-full border-collapse text-xs">
+      {/* Fixed layout with one width for every stat column: the numbers land in
+          the same place in both tables and don't shift as content changes. */}
+      <table className="w-full min-w-[44rem] table-fixed border-collapse text-xs">
+        <colgroup>
+          <col />
+          {columns.map((c) => (
+            <col key={c} className="w-14" />
+          ))}
+        </colgroup>
         <caption className="border-b border-line px-2 py-1.5 text-left text-[10px] tracking-[0.25em] text-ink-3">
           {caption}
         </caption>
@@ -167,7 +193,7 @@ function StatTable({
               key={r.key}
               className="border-b border-grid last:border-b-0 hover:bg-surface-2"
             >
-              <td className="px-2 py-1 whitespace-nowrap text-ink-2">{r.label}</td>
+              <td className="truncate px-2 py-1 text-ink-2">{r.label}</td>
               {r.cells.map((c, i) => (
                 <td
                   key={i}
@@ -194,7 +220,15 @@ function TeamLines({ team }: { team: BoxTeam }) {
           key: b.id,
           label: (
             <span className={b.sub ? "pl-3" : ""}>
-              {b.sub && <span className="text-ink-3">↳ </span>}
+              {/* The spot belongs to the starter; a sub is read off the arrow
+                  under them, not off a repeated number. */}
+              {b.sub ? (
+                <span className="text-ink-3">↳ </span>
+              ) : (
+                <span className="mr-1.5 text-[10px] tabular-nums text-ink-3">
+                  {b.order}
+                </span>
+              )}
               <PlayerLink id={b.id}>{b.name}</PlayerLink>
               <span className="ml-1.5 text-[10px] text-ink-3">{b.pos}</span>
             </span>
@@ -210,11 +244,17 @@ function TeamLines({ team }: { team: BoxTeam }) {
           label: (
             <span>
               <PlayerLink id={p.id}>{p.name}</PlayerLink>
-              {p.decision && (
-                <span className="ml-1.5 text-[10px] text-accent">
-                  {p.decision}
-                </span>
-              )}
+              {p.decision &&
+                decisions(p.decision).map((d) => (
+                  <span
+                    key={d}
+                    className={`ml-1.5 text-[10px] ${
+                      isBad(d) ? "text-crit" : "text-accent"
+                    }`}
+                  >
+                    {d}
+                  </span>
+                ))}
             </span>
           ),
           cells: pitCells(p),
