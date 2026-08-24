@@ -94,11 +94,14 @@ async function SectionBody({
   season,
   gameType,
   views,
+  seasonOver,
 }: {
   id: LeagueSection;
   date: string;
   season: number;
   gameType: GameType;
+  /** A past season, so who made the playoffs is already decided. */
+  seasonOver: boolean;
   /** The STANDINGS / WILD CARD buttons, for the two sections that show them. */
   views: React.ReactNode;
 }) {
@@ -122,11 +125,18 @@ async function SectionBody({
             divisions={divisions}
             projection={projection}
             left={views}
+            seasonOver={seasonOver}
           />
         );
       }
       case "wildcard":
-        return <WildCard groups={await getWildCard(season)} left={views} />;
+        return (
+          <WildCard
+            groups={await getWildCard(season)}
+            left={views}
+            seasonOver={seasonOver}
+          />
+        );
       case "teams":
         return <TeamStats tables={await getTeamStats(season, gameType)} />;
     }
@@ -213,6 +223,7 @@ export default async function LeagueSectionPage({
             date={date}
             season={season}
             gameType={gameType}
+            seasonOver={season < current}
             views={
               standingsView ? (
                 <StandingsViews active={found.id} query={viewQuery} />

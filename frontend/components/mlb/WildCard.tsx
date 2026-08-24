@@ -1,7 +1,12 @@
 import TeamLink from "@/components/mlb/TeamLink";
 import Glossary from "@/components/mlb/Glossary";
 import { ClinchMark } from "@/components/mlb/Standings";
-import { CLINCH_LEGEND, WC_BERTHS, type WildCardGroup } from "@/lib/mlb";
+import {
+  clinchPhase,
+  CLINCH_LEGEND,
+  WC_BERTHS,
+  type WildCardGroup,
+} from "@/lib/mlb";
 
 /*
  * The wild-card race, one table per league. MLB serves this as its own
@@ -39,10 +44,13 @@ const TD = "whitespace-nowrap px-2 py-1.5 text-center tabular-nums";
 export default function WildCard({
   groups,
   left,
+  seasonOver = false,
 }: {
   groups: WildCardGroup[];
   /** The view buttons, above the tables — the standings' controls row. */
   left?: React.ReactNode;
+  /** The season has been played out, so the clinch marks are the final word. */
+  seasonOver?: boolean;
 }) {
   if (groups.length === 0)
     return (
@@ -53,6 +61,11 @@ export default function WildCard({
         </p>
       </div>
     );
+
+  const phase = clinchPhase(
+    groups.flatMap((g) => g.teams),
+    seasonOver
+  );
 
   return (
     <div className="space-y-3">
@@ -100,7 +113,7 @@ export default function WildCard({
                     </td>
                     <td className="px-3 py-1.5">
                       <span className="flex items-center gap-1">
-                        <ClinchMark row={t} />
+                        <ClinchMark row={t} phase={phase} />
                         <TeamLink id={t.id} name={t.name} className="min-w-0" />
                         <span className="shrink-0 text-[10px] tracking-wider text-ink-3">
                           {t.division}
@@ -129,7 +142,9 @@ export default function WildCard({
 
       <Glossary
         entries={COLS}
-        groups={[{ name: "CLINCH", entries: CLINCH_LEGEND }]}
+        groups={
+          phase === "none" ? [] : [{ name: "CLINCH", entries: CLINCH_LEGEND }]
+        }
       />
     </div>
   );

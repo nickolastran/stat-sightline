@@ -6,7 +6,14 @@ import SortHeader from "@/components/ui/SortHeader";
 import TeamLink from "@/components/mlb/TeamLink";
 import { sortRows, toggleSort, type Sort } from "@/lib/sortTable";
 import Glossary from "@/components/mlb/Glossary";
-import { clinchMark, CLINCH_LEGEND, type Division, type StandingRow } from "@/lib/mlb";
+import {
+  clinchMark,
+  clinchPhase,
+  CLINCH_LEGEND,
+  type ClinchPhase,
+  type Division,
+  type StandingRow,
+} from "@/lib/mlb";
 import type { StandingsProjection, TeamProjection } from "@/lib/api";
 
 /*
@@ -227,8 +234,14 @@ function groupsFor(divisions: Division[], scope: Scope, proj: Map<number, TeamPr
  * out on hover. Quiet by design — it qualifies the row rather than competing
  * with the record, so it sits in the muted ink the other annotations use.
  */
-export function ClinchMark({ row }: { row: StandingRow }) {
-  const mark = clinchMark(row);
+export function ClinchMark({
+  row,
+  phase,
+}: {
+  row: StandingRow;
+  phase: ClinchPhase;
+}) {
+  const mark = clinchMark(row, phase);
   if (!mark) return null;
   return (
     <span
@@ -246,12 +259,14 @@ function StandingsTable({
   cols,
   sort,
   onSort,
+  phase,
 }: {
   group: Group;
   scope: Scope;
   cols: Col[];
   sort: Sort;
   onSort: (key: string) => void;
+  phase: ClinchPhase;
 }) {
   // A sort can outlive its column — order by PROJ, then have the projection go
   // away on the next render — so fall back to the default rather than crash.
@@ -323,7 +338,7 @@ function StandingsTable({
                   {/* TeamLink is a flex row of its own, so the mark only sits
                       beside the logo from inside a row with it. */}
                   <span className="flex items-center gap-1">
-                    <ClinchMark row={t} />
+                    <ClinchMark row={t} phase={phase} />
                     <TeamLink id={t.id} name={t.name} className="min-w-0" />
                   </span>
                 </td>
@@ -374,12 +389,15 @@ export default function Standings({
   divisions,
   projection = null,
   left,
+  seasonOver = false,
 }: {
   divisions: Division[];
   /** Projected finishes, when the projection service answered. */
   projection?: StandingsProjection | null;
   /** Shares the controls row with the scope toggle — the view buttons. */
   left?: React.ReactNode;
+  /** The season has been played out, so the clinch marks are the final word. */
+  seasonOver?: boolean;
 }) {
   const [scope, setScope] = useState<Scope>("division");
   const [sort, setSort] = useState<Sort>(DEFAULT_SORT);
@@ -401,6 +419,10 @@ export default function Standings({
 
   const cols = projection ? [...COLS, ...PROJ_COLS] : COLS;
   const groups = groupsFor(divisions, scope, byTeam);
+  const phase = clinchPhase(
+    divisions.flatMap((d) => d.teams),
+    seasonOver
+  );
 
   return (
     <div className="space-y-3">
@@ -422,6 +444,7 @@ export default function Standings({
           cols={cols}
           sort={sort}
           onSort={(key) => setSort((s) => toggleSort(s, key))}
+          phase={phase}
         />
       ))}
 
@@ -429,7 +452,10 @@ export default function Standings({
 
       <Glossary
         entries={cols.map((c) => ({ label: c.label, title: c.title }))}
-        groups={[{ name: "CLINCH", entries: CLINCH_LEGEND }]}
+        /* No marks on the table means no key for them. */
+        groups={
+          phase === "none" ? [] : [{ name: "CLINCH", entries: CLINCH_LEGEND }]
+        }
       />
     </div>
   );

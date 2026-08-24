@@ -995,22 +995,55 @@ export async function getPlayerSeasons(id: number): Promise<number[]> {
 /* ── Clinch / elimination marks ─────────────────────────────────────── */
 
 /**
- * The mark shown beside a club's name once its post-season is settled one way
- * or the other. MLB's payload uses its own letters ("z", "y", "w") for what a
- * club has clinched, and reports elimination separately as a magic number of
- * "E", so both are folded into one symbol here.
+ * How much the clinch column can say about a given payload.
+ *
+ *  "live"    — season in progress: only what MLB has already called, since a
+ *              club without a mark may still be playing for one.
+ *  "settled" — season over and MLB recorded who clinched what, so a club with
+ *              no mark is a club that missed the playoffs.
+ *  "none"    — season over with nothing clinched at all. Only 1994, whose
+ *              post-season was cancelled by the strike: nobody clinched and
+ *              nobody was eliminated in any meaningful sense, so the column is
+ *              dropped rather than invented. Spring training lands here too.
  */
-export function clinchMark(r: StandingRow): string {
+export type ClinchPhase = "live" | "settled" | "none";
+
+export const clinchPhase = (
+  rows: StandingRow[],
+  seasonOver: boolean
+): ClinchPhase =>
+  !seasonOver ? "live" : rows.some((r) => r.clinch !== "") ? "settled" : "none";
+
+/**
+ * The mark shown beside a club's name once its post-season is settled one way
+ * or the other. MLB's payload uses its own letters ("z", "y", "w", and "x" for
+ * the expanded 2020 field) for what a club has clinched, and reports
+ * elimination separately as a pair of magic numbers, so all of it folds into
+ * one symbol here.
+ *
+ * Elimination is the case MLB's own feed leaves ragged: a club knocked out on
+ * the last day by a tiebreaker keeps a wild-card magic number of "1" forever,
+ * because the number stopped updating when the season did. Three clubs across
+ * 2024–25 finish that way. Once the season is settled the letters are the
+ * whole truth — no letter means no October — so the magic numbers are only
+ * consulted while a season is still being played.
+ */
+export function clinchMark(r: StandingRow, phase: ClinchPhase): string {
+  if (phase === "none") return "";
   switch (r.clinch.toLowerCase()) {
     case "z":
       return "*";
     case "y":
       return "X";
+    // "w" is a wild card outright; "x" is a berth that isn't a division title,
+    // which since the wild card exists is the same thing.
     case "w":
+    case "x":
       return "Y";
     case "e":
       return "E";
   }
+  if (phase === "settled") return "E";
   return r.elim === "E" && r.wcElim === "E" ? "E" : "";
 }
 
