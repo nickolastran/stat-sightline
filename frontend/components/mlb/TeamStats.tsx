@@ -1,11 +1,13 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import SegmentedControl from "@/components/ui/SegmentedControl";
 import SortHeader from "@/components/ui/SortHeader";
 import TeamLink from "@/components/mlb/TeamLink";
 import { sortRows, toggleSort, type Sort } from "@/lib/sortTable";
+import Glossary from "@/components/mlb/Glossary";
+import { useSetParam } from "@/lib/useSetParam";
 import { teamStatNum, teamStatText, type TeamStatTable } from "@/lib/mlb";
 
 /*
@@ -29,7 +31,7 @@ const DEFAULT_SORT: Record<"hitting" | "pitching", Sort> = {
 };
 
 export default function TeamStats({ tables }: { tables: TeamStatTable[] }) {
-  const router = useRouter();
+  const setParam = useSetParam();
   const group =
     useSearchParams().get("group") === "pitching" ? "pitching" : "hitting";
   const [sorts, setSorts] = useState(DEFAULT_SORT);
@@ -51,7 +53,7 @@ export default function TeamStats({ tables }: { tables: TeamStatTable[] }) {
         <SegmentedControl<"hitting" | "pitching">
           ariaLabel="Stat group"
           value={group}
-          onChange={(g) => router.replace(`?group=${g}`, { scroll: false })}
+          onChange={(g) => setParam("group", g)}
           options={[
             { value: "hitting", label: "HITTING" },
             { value: "pitching", label: "PITCHING" },
@@ -78,6 +80,7 @@ export default function TeamStats({ tables }: { tables: TeamStatTable[] }) {
                   <SortHeader
                     key={c.key}
                     label={c.label}
+                    title={c.title}
                     sortKey={c.key}
                     sort={sort}
                     onSort={onSort}
@@ -112,6 +115,15 @@ export default function TeamStats({ tables }: { tables: TeamStatTable[] }) {
             </tbody>
           </table>
         </div>
+      )}
+
+      {table && (
+        <Glossary
+          entries={table.columns.map((c) => ({
+            label: c.label,
+            title: c.title,
+          }))}
+        />
       )}
     </div>
   );

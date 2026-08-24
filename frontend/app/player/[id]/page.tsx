@@ -39,7 +39,6 @@ function Identity({ p, right }: { p: PlayerSummary; right?: React.ReactNode }) {
     `B/T ${p.bats}/${p.throws}`,
     p.age !== null && `AGE ${p.age}`,
     p.height && p.weight ? `${p.height} · ${p.weight} LB` : "",
-    p.debut && `DEBUT ${p.debut}`,
   ].filter(Boolean);
 
   return (

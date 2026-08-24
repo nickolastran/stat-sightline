@@ -10,6 +10,9 @@ import SeasonSelect from "@/components/mlb/SeasonSelect";
 import ProbablePitchers from "@/components/mlb/ProbablePitchers";
 import GameGrid from "@/components/mlb/GameGrid";
 import ScoreboardDate from "@/components/mlb/ScoreboardDate";
+import GameTypeSelect from "@/components/mlb/GameTypeSelect";
+import WildCard from "@/components/mlb/WildCard";
+import StandingsViews from "@/components/mlb/StandingsViews";
 import {
   LEAGUE_SECTIONS,
   findSection,
@@ -18,11 +21,14 @@ import {
 import {
   getSchedule,
   getStandings,
+  getWildCard,
   getTeamStats,
   getLeaderboards,
   todayET,
   seasonOf,
+  pickGameType,
   FIRST_SEASON,
+  type GameType,
 } from "@/lib/mlb";
 import { getProjections, type StandingsProjection } from "@/lib/api";
 
@@ -86,10 +92,15 @@ async function SectionBody({
   id,
   date,
   season,
+  gameType,
+  views,
 }: {
   id: LeagueSection;
   date: string;
   season: number;
+  gameType: GameType;
+  /** The STANDINGS / WILD CARD buttons, for the two sections that show them. */
+  views: React.ReactNode;
 }) {
   try {
     switch (id) {
@@ -100,14 +111,24 @@ async function SectionBody({
       case "probables":
         return <ProbablePitchers games={await getSchedule(date)} />;
       case "standings": {
+        /* The projection is fit on regular-season schedules, so it has nothing
+           to say about a spring slate — the columns drop rather than mislead. */
         const [divisions, projection] = await Promise.all([
-          getStandings(season),
-          projectionOrNull(season),
+          getStandings(season, gameType),
+          gameType === "R" ? projectionOrNull(season) : null,
         ]);
-        return <Standings divisions={divisions} projection={projection} />;
+        return (
+          <Standings
+            divisions={divisions}
+            projection={projection}
+            left={views}
+          />
+        );
       }
+      case "wildcard":
+        return <WildCard groups={await getWildCard(season)} left={views} />;
       case "teams":
-        return <TeamStats tables={await getTeamStats(season)} />;
+        return <TeamStats tables={await getTeamStats(season, gameType)} />;
     }
   } catch {
     return (
@@ -123,7 +144,7 @@ export default async function LeagueSectionPage({
   searchParams,
 }: {
   params: Promise<{ section: string }>;
-  searchParams: Promise<{ season?: string; date?: string }>;
+  searchParams: Promise<{ season?: string; date?: string; type?: string }>;
 }) {
   const { section } = await params;
   const found = findSection(section);
@@ -131,14 +152,37 @@ export default async function LeagueSectionPage({
 
   const today = todayET();
   const current = seasonOf(today);
-  /* Only the boards and the scoreboard read off today — the leader boards back
-     through history, the scoreboard to any game day. The sections that don't
-     touch searchParams stay statically prerenderable. */
-  const leaders = found.id === "leaders";
+  /* Which controls a section carries: the scoreboard picks a game day, and
+     everything that reports a season total picks the season — the standings
+     and team tables also picking which half of the calendar it covers.
+     Probables is today's slate only, so it reads no searchParams at all and
+     stays statically prerenderable. */
   const scoreboard = found.id === "scoreboard";
-  const sp = leaders || scoreboard ? await searchParams : {};
-  const season = leaders ? pickSeason(sp.season, current) : current;
+  const seasonal =
+    found.id === "leaders" ||
+    found.id === "standings" ||
+    found.id === "wildcard" ||
+    found.id === "teams";
+  /* Spring training has no wild-card race of its own, and the leader boards
+     are regular-season figures. */
+  const typed = found.id === "standings" || found.id === "teams";
+  const sp = seasonal || scoreboard ? await searchParams : {};
+  const season = seasonal ? pickSeason(sp.season, current) : current;
   const date = scoreboard ? pickDate(sp.date, today) : today;
+  const gameType = typed ? pickGameType(sp.type) : "R";
+
+  /* The standings and the wild-card race are two routes with one control row,
+     so switching between them carries the season and game type across rather
+     than dropping the reader back on today. */
+  const standingsView = found.id === "standings" || found.id === "wildcard";
+  /* Read off the raw parameter, not the resolved one: the wild-card race has
+     no spring slate of its own and so resolves to "R", but it should still
+     hand a reader back to the spring standings they came from. */
+  const carried = pickGameType(sp.type);
+  const viewQuery =
+    season === current && carried === "R"
+      ? ""
+      : `?season=${season}${carried === "R" ? "" : `&type=${carried}`}`;
 
   return (
     <div className="mx-auto max-w-7xl space-y-3 p-3">
@@ -147,24 +191,34 @@ export default async function LeagueSectionPage({
         right={
           scoreboard ? (
             <ScoreboardDate value={date} today={today} />
-          ) : leaders ? (
-            <SeasonSelect value={season} first={FIRST_SEASON} last={current} />
+          ) : seasonal ? (
+            <div className="flex flex-wrap items-center gap-3">
+              {typed && <GameTypeSelect value={gameType} />}
+              <SeasonSelect value={season} first={FIRST_SEASON} last={current} />
+            </div>
           ) : (
-            /* Every other section is a snapshot, so it carries the day it
-               was read; a season total doesn't. */
-            <span className="text-[10px] text-ink-3">
-              {date} · SEASON {season}
-            </span>
+            /* Probables is today's slate, so it carries the day it was read. */
+            <span className="text-[10px] text-ink-3">{date}</span>
           )
         }
       >
         {/* Keyed on what the section is showing, so switching year or day
             re-suspends into the skeleton rather than holding the last one. */}
         <Suspense
-          key={`${season}-${date}`}
+          key={`${season}-${date}-${gameType}`}
           fallback={<SectionSkeleton section={found.id} />}
         >
-          <SectionBody id={found.id} date={date} season={season} />
+          <SectionBody
+            id={found.id}
+            date={date}
+            season={season}
+            gameType={gameType}
+            views={
+              standingsView ? (
+                <StandingsViews active={found.id} query={viewQuery} />
+              ) : null
+            }
+          />
         </Suspense>
       </Panel>
     </div>

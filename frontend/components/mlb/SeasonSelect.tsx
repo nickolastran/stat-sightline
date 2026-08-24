@@ -1,7 +1,7 @@
 "use client";
 
 import { useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { useSetParam } from "@/lib/useSetParam";
 
 /*
  * Season picker for the leader boards and the player page. The choice lives
@@ -27,7 +27,7 @@ function yearsOf(p: Props): number[] {
 
 export default function SeasonSelect(props: Props) {
   const { value } = props;
-  const router = useRouter();
+  const setParam = useSetParam();
   const [pending, startTransition] = useTransition();
   const years = yearsOf(props);
 
@@ -38,9 +38,7 @@ export default function SeasonSelect(props: Props) {
         value={value}
         disabled={pending}
         onChange={(e) =>
-          startTransition(() =>
-            router.replace(`?season=${e.target.value}`, { scroll: false })
-          )
+          startTransition(() => setParam("season", e.target.value))
         }
         className={`border border-line bg-bg px-1.5 py-0.5 text-[10px] tracking-normal tabular-nums text-ink hover:border-accent ${
           pending ? "opacity-50" : ""

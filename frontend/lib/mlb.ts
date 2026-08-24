@@ -352,6 +352,17 @@ export interface StandingRow {
   divRank: string;
   leagueRank: string;
   sportRank: string;
+  /** Place in the wild-card race, and games back of the last playoff spot. */
+  wcRank: string;
+  wcGb: string;
+  /**
+   * Magic numbers for the division and the wild card — how many combined
+   * wins by the clubs ahead and losses by this one would end the chase, or
+   * "E" once it already has. A club is out of the playoffs only when both
+   * read "E": losing the division still leaves the wild card.
+   */
+  elim: string;
+  wcElim: string;
   streak: string;
   runsScored: number;
   runsAllowed: number;
@@ -378,12 +389,75 @@ function splitRecord(splits: any[] | undefined, type: string): string {
   return s ? `${s.wins ?? 0}-${s.losses ?? 0}` : "—";
 }
 
-export async function getStandings(season: number): Promise<Division[]> {
-  // Hydrating the team gets full club names ("Tampa Bay Rays"); the bare
-  // payload carries only the nickname ("Rays"), which reads as ambiguous once
-  // rows are merged into a league-wide or all-MLB table.
+/*
+ * Which slice of the calendar a standings or team-stats view is reading.
+ * Spring training is its own set of records and its own game type, so the
+ * same season number means two different tables depending on this.
+ */
+export type GameType = "R" | "S";
+
+export const GAME_TYPES: { value: GameType; label: string }[] = [
+  { value: "R", label: "REGULAR SEASON" },
+  { value: "S", label: "SPRING TRAINING" },
+];
+
+/** Anything but an explicit "S" reads as the regular season. */
+export const pickGameType = (raw: string | undefined): GameType =>
+  raw === "S" ? "S" : "R";
+
+/**
+ * One club's row, off a `teamRecords` entry. The division and league are read
+ * off the hydrated team rather than the record it arrived in, because the
+ * wild-card payload groups by league and labels each group with an arbitrary
+ * one of its divisions.
+ */
+function standingRow(t: any): StandingRow {
+  const splits = t.records?.splitRecords;
+  const divisionId = t.team?.division?.id;
+  const leagueId = t.team?.league?.id;
+  return {
+    id: t.team?.id,
+    name: t.team?.name ?? "—",
+    divisionId,
+    division: DIVISIONS[divisionId] ?? `DIV ${divisionId}`,
+    leagueId,
+    league: LEAGUES[leagueId] ?? `LEAGUE ${leagueId}`,
+    wins: t.wins ?? 0,
+    losses: t.losses ?? 0,
+    pct: t.winningPercentage ?? "—",
+    gb: t.gamesBack ?? "-",
+    leagueGb: t.leagueGamesBack ?? "-",
+    sportGb: t.sportGamesBack ?? "-",
+    divRank: t.divisionRank ?? "—",
+    leagueRank: t.leagueRank ?? "—",
+    sportRank: t.sportRank ?? "—",
+    wcRank: t.wildCardRank ?? "—",
+    wcGb: t.wildCardGamesBack ?? "-",
+    elim: t.eliminationNumber ?? "",
+    wcElim: t.wildCardEliminationNumber ?? "",
+    streak: t.streak?.streakCode ?? "—",
+    runsScored: t.runsScored ?? 0,
+    runsAllowed: t.runsAllowed ?? 0,
+    runDiff: t.runDifferential ?? 0,
+    last10: splitRecord(splits, "lastTen"),
+    home: splitRecord(splits, "home"),
+    away: splitRecord(splits, "away"),
+    clinch: t.clinchIndicator ?? "",
+  };
+}
+
+/** Hydrating the team gets full club names ("Tampa Bay Rays"); the bare
+ * payload carries only the nickname ("Rays"), which reads as ambiguous once
+ * rows are merged into a league-wide or all-MLB table. */
+const standingsUrl = (season: number, type: string) =>
+  `/standings?leagueId=103,104&season=${season}&standingsTypes=${type}&hydrate=team`;
+
+export async function getStandings(
+  season: number,
+  gameType: GameType = "R"
+): Promise<Division[]> {
   const data = await mlb(
-    `/standings?leagueId=103,104&season=${season}&standingsTypes=regularSeason&hydrate=team`,
+    standingsUrl(season, gameType === "S" ? "springTraining" : "regularSeason"),
     1800
   );
   const records = (data.records ?? []) as any[];
@@ -391,44 +465,50 @@ export async function getStandings(season: number): Promise<Division[]> {
     .map((r): Division => {
       const divisionId = r.division?.id;
       const leagueId = r.league?.id;
-      const division = DIVISIONS[divisionId] ?? `DIV ${divisionId}`;
-      const league = LEAGUES[leagueId] ?? `LEAGUE ${leagueId}`;
       return {
         id: divisionId,
-        name: division,
+        name: DIVISIONS[divisionId] ?? `DIV ${divisionId}`,
         leagueId,
-        league,
-        teams: (r.teamRecords ?? []).map((t: any): StandingRow => {
-          const splits = t.records?.splitRecords;
-          return {
-            id: t.team?.id,
-            name: t.team?.name ?? "—",
-            divisionId,
-            division,
-            leagueId,
-            league,
-            wins: t.wins ?? 0,
-            losses: t.losses ?? 0,
-            pct: t.winningPercentage ?? "—",
-            gb: t.gamesBack ?? "-",
-            leagueGb: t.leagueGamesBack ?? "-",
-            sportGb: t.sportGamesBack ?? "-",
-            divRank: t.divisionRank ?? "—",
-            leagueRank: t.leagueRank ?? "—",
-            sportRank: t.sportRank ?? "—",
-            streak: t.streak?.streakCode ?? "—",
-            runsScored: t.runsScored ?? 0,
-            runsAllowed: t.runsAllowed ?? 0,
-            runDiff: t.runDifferential ?? 0,
-            last10: splitRecord(splits, "lastTen"),
-            home: splitRecord(splits, "home"),
-            away: splitRecord(splits, "away"),
-            clinch: t.clinchIndicator ?? "",
-          };
-        }),
+        league: LEAGUES[leagueId] ?? `LEAGUE ${leagueId}`,
+        teams: (r.teamRecords ?? []).map(standingRow),
       };
     })
     .sort((a, b) => a.name.localeCompare(b.name));
+}
+
+/**
+ * The wild-card race, one group per league. MLB's `wildCard` standings type
+ * drops the three division leaders and ranks everyone left by their distance
+ * from the last playoff berth, which is exactly the race — so the cut line is
+ * simply after the third row of each group.
+ */
+export interface WildCardGroup {
+  id: number;
+  name: string;
+  /** Rows in wild-card order; the first `berths` of them hold a spot. */
+  teams: StandingRow[];
+}
+
+/** Wild-card berths per league — three since the 2022 expansion. */
+export const WC_BERTHS = 3;
+
+export async function getWildCard(season: number): Promise<WildCardGroup[]> {
+  const data = await mlb(standingsUrl(season, "wildCard"), 1800);
+  return ((data.records ?? []) as any[])
+    .map((r): WildCardGroup => {
+      const leagueId = r.league?.id;
+      return {
+        id: leagueId,
+        name: LEAGUES[leagueId] ?? `LEAGUE ${leagueId}`,
+        teams: (r.teamRecords ?? [])
+          .map(standingRow)
+          .sort(
+            (a: StandingRow, b: StandingRow) =>
+              (Number(a.wcRank) || 99) - (Number(b.wcRank) || 99)
+          ),
+      };
+    })
+    .sort((a, b) => a.id - b.id);
 }
 
 /* ── Team statistics ────────────────────────────────────────────────── */
@@ -440,6 +520,8 @@ export interface TeamStatCol {
   /** statsapi key inside the split's `stat` object. */
   key: string;
   label: string;
+  /** Long form of the abbreviation — the column tooltip and the glossary entry. */
+  title: string;
 }
 
 export interface TeamStatRow {
@@ -457,39 +539,63 @@ export interface TeamStatTable {
 /* Column order for the team tables — also the order the team page lists a
  * single club's line in, so the two views stay in step. */
 export const TEAM_HITTING_COLS: TeamStatCol[] = [
-  { key: "gamesPlayed", label: "G" },
-  { key: "runs", label: "R" },
-  { key: "hits", label: "H" },
-  { key: "homeRuns", label: "HR" },
-  { key: "rbi", label: "RBI" },
-  { key: "doubles", label: "2B" },
-  { key: "triples", label: "3B" },
-  { key: "baseOnBalls", label: "BB" },
-  { key: "strikeOuts", label: "K" },
-  { key: "stolenBases", label: "SB" },
-  { key: "avg", label: "AVG" },
-  { key: "obp", label: "OBP" },
-  { key: "slg", label: "SLG" },
-  { key: "ops", label: "OPS" },
+  { key: "gamesPlayed", label: "G", title: "Games played" },
+  { key: "runs", label: "R", title: "Runs scored" },
+  { key: "hits", label: "H", title: "Hits" },
+  { key: "homeRuns", label: "HR", title: "Home runs" },
+  { key: "rbi", label: "RBI", title: "Runs batted in" },
+  { key: "doubles", label: "2B", title: "Doubles" },
+  { key: "triples", label: "3B", title: "Triples" },
+  { key: "baseOnBalls", label: "BB", title: "Walks (bases on balls)" },
+  { key: "strikeOuts", label: "K", title: "Strikeouts" },
+  { key: "stolenBases", label: "SB", title: "Stolen bases" },
+  { key: "avg", label: "AVG", title: "Batting average — hits per at-bat" },
+  {
+    key: "obp",
+    label: "OBP",
+    title: "On-base percentage — how often a batter reaches base",
+  },
+  {
+    key: "slg",
+    label: "SLG",
+    title: "Slugging percentage — total bases per at-bat",
+  },
+  { key: "ops", label: "OPS", title: "On-base plus slugging (OBP + SLG)" },
 ];
 
 export const TEAM_PITCHING_COLS: TeamStatCol[] = [
-  { key: "gamesPlayed", label: "G" },
-  { key: "wins", label: "W" },
-  { key: "losses", label: "L" },
-  { key: "era", label: "ERA" },
-  { key: "whip", label: "WHIP" },
-  { key: "inningsPitched", label: "IP" },
-  { key: "hits", label: "H" },
-  { key: "runs", label: "R" },
-  { key: "earnedRuns", label: "ER" },
-  { key: "homeRuns", label: "HR" },
-  { key: "baseOnBalls", label: "BB" },
-  { key: "strikeOuts", label: "K" },
-  { key: "saves", label: "SV" },
-  { key: "shutouts", label: "SHO" },
-  { key: "avg", label: "OAVG" },
-  { key: "strikeoutsPer9Inn", label: "K/9" },
+  { key: "gamesPlayed", label: "G", title: "Games played" },
+  { key: "wins", label: "W", title: "Wins" },
+  { key: "losses", label: "L", title: "Losses" },
+  {
+    key: "era",
+    label: "ERA",
+    title: "Earned run average — earned runs allowed per nine innings",
+  },
+  {
+    key: "whip",
+    label: "WHIP",
+    title: "Walks and hits allowed per inning pitched",
+  },
+  { key: "inningsPitched", label: "IP", title: "Innings pitched" },
+  { key: "hits", label: "H", title: "Hits allowed" },
+  { key: "runs", label: "R", title: "Runs allowed" },
+  { key: "earnedRuns", label: "ER", title: "Earned runs allowed" },
+  { key: "homeRuns", label: "HR", title: "Home runs allowed" },
+  { key: "baseOnBalls", label: "BB", title: "Walks issued" },
+  { key: "strikeOuts", label: "K", title: "Strikeouts recorded" },
+  { key: "saves", label: "SV", title: "Saves" },
+  { key: "shutouts", label: "SHO", title: "Shutouts" },
+  {
+    key: "avg",
+    label: "OAVG",
+    title: "Opponent batting average against this staff",
+  },
+  {
+    key: "strikeoutsPer9Inn",
+    label: "K/9",
+    title: "Strikeouts per nine innings pitched",
+  },
 ];
 
 /** Display form of a stat cell — "—" for anything the API didn't report. */
@@ -516,10 +622,11 @@ const cols = (group: "hitting" | "pitching") =>
 
 async function teamStatTable(
   group: "hitting" | "pitching",
-  season: number
+  season: number,
+  gameType: GameType
 ): Promise<TeamStatTable> {
   const data = await mlb(
-    `/teams/stats?season=${season}&sportIds=1&group=${group}&stats=season`,
+    `/teams/stats?season=${season}&sportIds=1&group=${group}&stats=season&gameType=${gameType}`,
     1800
   );
   const splits = (data.stats?.[0]?.splits ?? []) as any[];
@@ -545,10 +652,13 @@ async function teamStatTable(
  * section, and the source the team page pulls its own club's line from, so
  * both read the same cached pair of requests.
  */
-export async function getTeamStats(season: number): Promise<TeamStatTable[]> {
+export async function getTeamStats(
+  season: number,
+  gameType: GameType = "R"
+): Promise<TeamStatTable[]> {
   return Promise.all([
-    teamStatTable("hitting", season),
-    teamStatTable("pitching", season),
+    teamStatTable("hitting", season, gameType),
+    teamStatTable("pitching", season, gameType),
   ]);
 }
 
@@ -881,3 +991,33 @@ export async function getPlayerSeasons(id: number): Promise<number[]> {
   }
   return [...seasons].sort((a, b) => b - a);
 }
+
+/* ── Clinch / elimination marks ─────────────────────────────────────── */
+
+/**
+ * The mark shown beside a club's name once its post-season is settled one way
+ * or the other. MLB's payload uses its own letters ("z", "y", "w") for what a
+ * club has clinched, and reports elimination separately as a magic number of
+ * "E", so both are folded into one symbol here.
+ */
+export function clinchMark(r: StandingRow): string {
+  switch (r.clinch.toLowerCase()) {
+    case "z":
+      return "*";
+    case "y":
+      return "X";
+    case "w":
+      return "Y";
+    case "e":
+      return "E";
+  }
+  return r.elim === "E" && r.wcElim === "E" ? "E" : "";
+}
+
+/** What each mark above means, for the glossary under the tables. */
+export const CLINCH_LEGEND: { label: string; title: string }[] = [
+  { label: "*", title: "Clinched Best League Record" },
+  { label: "Y", title: "Clinched Wild Card" },
+  { label: "E", title: "Eliminated from Playoff Contention" },
+  { label: "X", title: "Clinched Division" },
+];

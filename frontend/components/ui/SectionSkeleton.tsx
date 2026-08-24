@@ -48,6 +48,15 @@ export default function SectionSkeleton({ section }: { section: string }) {
         </div>
       );
 
+    case "wildcard":
+      return (
+        <div className="space-y-3">
+          {[0, 1].map((i) => (
+            <SkeletonTable key={i} rows={12} delay={i * 0.12} />
+          ))}
+        </div>
+      );
+
     case "teams":
       return (
         <div className="space-y-3">

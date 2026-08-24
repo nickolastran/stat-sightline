@@ -10,7 +10,7 @@ export default function LeagueBar() {
   return (
     <div className="sticky top-12 z-30 border-b border-line bg-bg">
       <div className="no-scrollbar flex items-center gap-px overflow-x-auto px-4 py-1.5">
-        {LEAGUE_SECTIONS.map((s) => (
+        {LEAGUE_SECTIONS.filter((s) => !("inBar" in s) || s.inBar).map((s) => (
           <Link
             key={s.id}
             href={`/league/${s.id}`}

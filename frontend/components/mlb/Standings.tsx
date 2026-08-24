@@ -5,7 +5,8 @@ import SegmentedControl from "@/components/ui/SegmentedControl";
 import SortHeader from "@/components/ui/SortHeader";
 import TeamLink from "@/components/mlb/TeamLink";
 import { sortRows, toggleSort, type Sort } from "@/lib/sortTable";
-import type { Division, StandingRow } from "@/lib/mlb";
+import Glossary from "@/components/mlb/Glossary";
+import { clinchMark, CLINCH_LEGEND, type Division, type StandingRow } from "@/lib/mlb";
 import type { StandingsProjection, TeamProjection } from "@/lib/api";
 
 /*
@@ -221,6 +222,24 @@ function groupsFor(divisions: Division[], scope: Scope, proj: Map<number, TeamPr
   }));
 }
 
+/**
+ * The clinch/elimination symbol, ahead of the club it belongs to and spelled
+ * out on hover. Quiet by design — it qualifies the row rather than competing
+ * with the record, so it sits in the muted ink the other annotations use.
+ */
+export function ClinchMark({ row }: { row: StandingRow }) {
+  const mark = clinchMark(row);
+  if (!mark) return null;
+  return (
+    <span
+      className="shrink-0 tabular-nums text-ink-3"
+      title={CLINCH_LEGEND.find((c) => c.label === mark)?.title}
+    >
+      {mark} –
+    </span>
+  );
+}
+
 function StandingsTable({
   group,
   scope,
@@ -301,7 +320,12 @@ function StandingsTable({
                 className="border-t border-grid text-ink-2 hover:bg-surface-2"
               >
                 <td className="px-3 py-1.5">
-                  <TeamLink id={t.id} name={t.name} />
+                  {/* TeamLink is a flex row of its own, so the mark only sits
+                      beside the logo from inside a row with it. */}
+                  <span className="flex items-center gap-1">
+                    <ClinchMark row={t} />
+                    <TeamLink id={t.id} name={t.name} className="min-w-0" />
+                  </span>
                 </td>
                 {scope !== "division" && (
                   <td className="whitespace-nowrap px-2 py-1.5 text-[10px] tracking-wider text-ink-3">
@@ -349,10 +373,13 @@ function ModelNote({ model, asOf }: { model: StandingsProjection["model"]; asOf:
 export default function Standings({
   divisions,
   projection = null,
+  left,
 }: {
   divisions: Division[];
   /** Projected finishes, when the projection service answered. */
   projection?: StandingsProjection | null;
+  /** Shares the controls row with the scope toggle — the view buttons. */
+  left?: React.ReactNode;
 }) {
   const [scope, setScope] = useState<Scope>("division");
   const [sort, setSort] = useState<Sort>(DEFAULT_SORT);
@@ -364,9 +391,12 @@ export default function Standings({
 
   if (divisions.length === 0)
     return (
-      <p className="border border-line bg-bg px-3 py-6 text-center text-xs text-ink-3">
-        NO STANDINGS FOR THIS SEASON YET
-      </p>
+      <div className="space-y-3">
+        {left}
+        <p className="border border-line bg-bg px-3 py-6 text-center text-xs text-ink-3">
+          NO STANDINGS FOR THIS SEASON YET
+        </p>
+      </div>
     );
 
   const cols = projection ? [...COLS, ...PROJ_COLS] : COLS;
@@ -374,7 +404,8 @@ export default function Standings({
 
   return (
     <div className="space-y-3">
-      <div className="flex justify-end">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        {left}
         <SegmentedControl<Scope>
           ariaLabel="Standings scope"
           value={scope}
@@ -395,6 +426,11 @@ export default function Standings({
       ))}
 
       {projection && <ModelNote model={projection.model} asOf={projection.as_of} />}
+
+      <Glossary
+        entries={cols.map((c) => ({ label: c.label, title: c.title }))}
+        groups={[{ name: "CLINCH", entries: CLINCH_LEGEND }]}
+      />
     </div>
   );
 }

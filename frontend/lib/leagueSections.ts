@@ -2,12 +2,17 @@
  * The league reference sections, shared by the bar that links to them and the
  * route that renders them, so a new section is added in exactly one place.
  * `tab` is the short bar label; `title` is the panel heading on the page.
+ *
+ * `inBar: false` keeps a section routable without giving it a bar tab of its
+ * own — the wild-card race is reached from the standings page instead, since
+ * the two are the same table read two ways.
  */
 export const LEAGUE_SECTIONS = [
   { id: "scoreboard", tab: "SCOREBOARD", title: "SCOREBOARD" },
   { id: "leaders", tab: "STAT LEADERS", title: "STAT LEADERS" },
   { id: "probables", tab: "PROBABLES", title: "PROBABLE PITCHERS — TODAY" },
   { id: "standings", tab: "STANDINGS", title: "STANDINGS" },
+  { id: "wildcard", tab: "WILD CARD", title: "WILD CARD RACE", inBar: false },
   { id: "teams", tab: "TEAM STATS", title: "TEAM STATISTICS" },
 ] as const;
 
@@ -15,3 +20,13 @@ export type LeagueSection = (typeof LEAGUE_SECTIONS)[number]["id"];
 
 export const findSection = (id: string) =>
   LEAGUE_SECTIONS.find((s) => s.id === id);
+
+/**
+ * The standings page and the wild-card race, as the pair of buttons each of
+ * them shows above its table. They are separate routes rather than one view
+ * flag because each is its own MLB payload, fetched on the server.
+ */
+export const STANDINGS_VIEWS = [
+  { id: "standings", label: "STANDINGS" },
+  { id: "wildcard", label: "WILD CARD" },
+] as const;
