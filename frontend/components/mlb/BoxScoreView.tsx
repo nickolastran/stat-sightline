@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useTimeZone } from "@/lib/useTimeZone";
 import {
   gameStatus,
   teamLogo,
@@ -297,7 +298,7 @@ export default function BoxScoreView({
   right?: React.ReactNode;
 }) {
   const [side, setSide] = useState<"away" | "home">("away");
-  const st = gameStatus(game);
+  const st = gameStatus(game, useTimeZone());
   const tone =
     st.tone === "live" ? "text-good" : st.tone === "final" ? "text-ink-3" : "text-accent";
 
@@ -332,11 +333,11 @@ export default function BoxScoreView({
             <p className="text-xs text-ink-3">NOT STARTED — NO BOX SCORE YET</p>
             <p className="mt-2 text-[11px] text-ink-2">
               <PlayerLink id={game.away.probable?.id}>
-                {game.away.probable?.name ?? "TBD"}
+                {game.away.probable?.name ?? "TBA"}
               </PlayerLink>
               <span className="mx-2 text-ink-3">vs</span>
               <PlayerLink id={game.home.probable?.id}>
-                {game.home.probable?.name ?? "TBD"}
+                {game.home.probable?.name ?? "TBA"}
               </PlayerLink>
             </p>
           </div>

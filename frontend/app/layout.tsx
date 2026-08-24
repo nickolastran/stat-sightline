@@ -48,7 +48,11 @@ export default function RootLayout({
         </header>
         <LeagueBar />
         <ScoreboardSlot />
-        {children}
+        {/* The page owns its own centred, max-width container. It needs a
+            plain block to live in: as a direct flex item its `mx-auto` would
+            absorb the free space instead of the box stretching, collapsing
+            every page to the width of its content. */}
+        <div className="flex-1">{children}</div>
         <SiteFooter />
       </body>
     </html>

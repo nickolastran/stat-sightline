@@ -16,6 +16,7 @@ import StandingsViews from "@/components/mlb/StandingsViews";
 import {
   LEAGUE_SECTIONS,
   findSection,
+  sectionWidth,
   type LeagueSection,
 } from "@/lib/leagueSections";
 import {
@@ -195,7 +196,7 @@ export default async function LeagueSectionPage({
       : `?season=${season}${carried === "R" ? "" : `&type=${carried}`}`;
 
   return (
-    <div className="mx-auto max-w-7xl space-y-3 p-3">
+    <div className={`mx-auto ${sectionWidth(found.id)} space-y-3 p-3`}>
       <Panel
         title={found.title}
         right={

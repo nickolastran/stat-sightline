@@ -1,4 +1,5 @@
-import { gameStatus, teamLogo, type Game, type GameSide } from "@/lib/mlb";
+import { teamLogo, type Game, type GameSide } from "@/lib/mlb";
+import GameStatus from "@/components/mlb/GameStatus";
 
 /*
  * One game in the scoreboard. `detailed` adds probable pitchers + venue for
@@ -11,10 +12,13 @@ function TeamRow({
   s,
   live,
   detailed,
+  upcoming,
 }: {
   s: GameSide;
   live: boolean;
   detailed: boolean;
+  /** First pitch is still ahead, so an unnamed starter is one still to come. */
+  upcoming: boolean;
 }) {
   return (
     <div className="flex items-center gap-2 py-1">
@@ -38,9 +42,11 @@ function TeamRow({
           </span>
         )}
       </span>
-      {detailed && s.probable && (
+      {/* A game already under way says nothing rather than "TBA": there is
+          nothing left to announce once the starter has thrown a pitch. */}
+      {detailed && (s.probable || upcoming) && (
         <span className="hidden truncate text-[10px] text-ink-3 sm:block">
-          {s.probable.name}
+          {s.probable?.name ?? "TBA"}
         </span>
       )}
       <span
@@ -63,32 +69,21 @@ export default function GameCard({
   detailed?: boolean;
   className?: string;
 }) {
-  const st = gameStatus(game);
   const live = game.state === "Live";
-  const tone =
-    st.tone === "live"
-      ? "text-good"
-      : st.tone === "final"
-        ? "text-ink-3"
-        : "text-accent";
+  const upcoming = game.state === "Preview";
 
   return (
     <div className={`border border-line bg-bg p-2 ${className}`}>
       <div className="mb-1 flex items-center justify-between">
-        <span className={`text-[10px] tracking-widest ${tone}`}>
-          {live && (
-            <span className="mr-1 inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-good align-middle" />
-          )}
-          {st.text}
-        </span>
+        <GameStatus game={game} />
         {detailed && game.venue && (
           <span className="hidden truncate text-[10px] text-ink-3 sm:block">
             {game.venue}
           </span>
         )}
       </div>
-      <TeamRow s={game.away} live={live} detailed={detailed} />
-      <TeamRow s={game.home} live={live} detailed={detailed} />
+      <TeamRow s={game.away} live={live} detailed={detailed} upcoming={upcoming} />
+      <TeamRow s={game.home} live={live} detailed={detailed} upcoming={upcoming} />
     </div>
   );
 }

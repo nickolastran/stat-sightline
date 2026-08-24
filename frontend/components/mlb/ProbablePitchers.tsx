@@ -1,4 +1,4 @@
-import { teamLogo, type Game, type GameSide } from "@/lib/mlb";
+import { sortGames, teamLogo, type Game, type GameSide } from "@/lib/mlb";
 import PlayerLink from "@/components/mlb/PlayerLink";
 import GameFeedLink from "@/components/mlb/GameFeedLink";
 
@@ -8,7 +8,11 @@ import GameFeedLink from "@/components/mlb/GameFeedLink";
  * league bar's dropdown so both read identically.
  */
 
-/** Games with at least one side's starter announced. */
+/**
+ * Games with at least one side's starter announced — the count the dashboard
+ * reports. The list below shows the whole slate regardless, since a matchup
+ * nobody has named a starter for is still a matchup being played today.
+ */
 export const probableGames = (games: Game[]) =>
   games.filter((g) => g.away.probable || g.home.probable);
 
@@ -38,7 +42,7 @@ function Prob({
         <p className="truncate font-bold text-ink">{side.abbr}</p>
         <p className="truncate text-[10px] text-ink-3">
           <PlayerLink id={side.probable?.id}>
-            {side.probable?.name ?? "TBD"}
+            {side.probable?.name ?? "TBA"}
           </PlayerLink>
         </p>
       </div>
@@ -47,18 +51,16 @@ function Prob({
 }
 
 export default function ProbablePitchers({ games }: { games: Game[] }) {
-  const probables = probableGames(games);
-
-  if (probables.length === 0)
+  if (games.length === 0)
     return (
       <p className="border border-line bg-bg px-3 py-6 text-center text-xs text-ink-3">
-        NO PROBABLE PITCHERS ANNOUNCED FOR TODAY
+        NO GAMES SCHEDULED FOR TODAY
       </p>
     );
 
   return (
     <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
-      {probables.map((g) => (
+      {sortGames(games).map((g) => (
         <div
           key={g.pk}
           className="flex items-center justify-between gap-3 border border-line bg-bg px-3 py-2 text-xs"

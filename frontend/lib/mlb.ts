@@ -155,16 +155,26 @@ export const sortGames = (games: Game[]): Game[] =>
     );
 
 /**
+ * Baseball's home zone, and the fallback for a first-pitch time whenever the
+ * viewer's own can't be known — on the server, which renders in UTC, and in a
+ * browser whose Intl won't name a zone.
+ */
+export const FALLBACK_TZ = "America/New_York";
+
+/**
  * The one-line status a game shows everywhere: half-inning while live, the
  * detailed state once final, otherwise first pitch. `tone` picks the colour
  * without the caller re-deriving the state.
  *
- * First pitch is rendered in the viewer's own zone — no `timeZone` option, so
- * Intl falls back to the runtime default — and carries its abbreviation
- * ("7:05 PM PDT") so the number is never ambiguous. Only the client-side
- * scoreboard and box score call this, so "runtime" is the browser.
+ * First pitch carries its zone abbreviation ("7:05 PM PDT") so the number is
+ * never ambiguous. The zone is passed in rather than left to Intl's default:
+ * these cards are server-rendered, and the server's default is UTC, which is
+ * nobody's local time. See useTimeZone for who supplies the viewer's.
  */
-export function gameStatus(g: Game): {
+export function gameStatus(
+  g: Game,
+  timeZone: string = FALLBACK_TZ
+): {
   text: string;
   tone: "live" | "final" | "pre";
 } {
@@ -181,6 +191,7 @@ export function gameStatus(g: Game): {
     hour: "numeric",
     minute: "2-digit",
     timeZoneName: "short",
+    timeZone,
   }).format(new Date(g.startTime));
   return { text: t, tone: "pre" };
 }

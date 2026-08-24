@@ -9,7 +9,14 @@
  * Run with:  npx tsx lib/mlb.check.ts
  */
 import assert from "node:assert/strict";
-import { clinchMark, clinchPhase, gamesBack, type StandingRow } from "./mlb";
+import {
+  clinchMark,
+  clinchPhase,
+  gameStatus,
+  gamesBack,
+  type Game,
+  type StandingRow,
+} from "./mlb";
 
 const row = (p: Partial<StandingRow>) =>
   ({ clinch: "", elim: "", wcElim: "", ...p }) as StandingRow;
@@ -62,5 +69,37 @@ assert.deepEqual(april.map(gamesBack(april)), [2.5, 0], "no negative figures");
 const tied = [club(65, 66), club(65, 66), club(62, 69)];
 assert.deepEqual(tied.map(gamesBack(tied)), [0, 0, 3], "a tie leaves both at 0");
 
+/*
+ * First pitch in the viewer's zone. These cards are server-rendered, where the
+ * default zone is the host's UTC — so the zone is an argument, and leaving it
+ * off has to mean Eastern rather than whatever the machine happens to be set
+ * to. Run this under TZ=UTC and TZ=Asia/Tokyo alike and it holds.
+ */
+const preview = {
+  state: "Preview",
+  detailedState: "Scheduled",
+  startTime: "2026-08-25T02:40:00Z",
+  inning: null,
+  inningState: null,
+} as Game;
+
+assert.equal(gameStatus(preview).text, "10:40 PM EDT", "defaults to Eastern");
+assert.equal(
+  gameStatus(preview, "America/Los_Angeles").text,
+  "7:40 PM PDT",
+  "renders in the zone it is given"
+);
+assert.equal(gameStatus(preview).tone, "pre");
+
+// A game under way or finished reports its state, not a clock.
+const live = { ...preview, state: "Live", inning: 7, inningState: "Top" } as Game;
+assert.equal(gameStatus(live, "Asia/Tokyo").text, "TOP 7", "zone is irrelevant once it starts");
+assert.equal(
+  gameStatus({ ...preview, state: "Final", inning: 10 } as Game).text,
+  "SCHEDULED/10",
+  "extra innings ride along with the final state"
+);
+
 console.log("clinchMark ok");
 console.log("gamesBack ok");
+console.log("gameStatus ok");

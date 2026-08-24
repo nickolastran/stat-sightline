@@ -7,7 +7,7 @@ const REPO = "https://github.com/nickolastran/stat-sightline";
 
 export default function SiteFooter() {
   return (
-    <footer className="mt-auto flex flex-wrap items-center justify-between gap-x-6 gap-y-2 border-t border-line px-6 py-4 text-[10px] tracking-wider text-ink-3 sm:px-10">
+    <footer className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2 border-t border-line px-6 py-4 text-[10px] tracking-wider text-ink-3 sm:px-10">
       <span>
         © {new Date().getFullYear()} NICKOLAS TRAN · STAT//SIGHTLINE v0.1
       </span>
