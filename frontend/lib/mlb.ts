@@ -16,6 +16,13 @@ const DIVISIONS: Record<number, string> = {
   205: "NL CENTRAL",
 };
 
+/*
+ * The order the divisions are read in — east to west down each league, the way
+ * every scoreboard prints them. Alphabetical order by name would open the
+ * American League on its Central.
+ */
+const DIVISION_ORDER = [201, 202, 200, 204, 205, 203];
+
 /** League id → display name. Fixed alongside the division ids above. */
 const LEAGUES: Record<number, string> = {
   103: "AMERICAN LEAGUE",
@@ -329,12 +336,12 @@ export async function getBoxScore(pk: number): Promise<BoxScore> {
 /* ── Standings ──────────────────────────────────────────────────────── */
 
 /**
- * One club's line in the standings. Rank and games-back come in three
- * flavours because the standings page shows the same rows grouped three ways
- * (division / league / all MLB) — each scope reads its own pair, so a merged
- * table never shows a division-relative GB next to a league-wide field.
- * Every row carries its own division and league so it stays self-describing
- * once lifted out of its division table.
+ * One club's line in the standings. Rank comes in three flavours because the
+ * standings page shows the same rows grouped three ways (division / league /
+ * all MLB). Games back does not: MLB only computes it against the division,
+ * and not at all for spring training, so the table works it out per group from
+ * the wins and losses instead. Every row carries its own division and league
+ * so it stays self-describing once lifted out of its division table.
  */
 export interface StandingRow {
   id: number;
@@ -347,8 +354,6 @@ export interface StandingRow {
   losses: number;
   pct: string;
   gb: string;
-  leagueGb: string;
-  sportGb: string;
   divRank: string;
   leagueRank: string;
   sportRank: string;
@@ -426,8 +431,6 @@ function standingRow(t: any): StandingRow {
     losses: t.losses ?? 0,
     pct: t.winningPercentage ?? "—",
     gb: t.gamesBack ?? "-",
-    leagueGb: t.leagueGamesBack ?? "-",
-    sportGb: t.sportGamesBack ?? "-",
     divRank: t.divisionRank ?? "—",
     leagueRank: t.leagueRank ?? "—",
     sportRank: t.sportRank ?? "—",
@@ -473,7 +476,30 @@ export async function getStandings(
         teams: (r.teamRecords ?? []).map(standingRow),
       };
     })
-    .sort((a, b) => a.name.localeCompare(b.name));
+    .sort((a, b) => DIVISION_ORDER.indexOf(a.id) - DIVISION_ORDER.indexOf(b.id));
+}
+
+/*
+ * Games back, worked out from the rows rather than read off the payload.
+ *
+ * It is relative to whatever group it is being shown in — at league scope a
+ * club's distance is from the best record in its league, not its division —
+ * and MLB only reports the division figure reliably: its all-MLB number is
+ * blank for every club in spring training, and so is its division one, which
+ * left a spring table reading "-" for all thirty. One subtraction covers every
+ * scope and both game types, and reproduces MLB's own regular-season figures
+ * exactly.
+ *
+ * The reference is the club with the best win-loss margin rather than the best
+ * percentage, because games back is a function of that margin alone: measuring
+ * from it is what keeps every other figure at or above zero, even in April
+ * when clubs have played unequal numbers of games.
+ */
+const margin = (r: StandingRow) => r.wins - r.losses;
+
+export function gamesBack(teams: StandingRow[]): (r: StandingRow) => number {
+  const lead = Math.max(...teams.map(margin));
+  return (r) => (lead - margin(r)) / 2;
 }
 
 /**

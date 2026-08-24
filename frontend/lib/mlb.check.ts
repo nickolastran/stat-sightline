@@ -9,7 +9,7 @@
  * Run with:  npx tsx lib/mlb.check.ts
  */
 import assert from "node:assert/strict";
-import { clinchMark, clinchPhase, type StandingRow } from "./mlb";
+import { clinchMark, clinchPhase, gamesBack, type StandingRow } from "./mlb";
 
 const row = (p: Partial<StandingRow>) =>
   ({ clinch: "", elim: "", wcElim: "", ...p }) as StandingRow;
@@ -37,4 +37,30 @@ assert.equal(clinchMark(row({}), "live"), "", "nothing decided yet");
 /* A season with no post-season claims nothing about anyone. */
 assert.equal(clinchMark(row({ elim: "E", wcElim: "E" }), "none"), "", "1994 — no October to be eliminated from");
 
+/*
+ * Games back, against MLB's own published 2026 American League figures — the
+ * payload it computes for the regular season, and the one it leaves blank for
+ * spring training.
+ */
+const club = (wins: number, losses: number) => row({ wins, losses });
+const al = [
+  club(77, 53), // Tampa Bay — league leader
+  club(74, 56), // Yankees
+  club(71, 59), // Red Sox
+  club(68, 62), // White Sox
+  club(65, 66), // Guardians
+];
+const gb = gamesBack(al);
+assert.deepEqual(al.map(gb), [0, 3, 6, 9, 12.5], "matches leagueGamesBack");
+
+// A club with a better margin but a lower percentage would go negative if the
+// reference were picked on percentage — April, when games played differ.
+const april = [club(10, 0), club(20, 5)];
+assert.deepEqual(april.map(gamesBack(april)), [2.5, 0], "no negative figures");
+
+// Two clubs level at the top are both level with the leader.
+const tied = [club(65, 66), club(65, 66), club(62, 69)];
+assert.deepEqual(tied.map(gamesBack(tied)), [0, 0, 3], "a tie leaves both at 0");
+
 console.log("clinchMark ok");
+console.log("gamesBack ok");

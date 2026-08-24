@@ -9,6 +9,7 @@ import Glossary from "@/components/mlb/Glossary";
 import {
   clinchMark,
   clinchPhase,
+  gamesBack,
   CLINCH_LEGEND,
   type ClinchPhase,
   type Division,
@@ -39,9 +40,6 @@ const SCOPES: { value: Scope; label: string }[] = [
   { value: "mlb", label: "ALL MLB" },
 ];
 
-/** A games-back figure: the leader's "-" is 0 games back, not a missing value. */
-const gbNum = (gb: string) => (gb === "-" || gb === "" ? 0 : Number(gb));
-
 /** "5-5" → 5 wins, so the split columns sort by wins over the span. */
 const recordWins = (r: string) => {
   const w = Number(r.split("-")[0]);
@@ -55,25 +53,17 @@ const streakNum = (s: string) => {
   return s.startsWith("L") ? -n : n;
 };
 
-/** A standings line with its projection attached, if there is one. */
-type Row = StandingRow & { proj: TeamProjection | null };
+/** A standings line with its projection attached, and its games back of the
+ * leader of whichever group it is being shown in. */
+type Row = StandingRow & { proj: TeamProjection | null; gbGames: number };
 
 interface Col {
   key: string;
   label: string;
   title: string;
-  text: (r: Row, scope: Scope) => string;
-  num: (r: Row, scope: Scope) => number | null;
+  text: (r: Row) => string;
+  num: (r: Row) => number | null;
 }
-
-/*
- * Games back is scope-relative: at league scope a club's GB is its distance
- * from the best record in its league, not its division. The API reports all
- * three figures, so the column reads the one matching the active scope
- * instead of the merged view showing a number that means something else.
- */
-const pick = <T,>(scope: Scope, div: T, league: T, mlb: T) =>
-  scope === "division" ? div : scope === "league" ? league : mlb;
 
 const COLS: Col[] = [
   {
@@ -101,8 +91,8 @@ const COLS: Col[] = [
     key: "gb",
     label: "GB",
     title: "Games back of the leader in the current scope",
-    text: (r, s) => pick(s, r.gb, r.leagueGb, r.sportGb),
-    num: (r, s) => gbNum(pick(s, r.gb, r.leagueGb, r.sportGb)),
+    text: (r) => (r.gbGames === 0 ? "-" : r.gbGames.toFixed(1)),
+    num: (r) => r.gbGames,
   },
   {
     key: "rs",
@@ -206,26 +196,37 @@ interface Group {
   teams: Row[];
 }
 
-/** The six division tables regrouped for the active scope. */
+/**
+ * The six division tables regrouped for the active scope. Games back is
+ * measured within each finished group, so the same club reads 3.0 back of its
+ * division and 9.0 back of its league without either number being invented.
+ */
 function groupsFor(divisions: Division[], scope: Scope, proj: Map<number, TeamProjection>): Group[] {
-  const withProj = (teams: StandingRow[]): Row[] =>
-    teams.map((t) => ({ ...t, proj: proj.get(t.id) ?? null }));
+  const rows = (teams: StandingRow[]): Row[] => {
+    const gb = gamesBack(teams);
+    return teams.map((t) => ({
+      ...t,
+      proj: proj.get(t.id) ?? null,
+      gbGames: gb(t),
+    }));
+  };
 
   if (scope === "division")
     return divisions.map((d) => ({
       id: String(d.id),
       name: d.name,
-      teams: withProj(d.teams),
+      teams: rows(d.teams),
     }));
 
-  const all = withProj(divisions.flatMap((d) => d.teams));
-  if (scope === "mlb") return [{ id: "mlb", name: "MAJOR LEAGUE BASEBALL", teams: all }];
+  const all = divisions.flatMap((d) => d.teams);
+  if (scope === "mlb")
+    return [{ id: "mlb", name: "MAJOR LEAGUE BASEBALL", teams: rows(all) }];
 
   const leagues = [...new Set(divisions.map((d) => d.leagueId))].sort();
   return leagues.map((leagueId) => ({
     id: String(leagueId),
     name: divisions.find((d) => d.leagueId === leagueId)!.league,
-    teams: all.filter((t) => t.leagueId === leagueId),
+    teams: rows(all.filter((t) => t.leagueId === leagueId)),
   }));
 }
 
@@ -274,8 +275,8 @@ function StandingsTable({
     cols.find((c) => c.key === sort.key) ??
     cols.find((c) => c.key === DEFAULT_SORT.key)!;
   const teams = useMemo(
-    () => sortRows(group.teams, sort.dir, (r) => col.num(r, scope)),
-    [group.teams, sort.dir, col, scope]
+    () => sortRows(group.teams, sort.dir, (r) => col.num(r)),
+    [group.teams, sort.dir, col]
   );
 
   return (
@@ -354,7 +355,7 @@ function StandingsTable({
                       c.key === "w" ? "font-bold text-ink" : ""
                     } ${sort.key === c.key ? "text-ink" : ""}`}
                   >
-                    {c.text(t, scope)}
+                    {c.text(t)}
                   </td>
                 ))}
               </tr>
