@@ -3,6 +3,7 @@ import Link from "next/link";
 import ThemeToggle from "@/components/ThemeToggle";
 import LeagueBar from "@/components/mlb/LeagueBar";
 import ScoreboardSlot from "@/components/mlb/ScoreboardSlot";
+import SiteFooter from "@/components/SiteFooter";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -24,7 +25,9 @@ export default function RootLayout({
       <head>
         <script dangerouslySetInnerHTML={{ __html: NO_FLASH }} />
       </head>
-      <body className="min-h-screen antialiased">
+      {/* A column, so the footer sits at the bottom of a short page rather
+          than floating up under the content. */}
+      <body className="flex min-h-screen flex-col antialiased">
         <header className="sticky top-0 z-40 flex h-12 items-center justify-between border-b border-line bg-bg px-4">
           <Link href="/" className="text-sm font-bold tracking-widest">
             STAT<span className="text-accent">//</span>SIGHTLINE
@@ -44,6 +47,7 @@ export default function RootLayout({
         <LeagueBar />
         <ScoreboardSlot />
         {children}
+        <SiteFooter />
       </body>
     </html>
   );

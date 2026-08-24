@@ -122,11 +122,6 @@ export default async function LandingPage() {
           </div>
         </div>
       </section>
-
-      <footer className="flex flex-wrap items-center justify-between gap-2 border-x border-t border-line px-6 py-4 text-[10px] tracking-wider text-ink-3 sm:px-10">
-        <span>STAT//SIGHTLINE v0.1 — PITCH FACT TABLE, POSTGRES ≥ 13</span>
-        <span>DATA: MLB STATCAST. NOT AFFILIATED WITH MLB.</span>
-      </footer>
     </div>
   );
 }
