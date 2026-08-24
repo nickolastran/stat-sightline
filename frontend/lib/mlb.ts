@@ -688,6 +688,77 @@ export async function getTeamStats(
   ]);
 }
 
+/* ── Search ─────────────────────────────────────────────────────────── */
+
+/** One suggestion in the header search — a club or a person. */
+export interface SearchHit {
+  kind: "player" | "team";
+  id: number;
+  name: string;
+  /** Position and club for a player; league and division for a team. */
+  detail: string;
+}
+
+/** The 30 clubs, cached for a day — they change once a decade. */
+async function mlbTeams(): Promise<any[]> {
+  const data = await mlb(`/teams?sportId=1`, 86400);
+  return (data.teams ?? []) as any[];
+}
+
+/**
+ * Clubs and people matching what has been typed, clubs first.
+ *
+ * MLB's people search covers the whole of organised baseball, so a query lands
+ * minor leaguers and long-retired players alongside the major leaguer almost
+ * everyone means. Current major leaguers are floated to the top rather than
+ * filtered out, since a search for a retired great should still find him.
+ */
+export async function searchAll(q: string, limit = 8): Promise<SearchHit[]> {
+  const needle = q.trim().toLowerCase();
+  if (!needle) return [];
+
+  const [teams, people] = await Promise.all([
+    mlbTeams().catch(() => [] as any[]),
+    mlb(
+      `/people/search?names=${encodeURIComponent(needle)}&hydrate=currentTeam`,
+      3600
+    )
+      .then((d) => (d.people ?? []) as any[])
+      .catch(() => [] as any[]),
+  ]);
+
+  const teamHits: SearchHit[] = teams
+    .filter((t) =>
+      [t.name, t.teamName, t.locationName, t.abbreviation]
+        .filter(Boolean)
+        .some((f: string) => f.toLowerCase().includes(needle))
+    )
+    .map((t) => ({
+      kind: "team" as const,
+      id: t.id,
+      name: t.name,
+      detail: [LEAGUES[t.league?.id], DIVISIONS[t.division?.id]]
+        .filter(Boolean)
+        .join(" · "),
+    }));
+
+  const major = new Set(teams.map((t) => t.id));
+  const playerHits = people
+    .map((p) => ({
+      kind: "player" as const,
+      id: p.id,
+      name: p.fullName ?? "—",
+      detail: [p.primaryPosition?.abbreviation, p.currentTeam?.name]
+        .filter(Boolean)
+        .join(" · "),
+      rank: major.has(p.currentTeam?.id) ? 0 : 1,
+    }))
+    .sort((a, b) => a.rank - b.rank)
+    .map(({ rank: _rank, ...hit }): SearchHit => hit);
+
+  return [...teamHits, ...playerHits].slice(0, limit);
+}
+
 /* ── One team ───────────────────────────────────────────────────────── */
 
 export interface RosterEntry {

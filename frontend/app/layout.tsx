@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import ThemeToggle from "@/components/ThemeToggle";
+import SiteSearch from "@/components/mlb/SiteSearch";
 import LeagueBar from "@/components/mlb/LeagueBar";
 import ScoreboardSlot from "@/components/mlb/ScoreboardSlot";
 import SiteFooter from "@/components/SiteFooter";
@@ -32,7 +33,8 @@ export default function RootLayout({
           <Link href="/" className="text-sm font-bold tracking-widest">
             STAT<span className="text-accent">//</span>SIGHTLINE
           </Link>
-          <nav className="flex items-center gap-px text-xs">
+          <nav className="flex items-center gap-2 text-xs">
+            <SiteSearch />
             <Link
               href="/#access"
               className="border border-accent bg-accent px-3 py-1.5 font-bold text-white hover:opacity-90"

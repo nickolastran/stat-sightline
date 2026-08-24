@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useTypeahead } from "@/lib/useTypeahead";
 import { searchPitchers, type Pitcher } from "@/lib/api";
 import { playerHeadshot } from "@/lib/mlb";
 
@@ -24,61 +25,12 @@ export default function PlayerSearch({
 }: Props) {
   const router = useRouter();
   const [q, setQ] = useState("");
-  const [results, setResults] = useState<Pitcher[]>([]);
-  const [open, setOpen] = useState(false);
-  const [active, setActive] = useState(0);
-  const [error, setError] = useState<string | null>(null);
-  const rootRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!q.trim()) {
-      setResults([]);
-      setOpen(false);
-      return;
-    }
-    const t = setTimeout(async () => {
-      try {
-        const rows = await searchPitchers(q.trim(), 8);
-        setResults(rows);
-        setActive(0);
-        setOpen(true);
-        setError(null);
-      } catch {
-        setError("API UNREACHABLE :8000");
-        setOpen(false);
-      }
-    }, 150);
-    return () => clearTimeout(t);
-  }, [q]);
-
-  useEffect(() => {
-    const close = (e: MouseEvent) => {
-      if (!rootRef.current?.contains(e.target as Node)) setOpen(false);
-    };
-    document.addEventListener("mousedown", close);
-    return () => document.removeEventListener("mousedown", close);
-  }, []);
-
-  const go = (p: Pitcher) => {
-    setOpen(false);
-    router.push(`/pitcher/${p.player_id}`);
-  };
-
-  const onKeyDown = (e: React.KeyboardEvent) => {
-    if (!open || results.length === 0) return;
-    if (e.key === "ArrowDown") {
-      e.preventDefault();
-      setActive((a) => Math.min(a + 1, results.length - 1));
-    } else if (e.key === "ArrowUp") {
-      e.preventDefault();
-      setActive((a) => Math.max(a - 1, 0));
-    } else if (e.key === "Enter") {
-      e.preventDefault();
-      go(results[active]);
-    } else if (e.key === "Escape") {
-      setOpen(false);
-    }
-  };
+  const { results, open, setOpen, active, setActive, error, rootRef, onKeyDown, pick } =
+    useTypeahead<Pitcher>(
+      q,
+      (query) => searchPitchers(query, 8),
+      (p) => router.push(`/pitcher/${p.player_id}`)
+    );
 
   const heroSizing = size === "hero" ? "h-14 text-base" : "h-8 text-xs";
 
@@ -123,7 +75,7 @@ export default function PlayerSearch({
               <button
                 type="button"
                 onMouseEnter={() => setActive(i)}
-                onClick={() => go(p)}
+                onClick={() => pick(p)}
                 className={`flex w-full items-center justify-between px-3 py-2 text-left text-xs ${
                   i === active ? "bg-surface-2 text-ink" : "text-ink-2"
                 }`}
