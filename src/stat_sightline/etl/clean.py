@@ -20,6 +20,7 @@ INT_COLS = {
     "game_pk", "at_bat_number", "pitch_number", "batter", "pitcher",
     "inning", "balls", "strikes", "outs_when_up",
     "on_1b", "on_2b", "on_3b", "home_score", "away_score",
+    "post_home_score", "post_away_score",
     "zone", "launch_speed_angle",
     # dimensions
     "player_id", "game_year",
@@ -56,6 +57,9 @@ PITCH_COLUMNS = [
     # game state
     "inning", "inning_topbot", "balls", "strikes", "outs_when_up",
     "on_1b", "on_2b", "on_3b", "home_score", "away_score",
+    # score after the play — the only source of a final score and of RBI
+    # (runs the play drove in = post_bat_score - bat_score)
+    "post_home_score", "post_away_score",
     # classification & result
     "pitch_type", "pitch_name", "description", "type", "events", "des", "zone",
     # pitch physics

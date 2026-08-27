@@ -11,8 +11,16 @@ load_dotenv()  # picks up .env at project root if present
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 
-def database_url() -> str:
-    """SQLAlchemy URL, either explicit DATABASE_URL or built from PG* vars."""
+def database_url(direct: bool = False) -> str:
+    """SQLAlchemy URL, either explicit DATABASE_URL or built from PG* vars.
+
+    `direct=True` prefers DATABASE_URL_UNPOOLED when the provider serves one
+    (Neon does). Schema migrations and bulk loads must not go through a
+    transaction pooler; ordinary queries should, so the API keeps the pooled
+    default. Falls through to the pooled URL when no unpooled one is set.
+    """
+    if direct and (unpooled := os.getenv("DATABASE_URL_UNPOOLED")):
+        return unpooled
     explicit = os.getenv("DATABASE_URL")
     if explicit:
         return explicit

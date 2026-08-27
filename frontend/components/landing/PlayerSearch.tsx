@@ -46,6 +46,7 @@ export default function PlayerSearch({
         <input
           type="search"
           role="combobox"
+          autoComplete="off"
           aria-expanded={open}
           aria-label="Search pitchers"
           autoFocus={autoFocus}

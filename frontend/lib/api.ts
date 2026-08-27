@@ -112,3 +112,88 @@ export async function getPitcherPitches(
   if (!res.ok) throw new Error(`getPitcherPitches failed: ${res.status}`);
   return res.json();
 }
+
+/* ── Natural-language query ("ask") ─────────────────────────────────── */
+
+export interface AskAnswer {
+  value: number;
+  /** Pre-formatted headline — "42" or ".311". Never re-round it here. */
+  display: string;
+  label: string;
+  subject: string;
+  subject_id: number | null;
+  subject_kind: "player" | "team";
+  role: "batter" | "pitcher";
+  timeframe: string;
+  filters: string[];
+  rank: string | null;
+}
+
+export interface AskLeader {
+  rank: number;
+  player_id: number;
+  name: string;
+  value: number;
+  display: string;
+}
+
+export interface AskGame {
+  date: string;
+  day_of_week: string;
+  game_pk: number;
+  team: string | null;
+  opponent: string | null;
+  is_home: boolean | null;
+  venue_team: string | null;
+  result: string | null; // "W 6-4", from the subject's side
+  inning: number | null;
+  event: string | null;
+  detail: string | null;
+  count: number;
+  other_id: number | null;
+  other_name: string | null;
+  other_hand: string | null;
+  launch_speed: number | null;
+  launch_angle: number | null;
+  distance: number | null;
+}
+
+export interface AskSummary {
+  total: number;
+  denom: number;
+  home: number;
+  road: number;
+  vs_lhp: number;
+  vs_rhp: number;
+  games: number;
+  first_date: string | null;
+  last_date: string | null;
+}
+
+export interface AskResponse {
+  query: string;
+  query_type: "player_stat" | "comparative" | "team_stat";
+  answer: AskAnswer | null;
+  comparison: (AskLeader | AskAnswer)[];
+  game_log: AskGame[];
+  truncated: boolean;
+  summary_stats: AskSummary | null;
+  /** Why the answer is what it is — unparsed stat, unknown name, empty slice. */
+  notes: string[];
+  suggestions: string[];
+  data_through: string | null;
+}
+
+/**
+ * Answer one plain-English question from the pitch warehouse.
+ *
+ * Cached for an hour: the warehouse only moves when the ETL runs, and the
+ * same handful of questions get asked repeatedly.
+ */
+export async function ask(q: string): Promise<AskResponse> {
+  const res = await fetch(`${API_URL}/api/ask?q=${encodeURIComponent(q)}`, {
+    next: { revalidate: 3600 },
+  });
+  if (!res.ok) throw new Error(`ask failed: ${res.status}`);
+  return res.json();
+}

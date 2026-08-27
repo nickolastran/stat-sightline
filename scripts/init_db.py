@@ -20,7 +20,7 @@ SCHEMA_FILE = Path(__file__).resolve().parents[1] / "sql" / "01_schema.sql"
 
 def main() -> None:
     sql = SCHEMA_FILE.read_text()
-    engine = get_engine()
+    engine = get_engine(direct=True)  # DDL must not go through a pooler
     with engine.begin() as conn:
         conn.execute(text(sql))
     print(f"Applied schema from {SCHEMA_FILE.name} to {engine.url.database!r}.")
