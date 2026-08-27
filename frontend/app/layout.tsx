@@ -36,6 +36,12 @@ export default function RootLayout({
           <nav className="flex items-center gap-2 text-xs">
             <SiteSearch />
             <Link
+              href="/ask"
+              className="border border-line px-3 py-1.5 tracking-widest text-ink-2 hover:border-accent hover:text-ink"
+            >
+              ASK
+            </Link>
+            <Link
               href="/#access"
               className="border border-accent bg-accent px-3 py-1.5 font-bold text-white hover:opacity-90"
             >

@@ -31,6 +31,7 @@ export default function SiteSearch() {
       <input
         type="search"
         role="combobox"
+        autoComplete="off"
         aria-expanded={t.open}
         aria-label="Search players and teams"
         value={q}

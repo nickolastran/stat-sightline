@@ -21,13 +21,14 @@ pybaseball ──► ETL (pandas) ──► PostgreSQL ──► FastAPI ──�
 | --- | --- |
 | `src/stat_sightline/etl/` | Statcast fetch + parquet cache, cleaning, idempotent UPSERT loaders |
 | `src/stat_sightline/features/` | Barrels & hard-hit rates, attack zones / swing-take, custom xwOBA model |
+| `src/stat_sightline/query/` | Plain-English question parsing (`parse.py`, pure) and the SQL that answers it (`run.py`) |
 | `src/stat_sightline/standings/` | Standings projection: MLB results ingest, rolling-form features, model training, season projection |
 | `src/stat_sightline/db/` | Cached SQLAlchemy engine |
 | `sql/` | `01_schema.sql` (tables + indexes), `02_feature_views.sql` (barrel, attack-zone, swing-take views) |
-| `api/` | FastAPI app + `/api/pitchers` and `/api/standings` routers |
+| `api/` | FastAPI app + `/api/ask`, `/api/pitchers` and `/api/standings` routers |
 | `frontend/` | Next.js 16 app (App Router, Tailwind v4, Recharts) |
 | `scripts/` | `init_db.py`, `run_etl.py`, `train_standings.py` |
-| `tests/` | pytest for cleaning, feature math, and projection leakage |
+| `tests/` | pytest for cleaning, feature math, question parsing, and projection leakage |
 
 `src/app/` is a leftover `create-next-app` scaffold; the live frontend is
 `frontend/`.
@@ -50,12 +51,36 @@ Config comes from the environment or a `.env` at the project root:
 
 ```bash
 DATABASE_URL=postgresql+psycopg2://user:pass@localhost:5432/stat_sightline
+DATABASE_URL_UNPOOLED=          # optional; see "Pooled vs direct" below
 # …or the PG* vars: PGUSER PGPASSWORD PGHOST PGPORT PGDATABASE
 STATCAST_CACHE_DIR=data/raw     # parquet cache, relative to project root
 ETL_CHUNK_DAYS=3                # days per Statcast request window
 STANDINGS_DATA_DIR=data/standings        # games.csv + model.pkl for the projection
 FRONTEND_ORIGINS=http://localhost:3000   # CORS allowlist for the API
 ```
+
+### Neon (Lakebase Postgres)
+
+The warehouse is hosted on Neon; `neon link` writes the branch's URLs into
+`.env` and pins the branch in a git-ignored `.neon`:
+
+```bash
+npm i -g neon && neon auth
+neon link --org-id <org> --project-id <project>   # pulls DATABASE_URL + _UNPOOLED
+neon checkout <branch>                            # per feature; pulls that branch's env
+```
+
+**Pooled vs direct.** Neon serves two URLs and `config/settings.py` knows the
+difference: `database_url()` returns the pooled one (PgBouncer) for ordinary
+queries, and `database_url(direct=True)` returns `DATABASE_URL_UNPOOLED` for
+work a transaction pooler can't carry. `scripts/init_db.py` (DDL) and
+`scripts/run_etl.py` (staging table + bulk upsert) ask for direct; the API does
+not. With no `DATABASE_URL_UNPOOLED` set, direct falls back to the pooled URL,
+so a plain local Postgres is unaffected.
+
+Lakebase Postgres is the only Neon service this app uses — no Auth, Object
+Storage, Functions, or AI Gateway. The landing-page sign-in is a stubbed
+client-side form (`components/landing/AccessCta.tsx`), not a backend.
 
 ## Load the data
 
@@ -140,7 +165,30 @@ standings render in full, just without the projection columns.
 | `GET /health` | liveness |
 | `GET /api/pitchers?q=&limit=` | name typeahead, ordered by pitch count |
 | `GET /api/pitchers/{id}/pitches` | full pitch payload; filters `pitch_type`, `stand`, `date_from`, `date_to`, `limit` (≤20000) |
+| `GET /api/ask?q=` | plain-English question → headline number, splits, and the game log behind it. Always `200`: a stat the pitch table can't carry, or a name that matches nobody, comes back in `notes`/`suggestions` rather than as an error |
 | `GET /api/standings/projections?season=` | per club: actual W-L, games remaining, projected final W-L, both paces, plus the model's holdout metrics. Defaults to the current season (Eastern). `503` until `train_standings.py` has run |
+
+## Ask
+
+`/ask` answers questions like *"how many home runs did aaron judge hit at
+fenway park"* off the same warehouse. Parsing is a keyword consumer, not a
+model: `parse.py` strips the spans it recognises — timeframe, ballpark,
+opponent, home/road, opposing handedness, role, stat — and whatever text
+survives is the name to look up. That is the whole vocabulary, and it is pure,
+so `tests/test_ask.py` covers every phrasing offline.
+
+Names resolve against `savant.players` by substring first (people type last
+names), then `difflib` for typos, breaking ties on workload. A ballpark is not
+a column — the warehouse has no venue — it is `games.home_team`, which is the
+same thing. Filters flip with the role: a batter's opponent is the fielding
+club and the hand faced is `p_throws`; a pitcher's are the reverse.
+
+Answerable: HR, hits, singles/doubles/triples, extra-base hits, RBI,
+strikeouts, walks, batting average. Deliberately refused rather than guessed:
+stolen bases and runs scored (not plate-appearance outcomes) and ERA (needs
+innings-pitched bookkeeping the pitch table doesn't carry). RBI is derived from
+`post_bat_score - bat_score`, so it counts runs that crossed on the play — it
+differs from official RBI when a run scores on an error or a double play.
 
 The pitcher endpoint returns location, velo, spin, movement, count/base-out
 state, and batted-ball tracking in one response — the frontend filters that
@@ -152,6 +200,10 @@ every remaining game to answer, and a retrain invalidates it without a restart.
 ## Frontend routes
 
 - `/` — landing page with pitcher search
+- `/ask` — the question box and its answer card: headline number with its rank
+  under the same filters, home/road and platoon splits, a leaderboard when the
+  question is comparative, and the game log of every play behind the number.
+  The question lives in the URL, so answers are shareable
 - `/dashboard` — league overview: today's scoreboard, standings (with projected
   finishes), stat leaders — live from the public MLB Stats API plus our own
   projections endpoint, server-rendered; each source fails independently

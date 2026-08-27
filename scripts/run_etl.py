@@ -61,7 +61,8 @@ def main(argv: list[str] | None = None) -> int:
     from src.stat_sightline.db.connection import get_engine
     from src.stat_sightline.etl.load import load_all
 
-    counts = load_all(get_engine(), raw)
+    # Bulk staging + upsert: direct connection, never the pooler.
+    counts = load_all(get_engine(direct=True), raw)
     print(
         "Loaded -> "
         f"players: {counts['players']:,} | "

@@ -35,3 +35,4 @@ data/standings/
 
 # misc
 .DS_Store
+.neon

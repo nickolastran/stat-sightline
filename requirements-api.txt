@@ -1,0 +1,21 @@
+# Runtime deps for the FastAPI service only — what `api/` actually imports.
+# The full requirements.txt also pulls pybaseball, xgboost, lightgbm, streamlit
+# and matplotlib, which the ETL and notebooks need and the server never does;
+# on a free host that's a slow build for nothing. Keep in sync by hand: if a
+# router grows an import, add it here.
+
+fastapi>=0.110
+uvicorn[standard]>=0.29
+pydantic>=2.6
+
+SQLAlchemy>=2.0
+psycopg2-binary>=2.9      # PostgreSQL driver behind the SQLAlchemy URL
+python-dotenv>=1.0
+
+requests>=2.31            # standings router pulls the MLB schedule
+
+# The standings projection unpickles a sklearn pipeline and scores it.
+pandas>=2.2
+numpy>=1.26
+scikit-learn>=1.4
+joblib>=1.3

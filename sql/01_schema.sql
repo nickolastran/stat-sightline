@@ -80,6 +80,8 @@ CREATE TABLE IF NOT EXISTS pitches (
     on_3b               INTEGER,
     home_score          SMALLINT,
     away_score          SMALLINT,
+    post_home_score     SMALLINT,            -- score after the play; a game's
+    post_away_score     SMALLINT,            -- final = MAX over its pitches
 
     -- ---- Pitch classification & result -------------------------------
     pitch_type          VARCHAR(4) REFERENCES pitch_types(pitch_type),
@@ -136,6 +138,11 @@ CREATE TABLE IF NOT EXISTS pitches (
 
     CONSTRAINT uq_pitch_grain UNIQUE (game_pk, at_bat_number, pitch_number)
 );
+
+-- Added after the first release, so existing warehouses pick them up too
+-- (CREATE TABLE IF NOT EXISTS above is a no-op once the table is there).
+ALTER TABLE pitches ADD COLUMN IF NOT EXISTS post_home_score SMALLINT;
+ALTER TABLE pitches ADD COLUMN IF NOT EXISTS post_away_score SMALLINT;
 
 -- ---------------------------------------------------------------------
 -- Indexes tuned for the dashboard's common access paths

@@ -3,7 +3,14 @@ import PlayerSearch from "@/components/landing/PlayerSearch";
 import AccessCta from "@/components/landing/AccessCta";
 import { searchPitchers, type Pitcher } from "@/lib/api";
 
-const FEATURES = [
+const FEATURES: {
+  index: string;
+  code: string;
+  title: string;
+  body: string;
+  specs: string[];
+  href?: string;
+}[] = [
   {
     index: "01",
     code: "K-PROB",
@@ -22,8 +29,9 @@ const FEATURES = [
     index: "03",
     code: "QUERY",
     title: "CUSTOM STATCAST QUERIES",
-    body: "Direct filtered access to the pitch warehouse: every tracked pitch with location, movement, spin, and batted-ball outcome fields.",
+    body: "Direct filtered access to the pitch warehouse: every tracked pitch with location, movement, spin, and batted-ball outcome fields. Ask for a slice in plain English.",
     specs: ["SQL-BACKED FACTS", "14-ZONE LOCATION GRID", "EXPORTABLE SLICES"],
+    href: "/ask",
   },
 ];
 
@@ -89,7 +97,15 @@ export default async function LandingPage() {
                     {f.code}
                   </span>
                 </div>
-                <h3 className="text-sm font-bold tracking-wide">{f.title}</h3>
+                <h3 className="text-sm font-bold tracking-wide">
+                  {f.href ? (
+                    <Link href={f.href} className="hover:text-accent">
+                      {f.title} →
+                    </Link>
+                  ) : (
+                    f.title
+                  )}
+                </h3>
                 <p className="text-xs leading-5 text-ink-2">{f.body}</p>
                 <ul className="mt-auto space-y-1 pt-2 text-[10px] tracking-wider text-ink-3">
                   {f.specs.map((s) => (
