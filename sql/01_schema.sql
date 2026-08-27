@@ -178,6 +178,7 @@ INSERT INTO pitch_types (pitch_type, description, pitch_group) VALUES
     ('KC','Knuckle Curve','Breaking'),
     ('CS','Slow Curve','Breaking'),
     ('KN','Knuckleball','Other'),
+    ('FA','Other','Other'),                  -- Statcast's catch-all; pitch_name is 'Other'
     ('EP','Eephus','Other'),
     ('PO','Pitchout','Other'),
     ('IN','Intentional Ball','Other')

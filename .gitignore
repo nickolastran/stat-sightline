@@ -36,3 +36,7 @@ data/standings/
 # misc
 .DS_Store
 .neon
+
+#claude 
+.agents
+.claude
