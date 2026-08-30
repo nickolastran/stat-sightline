@@ -1,3 +1,4 @@
+import { Fragment } from "react";
 import Link from "next/link";
 import Panel from "@/components/ui/Panel";
 import PlayerLink from "@/components/mlb/PlayerLink";
@@ -28,11 +29,14 @@ function Table({
   head,
   children,
   maxHeight = "36rem",
+  align,
 }: {
   /** Column labels; anything after the first is right-aligned. */
   head: string[];
   children: React.ReactNode;
   maxHeight?: string;
+  /** One of "l"/"c"/"r" per column, where the default doesn't suit. */
+  align?: string;
 }) {
   return (
     <div
@@ -47,7 +51,7 @@ function Table({
                 key={h + i}
                 scope="col"
                 className={`sticky top-0 z-10 border-b border-line bg-surface px-3 py-2 text-[10px] font-normal tracking-widest text-ink-3 ${
-                  i === 0 ? "text-left" : "text-right"
+                  headAlign(align, i)
                 }`}
               >
                 {h}
@@ -60,6 +64,11 @@ function Table({
     </div>
   );
 }
+
+/** Where a head cell sits: the mask if it names this column, else the default. */
+const headAlign = (align: string | undefined, i: number) =>
+  ({ l: "text-left", c: "text-center", r: "text-right" })[align?.[i] ?? ""] ??
+  (i === 0 ? "text-left" : "text-right");
 
 const Row = ({ children }: { children: React.ReactNode }) => (
   <tr className="border-b border-grid text-ink-2 last:border-b-0 hover:bg-surface-2">
@@ -90,7 +99,8 @@ const dayOf = (iso: string) =>
     .toUpperCase();
 
 /**
- * How the game went for this club — "W 5-3" once it's final, the half-inning
+ * How the game went for this club — "W 5-3" once it's final ("W 6-4 F/10" if
+ * it went past nine), the half-inning
  * and the running score while it's on, the first pitch before that.
  */
 function result(
@@ -108,7 +118,9 @@ function result(
       final: false,
     };
   const mark = us.score! > them.score! ? "W" : us.score! < them.score! ? "L" : "T";
-  return { mark, text: `${mark} ${score}`, final: true };
+  /* A game that went past nine says where it ended — "W 6-4 F/10". */
+  const extra = g.inning && g.inning > 9 ? ` F/${g.inning}` : "";
+  return { mark, text: `${mark} ${score}${extra}`, final: true };
 }
 
 /** A pitcher of record with the line he carries — "Cavalli (12-5)". */
@@ -122,7 +134,7 @@ function Decision({
   /** A save is counted, not won and lost. */
   saves?: boolean;
 }) {
-  if (!person) return <span className="text-ink-3">—</span>;
+  if (!person) return null;
   const line = record
     ? saves
       ? `(${record.saves})`
@@ -138,6 +150,19 @@ function Decision({
   );
 }
 
+/** A named starter for a game not yet played — blank until MLB names one. */
+function Probable({ p }: { p: { id: number; name: string } | null }) {
+  if (!p) return null;
+  return (
+    <PlayerLink id={p.id} headshot={false}>
+      {p.name}
+    </PlayerLink>
+  );
+}
+
+/* Centred, except the club played, which reads down the left with its logo. */
+const SCHEDULE_ALIGN = "clcccccc";
+
 export function SchedulePanel({
   games,
   id,
@@ -147,11 +172,16 @@ export function SchedulePanel({
 }: {
   games: Game[];
   id: number;
-  /** Season lines for every pitcher, for the decision columns. */
-  records: Map<number, PitcherRecord>;
+  /** Every pitcher's line as of each game, for the decision columns. */
+  records: Map<string, PitcherRecord>;
   title: string;
   controls?: React.ReactNode;
 }) {
+  /* Games still to come read as a different table — a time and two probables
+     where a played one carries a score and its pitchers of record — so they
+     get their own bar rather than sitting silently under the wrong labels. */
+  const upcoming = games.findIndex((g) => !result(g, id).final);
+
   return (
     <Panel title={title} right={controls}>
       {/* No inner scroll: the half being shown is meant to fit on the page in
@@ -159,83 +189,98 @@ export function SchedulePanel({
       <Table
         head={["DATE", "OPPONENT", "RESULT", "REC", "WIN", "LOSS", "SAVE", "ATT"]}
         maxHeight="none"
+        align={SCHEDULE_ALIGN}
       >
         {games.length === 0 && <Empty what="NO GAMES IN THIS RANGE" cols={8} />}
-        {games.map((g) => {
+        {games.map((g, i) => {
           const home = g.home.id === id;
           const us = home ? g.home : g.away;
           const opp = home ? g.away : g.home;
           const r = result(g, id);
           const d = g.decisions;
+          const rec = (p: { id: number } | null) =>
+            p ? records.get(`${g.pk}:${p.id}`) : undefined;
 
           return (
-            <Row key={g.pk}>
-              <td className="px-3 py-1.5 whitespace-nowrap">
-                <Link href={`/game/${g.pk}`} className="hover:text-accent">
-                  {dayOf(g.startTime)}
-                </Link>
-              </td>
-              <td className="px-3 py-1.5">
-                <span className="flex items-center gap-1.5">
-                  <span className="text-ink-3">{home ? "VS" : "@"}</span>
-                  <TeamLink id={opp.id} name={opp.name} />
-                </span>
-              </td>
-              <td
-                className={`px-3 py-1.5 text-right whitespace-nowrap tabular-nums ${
-                  r.mark === "W"
-                    ? "font-bold text-good"
-                    : r.mark === "L"
-                      ? "font-bold text-crit"
-                      : "text-ink-2"
-                }`}
-              >
-                {r.text}
-              </td>
-              {r.final ? (
-                <>
-                  <td className="px-3 py-1.5 text-right tabular-nums whitespace-nowrap">
-                    {us.wins === null ? "—" : `${us.wins}-${us.losses}`}
-                  </td>
-                  <td className="px-3 py-1.5 text-right">
-                    <Decision person={d.winner} record={records.get(d.winner?.id ?? -1)} />
-                  </td>
-                  <td className="px-3 py-1.5 text-right">
-                    <Decision person={d.loser} record={records.get(d.loser?.id ?? -1)} />
-                  </td>
-                  <td className="px-3 py-1.5 text-right">
-                    <Decision person={d.save} record={records.get(d.save?.id ?? -1)} saves />
-                  </td>
-                  <td className="px-3 py-1.5 text-right tabular-nums">
-                    {g.attendance === null ? "—" : g.attendance.toLocaleString()}
-                  </td>
-                </>
-              ) : (
-                /* Nothing has been decided yet, and the club's record hasn't
-                   moved, so those columns become one line of who is expected to
-                   throw — MLB names probables a few days out, so the rest of
-                   the schedule reads "TBA". */
-                <td colSpan={5} className="px-3 py-1.5 text-right text-ink-3">
-                  <span className="inline-flex items-center gap-1.5">
-                    {us.probable ? (
-                      <PlayerLink id={us.probable.id} headshot={false}>
-                        {us.probable.name}
-                      </PlayerLink>
-                    ) : (
-                      "TBA"
-                    )}
-                    <span className="text-[10px] tracking-wider">VS</span>
-                    {opp.probable ? (
-                      <PlayerLink id={opp.probable.id} headshot={false}>
-                        {opp.probable.name}
-                      </PlayerLink>
-                    ) : (
-                      "TBA"
-                    )}
+            <Fragment key={g.pk}>
+              {i === upcoming && (
+                <tr>
+                  {["DATE", "OPPONENT", "TIME", "", "PITCHER", "OPPONENT", "", ""].map(
+                    (h, j) => (
+                      <th
+                        key={j}
+                        scope="col"
+                        className={`border-y border-line bg-surface px-3 py-2 text-[10px] font-normal tracking-widest text-ink-3 ${headAlign(
+                          SCHEDULE_ALIGN,
+                          j
+                        )}`}
+                      >
+                        {h}
+                      </th>
+                    )
+                  )}
+                </tr>
+              )}
+              <Row>
+                <td className="px-3 py-1.5 text-center whitespace-nowrap">
+                  <Link href={`/game/${g.pk}`} className="hover:text-accent">
+                    {dayOf(g.startTime)}
+                  </Link>
+                </td>
+                <td className="px-3 py-1.5">
+                  <span className="flex items-center gap-1.5">
+                    <span className="text-ink-3">{home ? "VS" : "@"}</span>
+                    <TeamLink id={opp.id} name={opp.name} />
                   </span>
                 </td>
-              )}
-            </Row>
+                <td
+                  className={`px-3 py-1.5 text-center whitespace-nowrap tabular-nums ${
+                    r.mark === "W"
+                      ? "font-bold text-good"
+                      : r.mark === "L"
+                        ? "font-bold text-crit"
+                        : "text-ink-2"
+                  }`}
+                >
+                  {r.text}
+                </td>
+                {r.final ? (
+                  <>
+                    <td className="px-3 py-1.5 text-center tabular-nums whitespace-nowrap">
+                      {us.wins === null ? "" : `${us.wins}-${us.losses}`}
+                    </td>
+                    <td className="px-3 py-1.5 text-center">
+                      <Decision person={d.winner} record={rec(d.winner)} />
+                    </td>
+                    <td className="px-3 py-1.5 text-center">
+                      <Decision person={d.loser} record={rec(d.loser)} />
+                    </td>
+                    <td className="px-3 py-1.5 text-center">
+                      <Decision person={d.save} record={rec(d.save)} saves />
+                    </td>
+                    <td className="px-3 py-1.5 text-center tabular-nums">
+                      {g.attendance === null ? "" : g.attendance.toLocaleString()}
+                    </td>
+                  </>
+                ) : (
+                  /* Nothing has been decided yet, so the two decision columns
+                     carry who is expected to throw instead — this club's under
+                     WIN, theirs under LOSS. MLB names probables a few days
+                     out, so the rest of the schedule leaves them blank. */
+                  <>
+                    <td className="px-3 py-1.5" />
+                    <td className="px-3 py-1.5 text-center text-ink-3">
+                      <Probable p={us.probable} />
+                    </td>
+                    <td className="px-3 py-1.5 text-center text-ink-3">
+                      <Probable p={opp.probable} />
+                    </td>
+                    <td className="px-3 py-1.5" />
+                    <td className="px-3 py-1.5" />
+                  </>
+                )}
+              </Row>
+            </Fragment>
           );
         })}
       </Table>

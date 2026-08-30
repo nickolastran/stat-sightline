@@ -1392,13 +1392,14 @@ export async function getTeamPlayerStats(
 }
 
 /**
- * Every pitcher in the majors, as won-lost-saved. One filtered request covers
- * a whole season's decisions — the schedule names a winner, a loser and a
- * saver per game, and any of the three can belong to either club.
+ * What the pitchers of record carried out of each game — the line the reader
+ * sees beside a decision, "(1-0)" for a first win of the year rather than the
+ * season total the pitcher finished with.
  *
- * These are season totals as they stand now, not the line the pitcher carried
- * into that particular game: the as-of-that-day figure lives only in each
- * game's own box score, which would be one request per row.
+ * MLB reports the as-of figure only inside a game's own box score, so it is
+ * counted here instead: one league-wide schedule read names a winner, a loser
+ * and a saver per game, and walking the season in order gives every pitcher's
+ * running line without a request per row.
  */
 export interface PitcherRecord {
   wins: number;
@@ -1406,24 +1407,60 @@ export interface PitcherRecord {
   saves: number;
 }
 
+/** Records as they stood after each game, keyed `${gamePk}:${pitcherId}`. */
+export function runningRecords(games: Game[]): Map<string, PitcherRecord> {
+  const running = new Map<number, PitcherRecord>();
+  const asOf = new Map<string, PitcherRecord>();
+  for (const g of games) {
+    for (const [role, key] of [
+      ["winner", "wins"],
+      ["loser", "losses"],
+      ["save", "saves"],
+    ] as const) {
+      const p = g.decisions[role];
+      if (!p) continue;
+      const r = running.get(p.id) ?? { wins: 0, losses: 0, saves: 0 };
+      r[key] += 1;
+      running.set(p.id, r);
+      asOf.set(`${g.pk}:${p.id}`, { ...r });
+    }
+  }
+  return asOf;
+}
+
 export async function getPitcherRecords(
   season: number
-): Promise<Map<number, PitcherRecord>> {
+): Promise<Map<string, PitcherRecord>> {
   const data = await mlb(
-    `/stats?stats=season&group=pitching&season=${season}&sportId=1` +
-      `&playerPool=ALL&limit=2000&fields=stats,splits,player,id,stat,wins,losses,saves`,
+    `/schedule?sportId=1&season=${season}&gameType=R,F,D,L,W&hydrate=decisions` +
+      `&fields=dates,games,gamePk,gameDate,decisions,winner,loser,save,id,fullName`,
     1800
   );
-  return new Map(
-    ((data.stats?.[0]?.splits ?? []) as any[]).map((s) => [
-      s.player?.id as number,
-      {
-        wins: s.stat?.wins ?? 0,
-        losses: s.stat?.losses ?? 0,
-        saves: s.stat?.saves ?? 0,
-      },
-    ])
+  return runningRecords(
+    latestByGame(
+      ((data.dates ?? []) as any[]).flatMap((d) => d.games ?? []).map(toGame)
+    )
   );
+}
+
+/**
+ * The All-Star Game, the seam a season is read in halves either side of. Null
+ * for a season that never played one, which leaves the split to game count.
+ */
+export async function getBreakDate(season: number): Promise<string | null> {
+  const data = await mlb(
+    `/schedule?sportId=1&season=${season}&gameType=A&fields=dates,games,gameDate`,
+    86400
+  );
+  const g = ((data.dates ?? []) as any[]).flatMap((d) => d.games ?? [])[0];
+  return g?.gameDate ?? null;
+}
+
+/** Index of the first game after the break — where a season's halves part. */
+export function breakIndex(games: Game[], breakAt: string | null): number {
+  if (!breakAt) return Math.ceil(games.length / 2);
+  const i = games.findIndex((g) => g.startTime > breakAt);
+  return i === -1 ? games.length : i;
 }
 
 /* ── Team leaders ───────────────────────────────────────────────────── */

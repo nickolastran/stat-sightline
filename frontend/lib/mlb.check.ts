@@ -14,8 +14,10 @@ import {
   clinchPhase,
   gameStatus,
   gamesBack,
+  breakIndex,
   latestByGame,
   leaderBoard,
+  runningRecords,
   teamHref,
   teamIdOf,
   ordinal,
@@ -269,10 +271,81 @@ assert.deepEqual(
   "a postponement with no makeup yet is still a game on the schedule"
 );
 
+/*
+ * Running pitcher lines — the figure beside a decision is what the pitcher
+ * carried out of that game, not the season total, so the same name reads
+ * (1-0) in March and (14-7) in September.
+ */
+const decided = (
+  pk: number,
+  startTime: string,
+  winner: number | null,
+  loser: number | null,
+  save: number | null
+) =>
+  ({
+    pk,
+    startTime,
+    decisions: {
+      winner: winner && { id: winner, name: `W${winner}` },
+      loser: loser && { id: loser, name: `L${loser}` },
+      save: save && { id: save, name: `S${save}` },
+    },
+  }) as Game;
+
+const lines = runningRecords([
+  decided(1, "2026-03-25T23:05:00Z", 425844, 657277, null),
+  decided(2, "2026-03-26T23:05:00Z", 657277, 425844, 605280),
+  decided(3, "2026-04-01T23:05:00Z", 425844, 111111, 605280),
+  decided(4, "2026-04-02T23:05:00Z", null, null, null), // rained out, nobody decided
+]);
+assert.deepEqual(
+  lines.get("1:425844"),
+  { wins: 1, losses: 0, saves: 0 },
+  "opening day win is (1-0), not the season total"
+);
+assert.deepEqual(
+  lines.get("2:425844"),
+  { wins: 1, losses: 1, saves: 0 },
+  "the loss the next day lands on the same line"
+);
+assert.deepEqual(
+  lines.get("3:425844"),
+  { wins: 2, losses: 1, saves: 0 },
+  "and the line keeps climbing through the season"
+);
+assert.deepEqual(
+  lines.get("3:605280"),
+  { wins: 0, losses: 0, saves: 2 },
+  "saves are counted on their own"
+);
+assert.equal(lines.get("4:425844"), undefined, "a game with no decision has no line");
+
+/*
+ * Where the halves part — the All-Star break, so a club that played 95 before
+ * it and 67 after still splits at the break rather than at game 81.
+ */
+const half = [
+  sched(1, "2026-07-11T17:05:00Z", "Final"),
+  sched(2, "2026-07-12T17:05:00Z", "Final"), // last one before the break
+  sched(3, "2026-07-17T23:10:00Z", "Final"),
+];
+const allStar = "2026-07-15T00:00:00Z";
+assert.equal(breakIndex(half, allStar), 2, "the second half starts with the first game after the break");
+assert.equal(
+  breakIndex(half, "2026-11-01T00:00:00Z"),
+  3,
+  "a season played entirely before the break is all first half"
+);
+assert.equal(breakIndex(half, null), 2, "no All-Star Game falls back to the midpoint");
+assert.equal(breakIndex([], allStar), 0, "a season with no games splits nowhere");
+
 console.log("clinchMark ok");
 console.log("gamesBack ok");
 console.log("gameStatus ok");
 console.log("latestByGame ok");
+console.log("runningRecords ok");
+console.log("breakIndex ok");
 console.log("leaderBoard ok");
 console.log("teamHref ok");
 console.log("statRank ok");

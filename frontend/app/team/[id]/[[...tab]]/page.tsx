@@ -22,6 +22,8 @@ import {
   TransactionsPanel,
 } from "@/components/mlb/TeamPanels";
 import {
+  getBreakDate,
+  breakIndex,
   getPitcherRecords,
   getTeamIdentity,
   getTeamInjuries,
@@ -321,7 +323,9 @@ const RosterSkeleton = () => (
 /* ── Schedule ───────────────────────────────────────────────────────── */
 
 /* Half a season at a time, because the whole of one is 162 rows and the point
- * of dropping the scrollbar was to see a stretch of it whole. */
+ * of dropping the scrollbar was to see a stretch of it whole. The halves part
+ * at the All-Star break, the way a season is actually talked about, not at the
+ * 81st game. */
 const HALVES = [
   { value: "1", label: "FIRST HALF" },
   { value: "2", label: "SECOND HALF" },
@@ -329,13 +333,19 @@ const HALVES = [
 ] as const;
 
 /**
- * Which half to open on: the one the season has reached, so the current club
- * lands on the games it is playing rather than on opening day.
+ * Which half to open on: for the season being played, the one it has reached,
+ * so a club lands on the games in front of it rather than on opening day. A
+ * season already in the books has no current half, so it opens whole.
  */
-function pickHalf(raw: string | undefined, games: Game[]): string {
+function pickHalf(
+  raw: string | undefined,
+  games: Game[],
+  mid: number,
+  season: number
+): string {
   if (HALVES.some((h) => h.value === raw)) return raw!;
-  const played = games.filter((g) => g.state === "Final").length;
-  return played > Math.ceil(games.length / 2) ? "2" : "1";
+  if (season !== seasonOf(todayET())) return "all";
+  return games.filter((g) => g.state === "Final").length > mid ? "2" : "1";
 }
 
 async function TeamSchedule({
@@ -350,14 +360,15 @@ async function TeamSchedule({
   first: number;
   half: string | undefined;
 }) {
-  const [games, records] = await Promise.all([
+  const [games, records, breakAt] = await Promise.all([
     getTeamSchedule(id, season),
     /* The decision columns are a nicety — a slow stats payload shouldn't
        cost the reader their schedule. */
-    getPitcherRecords(season).catch(() => new Map<number, PitcherRecord>()),
+    getPitcherRecords(season).catch(() => new Map<string, PitcherRecord>()),
+    getBreakDate(season).catch(() => null),
   ]);
-  const shown = pickHalf(half, games);
-  const mid = Math.ceil(games.length / 2);
+  const mid = breakIndex(games, breakAt);
+  const shown = pickHalf(half, games, mid, season);
   const range =
     shown === "all" ? games : shown === "1" ? games.slice(0, mid) : games.slice(mid);
 
