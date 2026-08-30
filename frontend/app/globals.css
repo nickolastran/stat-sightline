@@ -19,6 +19,7 @@
   --color-accent: #3987e5; /* categorical slot 1 (blue) doubles as UI accent */
   --color-good: #0ca30c; /* status — reserved, never a series */
   --color-crit: #d03b3b;
+  --color-warn: #d99a2b; /* status — between good and crit, never a series */
 
   --font-mono:
     ui-monospace, "SFMono-Regular", "Cascadia Mono", "JetBrains Mono", Menlo,
@@ -41,6 +42,7 @@
   --color-line: rgba(0, 0, 0, 0.14); /* hairline borders */
   --color-accent: #2668c9; /* darker blue for AA contrast on white */
   --color-crit: #c62d2d;
+  --color-warn: #b07714; /* darker amber for AA contrast on white */
   color-scheme: light;
 }
 

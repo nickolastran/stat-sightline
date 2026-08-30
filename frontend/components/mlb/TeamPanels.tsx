@@ -11,7 +11,7 @@ import {
   TEAM_PITCHING_COLS,
   type Game,
   type PitcherRecord,
-  type RosterEntry,
+  type InjuryEntry,
   type RosterGroup,
   type SplitLine,
   type TeamStatCol,
@@ -448,28 +448,79 @@ export function RosterPanel({ groups }: { groups: RosterGroup[] }) {
 
 /* ── Injuries ───────────────────────────────────────────────────────── */
 
-export function InjuriesPanel({ players }: { players: RosterEntry[] }) {
+/* Which list a player is on, by its dot: the short stays blue, the 15-day
+   amber, the 60-day red — a club reads its own report by that spread. */
+const IL_DOT: Record<string, string> = {
+  D7: "bg-accent",
+  D10: "bg-accent",
+  D15: "bg-warn",
+  D60: "bg-crit",
+};
+
+/** "D15" as a club says it — "15-DAY IL". */
+const ilLabel = (p: InjuryEntry) => {
+  const days = p.statusCode.match(/^D(\d+)/);
+  return days ? `${days[1]}-DAY IL` : p.status.toUpperCase();
+};
+
+const INJURY_WIDTHS = ["27%", "13%", "60%"];
+
+export function InjuriesPanel({ players }: { players: InjuryEntry[] }) {
+  /* Already newest move first, so a day's names sit together — they only need
+     collecting under the date they were placed. */
+  const days = players.reduce<{ date: string; players: InjuryEntry[] }[]>(
+    (acc, p) => {
+      const last = acc[acc.length - 1];
+      if (last && last.date === p.since) last.players.push(p);
+      else acc.push({ date: p.since, players: [p] });
+      return acc;
+    },
+    []
+  );
+
   return (
-    <Panel
-      title="INJURY REPORT"
-      right={
-        <span className="text-[10px] text-ink-3">
-          {players.length} ON THE LIST
-        </span>
-      }
-    >
-      <Table head={["PLAYER", "POS", "STATUS"]}>
+    <Panel title="INJURY REPORT">
+      <Table
+        head={["PLAYER", "STATUS", "NOTE"]}
+        align="lcl"
+        widths={INJURY_WIDTHS}
+        maxHeight="none"
+      >
         {players.length === 0 && <Empty what="NOBODY ON THE INJURED LIST" cols={3} />}
-        {players.map((p) => (
-          <Row key={p.id}>
-            <td className="px-3 py-1.5">
-              <PlayerLink id={p.id}>{p.name}</PlayerLink>
-            </td>
-            <td className="px-3 py-1.5 text-right text-[10px] tracking-wider text-ink-3">
-              {p.pos}
-            </td>
-            <td className="px-3 py-1.5 text-right whitespace-nowrap">{p.status}</td>
-          </Row>
+        {days.map((day) => (
+          <Fragment key={day.date}>
+            <tr>
+              <td
+                colSpan={3}
+                className="border-y border-line bg-surface px-3 py-1.5 text-[10px] tracking-[0.2em] text-ink-2"
+              >
+                {day.date ? dayOf(`${day.date}T12:00:00Z`) : "BEFORE THIS SEASON"}
+              </td>
+            </tr>
+            {day.players.map((p) => (
+              <Row key={p.id}>
+                <td className="px-3 py-1.5">
+                  <span className="flex items-center gap-2">
+                    <PlayerLink id={p.id}>{p.name}</PlayerLink>
+                    <span className="text-[10px] tracking-wider text-ink-3">
+                      {p.pos}
+                    </span>
+                  </span>
+                </td>
+                <td className="px-3 py-1.5 text-center whitespace-nowrap">
+                  <span className="inline-flex items-center gap-1.5">
+                    <span
+                      className={`h-1.5 w-1.5 shrink-0 ${IL_DOT[p.statusCode] ?? "bg-ink-3"}`}
+                    />
+                    <span className="text-[10px] tracking-wider">{ilLabel(p)}</span>
+                  </span>
+                </td>
+                {/* MLB's own wording of the move, which names the injury — the
+                    club's report, not a paraphrase of it. */}
+                <td className="px-3 py-1.5 text-ink-2">{p.note}</td>
+              </Row>
+            ))}
+          </Fragment>
         ))}
       </Table>
     </Panel>

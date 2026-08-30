@@ -1805,14 +1805,43 @@ export async function getTeamRosterGroups(
     .map((g) => ({ ...g, players: [...g.players].sort(byName) }));
 }
 
+/** A player on the list, with the move that put him there. */
+export interface InjuryEntry extends RosterEntry {
+  /** The date of that move — "" if no transaction names him this season. */
+  since: string;
+  /** The move in MLB's own words, which is where the injury is named. */
+  note: string;
+}
+
 /**
  * Who is hurt, off the 40-man rather than the full organisation: the club's
  * injury report is its major-league list, not every rookie-ball strain.
+ *
+ * The roster payload carries which list a player is on and nothing else — no
+ * date, no injury — so each name is joined to his own latest injured-list
+ * transaction, which carries both. A player placed before the season being
+ * read has no such move to find and keeps his status alone.
  */
 export async function getTeamInjuries(
   id: number,
   season: number
-): Promise<RosterEntry[]> {
-  const roster = await getTeamRoster(id, season, "40Man");
-  return roster.filter((p) => injured(p.statusCode));
+): Promise<InjuryEntry[]> {
+  const [roster, moves] = await Promise.all([
+    getTeamRoster(id, season, "40Man"),
+    getTeamTransactions(id, season).catch((): Transaction[] => []),
+  ]);
+  /* Sorted newest first already, so the first hit is the current move — a
+     transfer to the 60-day rather than the placement it superseded. */
+  const onto = moves.filter(
+    (t) =>
+      /injured list/i.test(t.description) &&
+      !/(activated|reinstated)/i.test(t.description)
+  );
+  return roster
+    .filter((p) => injured(p.statusCode))
+    .map((p): InjuryEntry => {
+      const m = onto.find((t) => t.personId === p.id);
+      return { ...p, since: m?.date ?? "", note: m?.description ?? "" };
+    })
+    .sort((a, b) => b.since.localeCompare(a.since));
 }
