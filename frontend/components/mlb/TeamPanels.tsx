@@ -6,6 +6,7 @@ import TeamLink from "@/components/mlb/TeamLink";
 import {
   gameStatus,
   teamStatText,
+  transactionMonths,
   FALLBACK_TZ,
   TEAM_HITTING_COLS,
   TEAM_PITCHING_COLS,
@@ -529,32 +530,53 @@ export function InjuriesPanel({ players }: { players: InjuryEntry[] }) {
 
 /* ── Transactions ───────────────────────────────────────────────────── */
 
-export function TransactionsPanel({ moves }: { moves: Transaction[] }) {
+const monthOf = (iso: string) =>
+  new Intl.DateTimeFormat("en-US", {
+    month: "long",
+    timeZone: FALLBACK_TZ,
+  })
+    .format(new Date(`${iso}T12:00:00Z`))
+    .toUpperCase();
+
+export function TransactionsPanel({
+  moves,
+  controls,
+}: {
+  moves: Transaction[];
+  controls?: React.ReactNode;
+}) {
+  const months = transactionMonths(moves);
+
   return (
-    <Panel
-      title="TRANSACTIONS"
-      right={<span className="text-[10px] text-ink-3">{moves.length} MOVES</span>}
-    >
-      <Table head={["DATE", "PLAYER", "TYPE", "MOVE"]}>
-        {moves.length === 0 && <Empty what="NO TRANSACTIONS THIS SEASON" cols={4} />}
-        {/* A trade is one transaction id per player it moved, so the two sides
-            of a swap arrive as two rows sharing an id — the player makes the
-            row, and the id alone would not make it unique. */}
-        {moves.map((t, i) => (
-          <Row key={`${t.id}-${t.personId ?? i}`}>
-            <td className="px-3 py-1.5 whitespace-nowrap tabular-nums">{t.date}</td>
-            <td className="px-3 py-1.5">
-              {t.personId ? (
-                <PlayerLink id={t.personId}>{t.person}</PlayerLink>
-              ) : (
-                <span className="text-ink-3">—</span>
-              )}
-            </td>
-            <td className="px-3 py-1.5 text-right text-[10px] tracking-wider whitespace-nowrap text-ink-3">
-              {t.type}
-            </td>
-            <td className="px-3 py-1.5 text-right text-ink-2">{t.description}</td>
-          </Row>
+    <Panel title="TRANSACTIONS" right={controls}>
+      <Table
+        head={["DATE", "TRANSACTION"]}
+        align="ll"
+        widths={["18%", "82%"]}
+        maxHeight="none"
+      >
+        {moves.length === 0 && <Empty what="NO TRANSACTIONS THIS SEASON" cols={2} />}
+        {months.map((m) => (
+          <Fragment key={m.key}>
+            <tr>
+              <td
+                colSpan={2}
+                className="border-y border-line bg-surface px-3 py-1.5 text-[10px] tracking-[0.2em] text-ink-2"
+              >
+                {monthOf(m.days[0].date)}
+              </td>
+            </tr>
+            {m.days.map((d) => (
+              <Row key={d.date}>
+                <td className="px-3 py-1.5 align-top whitespace-nowrap text-ink-3">
+                  {dayOf(`${d.date}T12:00:00Z`)}
+                </td>
+                {/* The day's moves in MLB's own wording, one paragraph, the
+                    way a club posts its log. */}
+                <td className="px-3 py-1.5 text-ink-2">{d.notes.join(" ")}</td>
+              </Row>
+            ))}
+          </Fragment>
         ))}
       </Table>
     </Panel>

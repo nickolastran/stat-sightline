@@ -450,7 +450,7 @@ async function TabBody({
   tab: TeamTab;
   id: number;
   season: number;
-  /** The stats and schedule tabs read their own season; the others don't offer one. */
+  /** The stats, schedule and transactions tabs read their own season. */
   statSeason: number;
   first: number;
   gameType: PlayerGameType;
@@ -488,7 +488,16 @@ async function TabBody({
         return <InjuriesPanel players={await getTeamInjuries(id, season)} />;
       case "transactions":
         return (
-          <TransactionsPanel moves={await getTeamTransactions(id, season)} />
+          <TransactionsPanel
+            moves={await getTeamTransactions(id, statSeason)}
+            controls={
+              <SeasonSelect
+                value={statSeason}
+                first={first}
+                last={seasonOf(todayET())}
+              />
+            }
+          />
         );
     }
   } catch {
@@ -553,10 +562,10 @@ export default async function TeamPage({
   }
   if (!team) notFound();
 
-  /* Only the stats and schedule tabs carry controls, so only they read the
-     query string — every other tab stays on the running season. */
+  /* Only the tabs that carry a season control read the query string — every
+     other tab stays on the running season. */
   const stats = section === "stats";
-  const dated = stats || section === "schedule";
+  const dated = stats || section === "schedule" || section === "transactions";
   const sp = dated ? await searchParams : {};
   const first = Number(team.firstYear) || FIRST_SEASON;
   const statSeason = pickSeason(sp.season, first, season);

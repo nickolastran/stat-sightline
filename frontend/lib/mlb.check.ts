@@ -20,11 +20,13 @@ import {
   runningRecords,
   teamHref,
   teamIdOf,
+  transactionMonths,
   ordinal,
   statRank,
   type Game,
   type PlayerStatRow,
   type StandingRow,
+  type Transaction,
   type TeamStatRow,
 } from "./mlb";
 
@@ -340,12 +342,44 @@ assert.equal(
 assert.equal(breakIndex(half, null), 2, "no All-Star Game falls back to the midpoint");
 assert.equal(breakIndex([], allStar), 0, "a season with no games splits nowhere");
 
+/*
+ * The transaction log's shape — months, then days, then the day's moves in
+ * one piece. A trade is filed once per player it moved, all of them carrying
+ * the same sentence, which must not be read out twice.
+ */
+const move = (date: string, description: string, id = 1) =>
+  ({ id, date, description, type: "", personId: null, person: "" }) as Transaction;
+const log = transactionMonths([
+  move("2026-08-29", "Optioned RHP Spencer Bivens to Sacramento."),
+  move("2026-08-26", "Placed RHP Adrian Houser on the 15-day injured list."),
+  move("2026-08-26", "Selected the contract of RHP Braxton Roxby."),
+  move("2026-07-31", "Traded OF Heliot Ramos to the Yankees.", 7),
+  move("2026-07-31", "Traded OF Heliot Ramos to the Yankees.", 7),
+]);
+assert.deepEqual(
+  log.map((m) => m.key),
+  ["2026-08", "2026-07"],
+  "months keep the order the moves arrived in, newest first"
+);
+assert.deepEqual(
+  log[0].days.map((d) => d.date),
+  ["2026-08-29", "2026-08-26"],
+  "a month reads day by day"
+);
+assert.equal(log[0].days[1].notes.length, 2, "a day carries every move made on it");
+assert.deepEqual(
+  log[1].days[0].notes,
+  ["Traded OF Heliot Ramos to the Yankees."],
+  "both sides of a trade are the same sentence, written once"
+);
+
 console.log("clinchMark ok");
 console.log("gamesBack ok");
 console.log("gameStatus ok");
 console.log("latestByGame ok");
 console.log("runningRecords ok");
 console.log("breakIndex ok");
+console.log("transactionMonths ok");
 console.log("leaderBoard ok");
 console.log("teamHref ok");
 console.log("statRank ok");

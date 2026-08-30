@@ -1727,6 +1727,39 @@ export async function getTeamTransactions(
     .sort((a, b) => b.date.localeCompare(a.date));
 }
 
+/** A day's moves, in the order the club made them. */
+export interface TransactionDay {
+  date: string;
+  notes: string[];
+}
+
+/** One month of a season's moves — "2026-08" and the days under it. */
+export interface TransactionMonth {
+  key: string;
+  days: TransactionDay[];
+}
+
+/**
+ * A season's moves as the club's own log reads: months, then days, then what
+ * was done that day in one piece.
+ *
+ * A trade is filed once per player it moved, each row carrying the same
+ * sentence, so identical wording within a day is written once.
+ */
+export function transactionMonths(moves: Transaction[]): TransactionMonth[] {
+  const months: TransactionMonth[] = [];
+  for (const t of moves) {
+    const key = t.date.slice(0, 7);
+    let m = months[months.length - 1];
+    if (!m || m.key !== key) months.push((m = { key, days: [] }));
+    let d = m.days[m.days.length - 1];
+    if (!d || d.date !== t.date) m.days.push((d = { date: t.date, notes: [] }));
+    if (t.description && !d.notes.includes(t.description))
+      d.notes.push(t.description);
+  }
+  return months;
+}
+
 /* Injured-list codes all start with D (day counts) or IL (full season) —
  * everything else on the 40-man is an option, a reassignment or a DFA. */
 const injured = (status: string) => /^(D\d|IL)/.test(status);
