@@ -227,7 +227,11 @@ export default async function LeagueSectionPage({
             seasonOver={season < current}
             views={
               standingsView ? (
-                <StandingsViews active={found.id} query={viewQuery} />
+                <StandingsViews
+                  active={found.id}
+                  query={viewQuery}
+                  hideWildCard={found.id === "standings" && carried === "S"}
+                />
               ) : null
             }
           />
