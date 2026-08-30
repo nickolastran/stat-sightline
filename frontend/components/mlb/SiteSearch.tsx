@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useTypeahead } from "@/lib/useTypeahead";
-import { playerHeadshot, teamLogo, type SearchHit } from "@/lib/mlb";
+import { playerHeadshot, teamHref, teamLogo, type SearchHit } from "@/lib/mlb";
 
 /*
  * Header search — any club or any person in MLB's records, in one box beside
@@ -23,7 +23,11 @@ export default function SiteSearch() {
   const [q, setQ] = useState("");
   const t = useTypeahead<SearchHit>(q, search, (hit) => {
     setQ("");
-    router.push(`/${hit.kind}/${hit.id}`);
+    router.push(
+      hit.kind === "team"
+        ? teamHref(hit.id, hit.name)
+        : `/${hit.kind}/${hit.id}`
+    );
   });
 
   return (

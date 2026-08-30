@@ -30,6 +30,31 @@ const LEAGUES: Record<number, string> = {
 };
 
 /** Team logo — degrades to alt text if unreachable. */
+/**
+ * A club's page URL — `/team/137-san-francisco-giants`.
+ *
+ * The id leads so the route never has to look a name up, which matters for
+ * the clubs that only exist in old standings (the 1884 Union Association is
+ * not in the current teams list); the slug is there for the reader, and a
+ * bare `/team/137` still resolves.
+ */
+export const teamHref = (id: number, name: string, tab = ""): string =>
+  `/team/${id}${teamSlug(name)}${tab && `/${tab}`}`;
+
+const teamSlug = (name: string): string => {
+  const slug = name
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
+  return slug ? `-${slug}` : "";
+};
+
+/** The club id out of a `137-san-francisco-giants` segment, or NaN. */
+export const teamIdOf = (param: string): number =>
+  /^\d+(-|$)/.test(param) ? Number.parseInt(param, 10) : NaN;
+
 export const teamLogo = (id: number) =>
   `https://www.mlbstatic.com/team-logos/${id}.svg`;
 
@@ -79,6 +104,13 @@ export interface GameSide {
   probable: { id: number; name: string } | null;
 }
 
+/** Who won, lost and saved it — empty until a game is final. */
+export interface Decisions {
+  winner: { id: number; name: string } | null;
+  loser: { id: number; name: string } | null;
+  save: { id: number; name: string } | null;
+}
+
 export interface Game {
   pk: number;
   state: "Preview" | "Live" | "Final" | string;
@@ -89,11 +121,13 @@ export interface Game {
   inningState: string | null;
   away: GameSide;
   home: GameSide;
+  decisions: Decisions;
+  /** Tickets counted through the gate, null for a game not yet played. */
+  attendance: number | null;
 }
 
 function side(raw: any): GameSide {
   const t = raw.team ?? {};
-  const pp = raw.probablePitcher;
   return {
     id: t.id,
     name: t.name ?? "TBD",
@@ -102,7 +136,7 @@ function side(raw: any): GameSide {
     wins: raw.leagueRecord?.wins ?? null,
     losses: raw.leagueRecord?.losses ?? null,
     isWinner: !!raw.isWinner,
-    probable: pp ? { id: pp.id, name: pp.fullName } : null,
+    probable: person(raw.probablePitcher),
   };
 }
 
@@ -116,9 +150,20 @@ const toGame = (g: any): Game => ({
   inningState: g.linescore?.inningState ?? null,
   away: side(g.teams?.away ?? {}),
   home: side(g.teams?.home ?? {}),
+  decisions: {
+    winner: person(g.decisions?.winner),
+    loser: person(g.decisions?.loser),
+    save: person(g.decisions?.save),
+  },
+  attendance: g.gameInfo?.attendance ?? null,
 });
 
-const SCHEDULE_HYDRATE = "probablePitcher,linescore,team";
+/** The pitcher of a decision or a probable, or null when there isn't one. */
+const person = (p: any) => (p?.id ? { id: p.id, name: p.fullName ?? "—" } : null);
+
+/* Decisions and the gate count ride along with every schedule read: they are
+ * a few hundred bytes a game, and it keeps one hydrate string to keep right. */
+const SCHEDULE_HYDRATE = "probablePitcher,linescore,team,decisions,gameInfo";
 
 export async function getSchedule(date: string): Promise<Game[]> {
   const data = await mlb(
@@ -780,6 +825,15 @@ export interface RosterEntry {
   /** "Pitcher" / "Infielder" / … — the page groups the roster by this. */
   posType: string;
   status: string;
+  /** "A", "D10", "ILF" … — what the injuries tab filters on. */
+  statusCode: string;
+  /** Which hand they throw and hit with — "L", "R", "S" for a switch-hitter. */
+  throws: string;
+  bats: string;
+  age: number | null;
+  /** As MLB reports them: `5' 10"` and pounds. */
+  height: string;
+  weight: number | null;
 }
 
 export interface TeamIdentity {
@@ -851,20 +905,30 @@ export async function getTeamLines(
 /** One club's roster. Degrades to an empty list — the rest of the page stands. */
 export async function getTeamRoster(
   id: number,
-  season: number
+  season: number,
+  rosterType = "fullSeason"
 ): Promise<RosterEntry[]> {
   const data = await mlb(
-    `/teams/${id}/roster?season=${season}&rosterType=fullSeason`,
+    `/teams/${id}/roster?season=${season}&rosterType=${rosterType}&hydrate=person`,
     1800
   ).catch(() => null);
-  return ((data?.roster ?? []) as any[]).map((r): RosterEntry => ({
-    id: r.person?.id,
-    name: r.person?.fullName ?? "—",
-    number: r.jerseyNumber ?? "",
-    pos: r.position?.abbreviation ?? "",
-    posType: r.position?.type ?? "Other",
-    status: r.status?.description ?? "",
-  }));
+  return ((data?.roster ?? []) as any[]).map((r): RosterEntry => {
+    const p = r.person ?? {};
+    return {
+      id: p.id,
+      name: p.fullName ?? "—",
+      number: r.jerseyNumber ?? p.primaryNumber ?? "",
+      pos: r.position?.abbreviation ?? "",
+      posType: r.position?.type ?? "Other",
+      status: r.status?.description ?? "",
+      statusCode: r.status?.code ?? "",
+      throws: p.pitchHand?.code ?? "—",
+      bats: p.batSide?.code ?? "—",
+      age: typeof p.currentAge === "number" ? p.currentAge : null,
+      height: p.height ?? "—",
+      weight: typeof p.weight === "number" ? p.weight : null,
+    };
+  });
 }
 
 /* ── Leaderboards ───────────────────────────────────────────────────── */
@@ -1162,3 +1226,551 @@ export const CLINCH_LEGEND: { label: string; title: string }[] = [
   { label: "E", title: "Eliminated from Playoff Contention" },
   { label: "X", title: "Clinched Division" },
 ];
+
+/* ── Team page: schedule, leaders, ranks, splits, transactions ──────── */
+
+/**
+ * One game per gamePk, the latest date it was played on.
+ *
+ * A rained-out game keeps its gamePk: the season schedule lists it once as
+ * "Postponed" on the night it wasn't played and again on the makeup date, and
+ * a suspended game lists both halves the same way. Both entries are the same
+ * game, so the played one wins — which is also what keeps React from seeing
+ * two rows with one key.
+ */
+export function latestByGame(games: Game[]): Game[] {
+  const latest = new Map<number, Game>();
+  for (const g of games) {
+    const prev = latest.get(g.pk);
+    if (!prev || g.startTime > prev.startTime) latest.set(g.pk, g);
+  }
+  return [...latest.values()].sort((a, b) =>
+    a.startTime.localeCompare(b.startTime)
+  );
+}
+
+/**
+ * One club's season, every game of it — the schedule tab, and the source the
+ * home tab slices its last few finals off. Post-season game types ride along
+ * so October doesn't vanish from a past season's page.
+ */
+export async function getTeamSchedule(
+  id: number,
+  season: number
+): Promise<Game[]> {
+  const data = await mlb(
+    `/schedule?sportId=1&teamId=${id}&season=${season}&gameType=R,F,D,L,W&hydrate=${SCHEDULE_HYDRATE}`,
+    300
+  );
+  return latestByGame(
+    ((data.dates ?? []) as any[]).flatMap((d) => d.games ?? []).map(toGame)
+  );
+}
+
+/* ── Individual player stats ────────────────────────────────────────── */
+
+/**
+ * Which slice of the calendar a player-stat view reads. Wider than the
+ * standings' game type: a club's players have a post-season line, its
+ * standings row does not.
+ */
+export type PlayerGameType = "R" | "P" | "S";
+
+export const PLAYER_GAME_TYPES: { value: PlayerGameType; label: string }[] = [
+  { value: "R", label: "REGULAR SEASON" },
+  { value: "P", label: "POSTSEASON" },
+  { value: "S", label: "SPRING TRAINING" },
+];
+
+export const pickPlayerGameType = (raw: string | undefined): PlayerGameType =>
+  raw === "P" || raw === "S" ? raw : "R";
+
+export type StatGroup = "hitting" | "pitching" | "fielding";
+
+/** One player's line in one group — a row of the stats tab's tables. */
+export interface PlayerStatRow {
+  id: number;
+  name: string;
+  /** Fielding is reported per position, so a player has a row for each. */
+  position: string;
+  values: Record<string, TeamStatValue>;
+}
+
+/* The columns each table carries, in the order MLB's own lines read. */
+export const PLAYER_HITTING_COLS: TeamStatCol[] = [
+  { key: "gamesPlayed", label: "G", title: "Games played" },
+  { key: "plateAppearances", label: "PA", title: "Plate appearances" },
+  { key: "atBats", label: "AB", title: "At-bats" },
+  { key: "runs", label: "R", title: "Runs scored" },
+  { key: "hits", label: "H", title: "Hits" },
+  { key: "doubles", label: "2B", title: "Doubles" },
+  { key: "triples", label: "3B", title: "Triples" },
+  { key: "homeRuns", label: "HR", title: "Home runs" },
+  { key: "rbi", label: "RBI", title: "Runs batted in" },
+  { key: "baseOnBalls", label: "BB", title: "Walks (bases on balls)" },
+  { key: "strikeOuts", label: "K", title: "Strikeouts" },
+  { key: "stolenBases", label: "SB", title: "Stolen bases" },
+  { key: "avg", label: "AVG", title: "Batting average — hits per at-bat" },
+  { key: "obp", label: "OBP", title: "On-base percentage" },
+  { key: "slg", label: "SLG", title: "Slugging percentage" },
+  { key: "ops", label: "OPS", title: "On-base plus slugging" },
+];
+
+export const PLAYER_PITCHING_COLS: TeamStatCol[] = [
+  { key: "gamesPlayed", label: "G", title: "Games pitched" },
+  { key: "gamesStarted", label: "GS", title: "Games started" },
+  { key: "wins", label: "W", title: "Wins" },
+  { key: "losses", label: "L", title: "Losses" },
+  { key: "saves", label: "SV", title: "Saves" },
+  { key: "era", label: "ERA", title: "Earned run average" },
+  { key: "whip", label: "WHIP", title: "Walks and hits per inning pitched" },
+  { key: "inningsPitched", label: "IP", title: "Innings pitched" },
+  { key: "hits", label: "H", title: "Hits allowed" },
+  { key: "runs", label: "R", title: "Runs allowed" },
+  { key: "earnedRuns", label: "ER", title: "Earned runs allowed" },
+  { key: "homeRuns", label: "HR", title: "Home runs allowed" },
+  { key: "baseOnBalls", label: "BB", title: "Walks issued" },
+  { key: "strikeOuts", label: "K", title: "Strikeouts recorded" },
+  { key: "avg", label: "OAVG", title: "Opponent batting average" },
+  { key: "strikeoutsPer9Inn", label: "K/9", title: "Strikeouts per nine innings" },
+];
+
+export const PLAYER_FIELDING_COLS: TeamStatCol[] = [
+  { key: "games", label: "G", title: "Games at this position" },
+  { key: "gamesStarted", label: "GS", title: "Games started at this position" },
+  { key: "innings", label: "INN", title: "Innings played at this position" },
+  { key: "chances", label: "TC", title: "Total chances" },
+  { key: "putOuts", label: "PO", title: "Putouts" },
+  { key: "assists", label: "A", title: "Assists" },
+  { key: "errors", label: "E", title: "Errors" },
+  { key: "doublePlays", label: "DP", title: "Double plays turned" },
+  { key: "fielding", label: "FPCT", title: "Fielding percentage" },
+  { key: "rangeFactorPer9Inn", label: "RF/9", title: "Range factor per nine innings" },
+];
+
+export const playerCols = (group: StatGroup): TeamStatCol[] =>
+  group === "hitting"
+    ? PLAYER_HITTING_COLS
+    : group === "pitching"
+      ? PLAYER_PITCHING_COLS
+      : PLAYER_FIELDING_COLS;
+
+/**
+ * Every player on a club's season, one row each — the stats tab's tables and
+ * the source the home tab's leader boards are ranked from.
+ *
+ * `playerPool=ALL` is what makes it every player: the default pool is the
+ * qualified one, which on a club with an injured rotation answers with a
+ * single pitcher. Qualification is a property of a leader board, not of the
+ * roster, so it is applied where the boards are built instead.
+ */
+export async function getTeamPlayerStats(
+  id: number,
+  season: number,
+  group: StatGroup,
+  gameType: PlayerGameType = "R"
+): Promise<PlayerStatRow[]> {
+  const data = await mlb(
+    `/stats?stats=season&group=${group}&season=${season}&teamId=${id}` +
+      `&gameType=${gameType}&sportId=1&playerPool=ALL&limit=200`,
+    1800
+  );
+  const columns = playerCols(group);
+  return ((data.stats?.[0]?.splits ?? []) as any[]).map(
+    (s): PlayerStatRow => {
+      const stat = s.stat ?? {};
+      return {
+        id: s.player?.id,
+        name: s.player?.fullName ?? "—",
+        position: s.position?.abbreviation ?? "",
+        values: Object.fromEntries(
+          columns.map((c) => [c.key, stat[c.key] ?? null])
+        ),
+      };
+    }
+  );
+}
+
+/**
+ * Every pitcher in the majors, as won-lost-saved. One filtered request covers
+ * a whole season's decisions — the schedule names a winner, a loser and a
+ * saver per game, and any of the three can belong to either club.
+ *
+ * These are season totals as they stand now, not the line the pitcher carried
+ * into that particular game: the as-of-that-day figure lives only in each
+ * game's own box score, which would be one request per row.
+ */
+export interface PitcherRecord {
+  wins: number;
+  losses: number;
+  saves: number;
+}
+
+export async function getPitcherRecords(
+  season: number
+): Promise<Map<number, PitcherRecord>> {
+  const data = await mlb(
+    `/stats?stats=season&group=pitching&season=${season}&sportId=1` +
+      `&playerPool=ALL&limit=2000&fields=stats,splits,player,id,stat,wins,losses,saves`,
+    1800
+  );
+  return new Map(
+    ((data.stats?.[0]?.splits ?? []) as any[]).map((s) => [
+      s.player?.id as number,
+      {
+        wins: s.stat?.wins ?? 0,
+        losses: s.stat?.losses ?? 0,
+        saves: s.stat?.saves ?? 0,
+      },
+    ])
+  );
+}
+
+/* ── Team leaders ───────────────────────────────────────────────────── */
+
+/** One club's leader board for a stat — the top few names, not the league's. */
+export interface TeamLeaderBoard {
+  key: string;
+  label: string;
+  group: "hitting" | "pitching";
+  leaders: { id: number; name: string; value: string }[];
+}
+
+/*
+ * The six a club is read by, and what it takes to appear on one. Counting
+ * stats need no bar; a rate does, or a September call-up with one good week
+ * leads the club in batting average. The bar is MLB's own qualification —
+ * 3.1 plate appearances and one inning per team game.
+ */
+export interface TeamLeaderSpec {
+  key: string;
+  label: string;
+  group: "hitting" | "pitching";
+  /** Lower is better — ERA, not home runs. */
+  low?: boolean;
+  /** Minimum of `key` per team game to qualify. */
+  min?: { key: string; perGame: number };
+}
+
+const TEAM_LEADER_SPECS: TeamLeaderSpec[] = [
+  {
+    key: "avg",
+    label: "AVG",
+    group: "hitting",
+    min: { key: "plateAppearances", perGame: 3.1 },
+  },
+  { key: "homeRuns", label: "HOME RUNS", group: "hitting" },
+  { key: "rbi", label: "RBI", group: "hitting" },
+  {
+    key: "era",
+    label: "ERA",
+    group: "pitching",
+    low: true,
+    min: { key: "inningsPitched", perGame: 1 },
+  },
+  { key: "strikeOuts", label: "STRIKEOUTS", group: "pitching" },
+  { key: "saves", label: "SAVES", group: "pitching" },
+];
+
+/** How many names each board shows. */
+export const TEAM_LEADER_COUNT = 3;
+
+/*
+ * Fractions of the qualifying bar to try, in order. A club whose rotation
+ * spent the summer hurt can have fewer than three qualified pitchers — MLB's
+ * own leader endpoint then answers with one name — so the bar comes down a
+ * step at a time until the board fills, rather than the board being short.
+ * The last step is no bar at all, which only a club with barely three
+ * pitchers all season ever reaches.
+ */
+const BAR_STEPS = [1, 0.5, 0.25, 0];
+
+/** Best first, by this spec's direction; unreported figures never rank. */
+function rankBy(rows: PlayerStatRow[], spec: TeamLeaderSpec): PlayerStatRow[] {
+  return rows
+    .filter((r) => teamStatNum(r.values[spec.key]) !== null)
+    .sort((a, b) => {
+      const va = teamStatNum(a.values[spec.key])!;
+      const vb = teamStatNum(b.values[spec.key])!;
+      return spec.low ? va - vb : vb - va;
+    });
+}
+
+export function leaderBoard(
+  spec: TeamLeaderSpec,
+  rows: PlayerStatRow[],
+  teamGames: number
+): TeamLeaderBoard {
+  const ranked = rankBy(rows, spec);
+  const bar = spec.min
+    ? (fraction: number) =>
+        ranked.filter(
+          (r) =>
+            (teamStatNum(r.values[spec.min!.key]) ?? 0) >=
+            teamGames * spec.min!.perGame * fraction
+        )
+    : () => ranked;
+  const filled =
+    BAR_STEPS.map(bar).find((list) => list.length >= TEAM_LEADER_COUNT) ??
+    ranked;
+
+  return {
+    key: `${spec.group}.${spec.key}`,
+    label: spec.label,
+    group: spec.group,
+    leaders: filled.slice(0, TEAM_LEADER_COUNT).map((r) => ({
+      id: r.id,
+      name: r.name,
+      value: teamStatText(r.values[spec.key]),
+    })),
+  };
+}
+
+/**
+ * The club's own leaders, ranked here rather than read off MLB's team-leader
+ * endpoint: that one answers only with qualified players, which leaves a
+ * board of one or two names where three were asked for.
+ */
+export async function getTeamLeaders(
+  id: number,
+  season: number,
+  gameType: PlayerGameType = "R"
+): Promise<TeamLeaderBoard[]> {
+  const [hitting, pitching] = await Promise.all([
+    getTeamPlayerStats(id, season, "hitting", gameType),
+    getTeamPlayerStats(id, season, "pitching", gameType),
+  ]);
+  /* Games the club has played, as its busiest position player has seen them —
+     the denominator every qualifying bar is a multiple of. */
+  const teamGames = Math.max(
+    0,
+    ...hitting.map((r) => teamStatNum(r.values.gamesPlayed) ?? 0)
+  );
+
+  return TEAM_LEADER_SPECS.map((spec) =>
+    leaderBoard(spec, spec.group === "hitting" ? hitting : pitching, teamGames)
+  );
+}
+
+/** A team stat with where it places among the thirty clubs. */
+export interface RankedStat {
+  key: string;
+  label: string;
+  value: TeamStatValue;
+  /** 1 is best in the majors; null when the club has no figure yet. */
+  rank: number | null;
+}
+
+/* The four each group leads with on the home tab, and which direction is
+ * good — a low ERA is first, a low run total is last. */
+export const TEAM_CARD_STATS: Record<
+  "hitting" | "pitching",
+  { key: string; label: string; low?: boolean }[]
+> = {
+  hitting: [
+    { key: "runs", label: "RUNS" },
+    { key: "avg", label: "BATTING AVERAGE" },
+    { key: "obp", label: "ON BASE PERCENTAGE" },
+    { key: "slg", label: "SLUGGING PERCENTAGE" },
+  ],
+  pitching: [
+    { key: "era", label: "ERA", low: true },
+    { key: "whip", label: "WHIP", low: true },
+    { key: "strikeOuts", label: "STRIKEOUTS" },
+    { key: "avg", label: "OPP AVG", low: true },
+  ],
+};
+
+/**
+ * Where one club places in a stat, counting how many clubs beat it — ties
+ * share a rank (two firsts, then a third) and unreported figures are skipped
+ * rather than counted as zero, which would rank a silent club above a bad one.
+ */
+export function statRank(
+  rows: TeamStatRow[],
+  key: string,
+  id: number,
+  low = false
+): number | null {
+  const mine = teamStatNum(rows.find((r) => r.id === id)?.values[key] ?? null);
+  if (mine === null) return null;
+  const ahead = rows.filter((r) => {
+    const v = teamStatNum(r.values[key]);
+    return v !== null && (low ? v < mine : v > mine);
+  }).length;
+  return ahead + 1;
+}
+
+/** "2ND", "3RD", "11TH" — the rank line under a stat tile. */
+export function ordinal(n: number): string {
+  const tail = ["TH", "ST", "ND", "RD"];
+  const v = n % 100;
+  return `${n}${v >= 11 && v <= 13 ? "TH" : (tail[n % 10] ?? "TH")}`;
+}
+
+/**
+ * The home tab's stat card: the club's headline figures with their MLB rank,
+ * off the same league-wide payload the team-stats section already cached.
+ */
+export async function getTeamCardStats(
+  id: number,
+  season: number
+): Promise<Record<"hitting" | "pitching", RankedStat[]>> {
+  const tables = await getTeamStats(season);
+  const build = (group: "hitting" | "pitching"): RankedStat[] => {
+    const rows = tables.find((t) => t.group === group)?.rows ?? [];
+    const mine = rows.find((r) => r.id === id);
+    return TEAM_CARD_STATS[group].map((s) => ({
+      key: s.key,
+      label: s.label,
+      value: mine?.values[s.key] ?? null,
+      rank: statRank(rows, s.key, id, s.low),
+    }));
+  };
+  return { hitting: build("hitting"), pitching: build("pitching") };
+}
+
+/** One situational line — home, away, versus left, versus right. */
+export interface SplitLine {
+  code: string;
+  label: string;
+  values: Record<string, TeamStatValue>;
+}
+
+/* Home/away and platoon: the four every club's page is read for. */
+const SIT_CODES = "h,a,vl,vr";
+
+export async function getTeamSplits(
+  id: number,
+  season: number,
+  group: "hitting" | "pitching"
+): Promise<SplitLine[]> {
+  const data = await mlb(
+    `/teams/${id}/stats?season=${season}&group=${group}&stats=statSplits&sitCodes=${SIT_CODES}`,
+    1800
+  );
+  const columns = cols(group);
+  return ((data.stats?.[0]?.splits ?? []) as any[]).map((s): SplitLine => {
+    const stat = s.stat ?? {};
+    return {
+      code: s.split?.code ?? "",
+      label: (s.split?.description ?? "—").toUpperCase(),
+      values: Object.fromEntries(columns.map((c) => [c.key, stat[c.key] ?? null])),
+    };
+  });
+}
+
+/** One roster move — the transactions tab, newest first. */
+export interface Transaction {
+  id: number;
+  date: string;
+  type: string;
+  description: string;
+  personId: number | null;
+  person: string;
+}
+
+export async function getTeamTransactions(
+  id: number,
+  season: number
+): Promise<Transaction[]> {
+  const data = await mlb(
+    `/transactions?teamId=${id}&startDate=${season}-01-01&endDate=${season}-12-31`,
+    3600
+  );
+  return ((data.transactions ?? []) as any[])
+    .map((t): Transaction => ({
+      id: t.id,
+      date: t.date ?? "",
+      type: t.typeDesc ?? "",
+      description: t.description ?? "",
+      personId: t.person?.id ?? null,
+      person: t.person?.fullName ?? "",
+    }))
+    .sort((a, b) => b.date.localeCompare(a.date));
+}
+
+/* Injured-list codes all start with D (day counts) or IL (full season) —
+ * everything else on the 40-man is an option, a reassignment or a DFA. */
+const injured = (status: string) => /^(D\d|IL)/.test(status);
+
+/**
+ * The active roster, grouped the way a club lists itself: the rotation, then
+ * the bullpen, then round the diamond. Only pitchers need their season line to
+ * be placed — everyone else is grouped by the position they play.
+ */
+export interface RosterGroup {
+  label: string;
+  players: RosterEntry[];
+}
+
+/* Position types in the order a roster page reads, pitchers already split. */
+const GROUP_ORDER = ["Catcher", "Infielder", "Outfielder", "Hitter"];
+const GROUP_LABEL: Record<string, string> = {
+  Catcher: "CATCHERS",
+  Infielder: "INFIELDERS",
+  Outfielder: "OUTFIELDERS",
+  Hitter: "DESIGNATED HITTERS",
+};
+
+/**
+ * The club as it stands today: who is on the active roster, in groups.
+ *
+ * Starter or reliever is not something the roster payload says — every arm is
+ * position "P" — so it is read off the season line: a pitcher who started at
+ * least half his appearances is in the rotation. Nobody with no line yet (a
+ * call-up on his first day) has started a game, which puts him in the bullpen,
+ * where a fresh arm in fact is.
+ */
+export async function getTeamRosterGroups(
+  id: number,
+  season: number
+): Promise<RosterGroup[]> {
+  const [roster, pitching] = await Promise.all([
+    getTeamRoster(id, season, "active"),
+    getTeamPlayerStats(id, season, "pitching").catch(
+      (): PlayerStatRow[] => []
+    ),
+  ]);
+  const starts = new Map(
+    pitching.map((r) => [
+      r.id,
+      {
+        gs: teamStatNum(r.values.gamesStarted) ?? 0,
+        g: teamStatNum(r.values.gamesPlayed) ?? 0,
+      },
+    ])
+  );
+  const rotation = (p: RosterEntry) => {
+    const line = starts.get(p.id);
+    return !!line && line.gs > 0 && line.gs * 2 >= line.g;
+  };
+
+  const pitchers = roster.filter((p) => p.posType === "Pitcher");
+  const groups: RosterGroup[] = [
+    { label: "STARTING PITCHERS", players: pitchers.filter(rotation) },
+    { label: "RELIEF PITCHERS", players: pitchers.filter((p) => !rotation(p)) },
+    ...GROUP_ORDER.map((type) => ({
+      label: GROUP_LABEL[type] ?? type.toUpperCase(),
+      players: roster.filter((p) => p.posType === type),
+    })),
+  ];
+
+  const byName = (a: RosterEntry, b: RosterEntry) =>
+    a.name.localeCompare(b.name);
+  return groups
+    .filter((g) => g.players.length > 0)
+    .map((g) => ({ ...g, players: [...g.players].sort(byName) }));
+}
+
+/**
+ * Who is hurt, off the 40-man rather than the full organisation: the club's
+ * injury report is its major-league list, not every rookie-ball strain.
+ */
+export async function getTeamInjuries(
+  id: number,
+  season: number
+): Promise<RosterEntry[]> {
+  const roster = await getTeamRoster(id, season, "40Man");
+  return roster.filter((p) => injured(p.statusCode));
+}

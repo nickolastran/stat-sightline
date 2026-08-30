@@ -10,7 +10,7 @@ import SeasonSelect from "@/components/mlb/SeasonSelect";
 import ProbablePitchers from "@/components/mlb/ProbablePitchers";
 import GameGrid from "@/components/mlb/GameGrid";
 import ScoreboardDate from "@/components/mlb/ScoreboardDate";
-import GameTypeSelect from "@/components/mlb/GameTypeSelect";
+import ParamSelect from "@/components/mlb/ParamSelect";
 import WildCard from "@/components/mlb/WildCard";
 import StandingsViews from "@/components/mlb/StandingsViews";
 import {
@@ -29,6 +29,7 @@ import {
   seasonOf,
   pickGameType,
   FIRST_SEASON,
+  GAME_TYPES,
   type GameType,
 } from "@/lib/mlb";
 import { getProjections, type StandingsProjection } from "@/lib/api";
@@ -204,7 +205,14 @@ export default async function LeagueSectionPage({
             <ScoreboardDate value={date} today={today} />
           ) : seasonal ? (
             <div className="flex flex-wrap items-center gap-3">
-              {typed && <GameTypeSelect value={gameType} />}
+              {typed && (
+                <ParamSelect
+                  param="type"
+                  label="TYPE"
+                  value={gameType}
+                  options={GAME_TYPES}
+                />
+              )}
               <SeasonSelect value={season} first={FIRST_SEASON} last={current} />
             </div>
           ) : (
