@@ -1757,7 +1757,8 @@ const GROUP_LABEL: Record<string, string> = {
  * position "P" — so it is read off the season line: a pitcher who started at
  * least half his appearances is in the rotation. Nobody with no line yet (a
  * call-up on his first day) has started a game, which puts him in the bullpen,
- * where a fresh arm in fact is.
+ * where a fresh arm in fact is. The same reading gives each arm the position
+ * he is actually listed by, "SP" or "RP" rather than the payload's flat "P".
  */
 export async function getTeamRosterGroups(
   id: number,
@@ -1784,9 +1785,13 @@ export async function getTeamRosterGroups(
   };
 
   const pitchers = roster.filter((p) => p.posType === "Pitcher");
+  const arms = (starters: boolean) =>
+    pitchers
+      .filter((p) => rotation(p) === starters)
+      .map((p) => ({ ...p, pos: starters ? "SP" : "RP" }));
   const groups: RosterGroup[] = [
-    { label: "STARTING PITCHERS", players: pitchers.filter(rotation) },
-    { label: "RELIEF PITCHERS", players: pitchers.filter((p) => !rotation(p)) },
+    { label: "STARTING PITCHERS", players: arms(true) },
+    { label: "RELIEF PITCHERS", players: arms(false) },
     ...GROUP_ORDER.map((type) => ({
       label: GROUP_LABEL[type] ?? type.toUpperCase(),
       players: roster.filter((p) => p.posType === type),

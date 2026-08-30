@@ -30,6 +30,7 @@ function Table({
   children,
   maxHeight = "36rem",
   align,
+  widths,
 }: {
   /** Column labels; anything after the first is right-aligned. */
   head: string[];
@@ -37,13 +38,25 @@ function Table({
   maxHeight?: string;
   /** One of "l"/"c"/"r" per column, where the default doesn't suit. */
   align?: string;
+  /** Fixed column widths — for a section split over several tables, which
+      otherwise size their columns to their own longest name and wander. */
+  widths?: string[];
 }) {
   return (
     <div
       className="overflow-auto border border-line"
       style={{ maxHeight }}
     >
-      <table className="w-full border-collapse text-xs">
+      <table
+        className={`w-full border-collapse text-xs ${widths ? "table-fixed" : ""}`}
+      >
+        {widths && (
+          <colgroup>
+            {widths.map((w, i) => (
+              <col key={i} style={{ width: w }} />
+            ))}
+          </colgroup>
+        )}
         <thead>
           <tr>
             {head.map((h, i) => (
@@ -359,6 +372,10 @@ export function SplitsPanels({
 const or = (v: string | number | null, unit = "") =>
   v === null || v === "" ? "—" : `${v}${unit}`;
 
+/* Every group is its own table, so the columns are pinned rather than sized
+   to each group's longest name — the roster reads as one list. */
+const ROSTER_WIDTHS = ["28%", "12%", "12%", "12%", "12%", "12%", "12%"];
+
 export function RosterPanel({ groups }: { groups: RosterGroup[] }) {
   const total = groups.reduce((n, g) => n + g.players.length, 0);
 
@@ -379,29 +396,43 @@ export function RosterPanel({ groups }: { groups: RosterGroup[] }) {
                 {g.label} · {g.players.length}
               </h3>
               <Table
-                head={["PLAYER", "#", "POS", "T", "B", "AGE", "HT", "WT"]}
+                head={[
+                  "PLAYER",
+                  "POSITION",
+                  "THROWS",
+                  "BATS",
+                  "AGE",
+                  "HEIGHT",
+                  "WEIGHT",
+                ]}
                 maxHeight="none"
+                align="lcccccc"
+                widths={ROSTER_WIDTHS}
               >
                 {g.players.map((p) => (
                   <Row key={p.id}>
                     <td className="px-3 py-1.5">
-                      <PlayerLink id={p.id}>{p.name}</PlayerLink>
+                      <span className="flex items-center gap-2">
+                        <PlayerLink id={p.id}>{p.name}</PlayerLink>
+                        {p.number && (
+                          <span className="tabular-nums text-ink-3">
+                            #{p.number}
+                          </span>
+                        )}
+                      </span>
                     </td>
-                    <td className="px-3 py-1.5 text-right tabular-nums text-ink-3">
-                      {p.number ? `#${p.number}` : "—"}
-                    </td>
-                    <td className="px-3 py-1.5 text-right text-[10px] tracking-wider text-ink-3">
+                    <td className="px-3 py-1.5 text-center text-[10px] tracking-wider text-ink-3">
                       {p.pos || "—"}
                     </td>
-                    <td className="px-3 py-1.5 text-right">{p.throws}</td>
-                    <td className="px-3 py-1.5 text-right">{p.bats}</td>
-                    <td className="px-3 py-1.5 text-right tabular-nums">
+                    <td className="px-3 py-1.5 text-center">{p.throws}</td>
+                    <td className="px-3 py-1.5 text-center">{p.bats}</td>
+                    <td className="px-3 py-1.5 text-center tabular-nums">
                       {or(p.age)}
                     </td>
-                    <td className="px-3 py-1.5 text-right whitespace-nowrap tabular-nums">
+                    <td className="px-3 py-1.5 text-center whitespace-nowrap tabular-nums">
                       {or(p.height)}
                     </td>
-                    <td className="px-3 py-1.5 text-right tabular-nums">
+                    <td className="px-3 py-1.5 text-center tabular-nums">
                       {or(p.weight, " LB")}
                     </td>
                   </Row>
