@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { teamLogo } from "@/lib/mlb";
+import { teamHref, teamLogo } from "@/lib/mlb";
 
 /*
  * A club's name with its mark, wherever it appears (standings, team stats),
@@ -38,7 +38,7 @@ export default function TeamLink({
 
   return (
     <Link
-      href={`/team/${id}`}
+      href={teamHref(id, name)}
       className={`flex items-center gap-1.5 hover:text-accent ${className}`}
     >
       {label}

@@ -12,14 +12,17 @@ import { STANDINGS_VIEWS } from "@/lib/leagueSections";
 export default function StandingsViews({
   active,
   query,
+  hideWildCard = false,
 }: {
   active: string;
   /** The current `?season=`/`?type=`, already serialised. */
   query: string;
+  /** Spring training has no wild-card race, so don't offer the empty one. */
+  hideWildCard?: boolean;
 }) {
   return (
     <div role="group" aria-label="Standings view" className="flex gap-px">
-      {STANDINGS_VIEWS.map((v) => (
+      {STANDINGS_VIEWS.filter((v) => !(hideWildCard && v.id === "wildcard")).map((v) => (
         <Link
           key={v.id}
           href={`/league/${v.id}${query}`}
