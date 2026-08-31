@@ -17,6 +17,7 @@ import {
   breakIndex,
   latestByGame,
   leaderBoard,
+  mergeFielding,
   runningRecords,
   teamHref,
   teamIdOf,
@@ -384,3 +385,35 @@ console.log("leaderBoard ok");
 console.log("teamHref ok");
 console.log("statRank ok");
 console.log("ordinal ok");
+
+/* ── mergeFielding ──────────────────────────────────────────────────── */
+
+const spot = (
+  id: number,
+  pos: string,
+  innings: string,
+  putOuts: number,
+  assists: number,
+  errors: number
+) => ({
+  id,
+  name: `F${id}`,
+  position: pos,
+  values: { games: 1, gamesStarted: 1, innings, putOuts, assists, errors, doublePlays: 0, chances: null },
+});
+
+const merged = mergeFielding([
+  spot(1, "SS", "100.2", 90, 200, 5),
+  spot(1, "2B", "50.2", 30, 60, 1),
+  spot(2, "C", "40.0", 300, 10, 2),
+]);
+
+assert.equal(merged.length, 2, "one row per player, not per position");
+assert.equal(merged[0].position, "SS", "the most innings names the spot");
+assert.equal(merged[1].position, "C");
+assert.equal(merged[0].values.innings, "151.1", "innings add as thirds: 100.2 + 50.2 is 151.1, not 151.4");
+assert.equal(merged[0].values.putOuts, 120);
+assert.equal(merged[0].values.chances, 386, "chances fall back to PO + A + E when unreported");
+assert.equal(merged[0].values.fielding, ".984", "pct is recomputed from the totals, not averaged");
+assert.equal(merged[0].values.rangeFactorPer9Inn, "22.60", "range factor is per nine, off the summed outs");
+console.log("mergeFielding ok");

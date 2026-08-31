@@ -9,10 +9,16 @@ import { useMemo, useState } from "react";
  * Numeric columns right-align with tabular figures so digits line up.
  */
 
+const ALIGN = {
+  left: "text-left",
+  center: "text-center",
+  right: "text-right",
+} as const;
+
 export interface Column<T> {
   key: string;
   label: string;
-  align?: "left" | "right";
+  align?: keyof typeof ALIGN;
   sortValue?: (row: T) => number | string | null;
   render: (row: T) => React.ReactNode;
 }
@@ -25,6 +31,8 @@ interface Props<T> {
   pageSize?: number;
   maxHeight?: string;
   emptyLabel?: string;
+  /** The "n / total ROWS" line — off where the panel already says the count. */
+  showCount?: boolean;
 }
 
 export default function DataTable<T>({
@@ -35,6 +43,7 @@ export default function DataTable<T>({
   pageSize = 50,
   maxHeight = "28rem",
   emptyLabel = "0 ROWS IN SLICE",
+  showCount = true,
 }: Props<T>) {
   const [sort, setSort] = useState(defaultSort ?? null);
   const [visible, setVisible] = useState(pageSize);
@@ -63,9 +72,16 @@ export default function DataTable<T>({
         : { key, dir: "desc" }
     );
 
+  /* "none" hands the vertical scroll back to the page — a long roster reads
+     straight down instead of inside a box with its own scrollbar. */
+  const boxed = maxHeight !== "none";
+
   return (
     <div>
-      <div className="overflow-auto border border-line" style={{ maxHeight }}>
+      <div
+        className={`border border-line ${boxed ? "overflow-auto" : "overflow-x-auto"}`}
+        style={boxed ? { maxHeight } : undefined}
+      >
         <table className="w-full border-collapse text-xs">
           <thead>
             <tr>
@@ -83,7 +99,7 @@ export default function DataTable<T>({
                         : undefined
                     }
                     className={`sticky top-0 z-10 border-b border-line bg-surface p-0 ${
-                      c.align === "right" ? "text-right" : "text-left"
+                      ALIGN[c.align ?? "left"]
                     }`}
                   >
                     {c.sortValue ? (
@@ -91,7 +107,7 @@ export default function DataTable<T>({
                         type="button"
                         onClick={() => toggleSort(c.key)}
                         className={`w-full px-3 py-2 text-[10px] tracking-widest ${
-                          c.align === "right" ? "text-right" : "text-left"
+                          ALIGN[c.align ?? "left"]
                         } ${active ? "text-ink" : "text-ink-3 hover:text-ink"}`}
                       >
                         {/* Marker hangs in the padding — see SortHeader. */}
@@ -131,11 +147,9 @@ export default function DataTable<T>({
                 {columns.map((c) => (
                   <td
                     key={c.key}
-                    className={`px-3 py-1.5 whitespace-nowrap ${
-                      c.align === "right"
-                        ? "text-right tabular-nums text-ink-2"
-                        : "text-left text-ink-2"
-                    }`}
+                    className={`px-3 py-1.5 whitespace-nowrap text-ink-2 ${
+                      ALIGN[c.align ?? "left"]
+                    } ${c.align === "left" || !c.align ? "" : "tabular-nums"}`}
                   >
                     {c.render(row)}
                   </td>
@@ -145,21 +159,27 @@ export default function DataTable<T>({
           </tbody>
         </table>
       </div>
-      <div className="flex items-center justify-between border-x border-b border-line px-3 py-1.5 text-[10px] tracking-wider text-ink-3">
-        <span>
-          {Math.min(visible, sorted.length).toLocaleString()} /{" "}
-          {sorted.length.toLocaleString()} ROWS
-        </span>
-        {visible < sorted.length && (
-          <button
-            type="button"
-            onClick={() => setVisible((v) => v + pageSize)}
-            className="border border-line px-2 py-0.5 text-ink-2 hover:border-accent hover:text-ink"
-          >
-            SHOW MORE +{Math.min(pageSize, sorted.length - visible)}
-          </button>
-        )}
-      </div>
+      {/* Nothing to say once the count is off and every row is on screen —
+          then the bar itself goes rather than sitting empty under the table. */}
+      {(showCount || visible < sorted.length) && (
+        <div className="flex items-center justify-between gap-2 border-x border-b border-line px-3 py-1.5 text-[10px] tracking-wider text-ink-3">
+          {showCount && (
+            <span>
+              {Math.min(visible, sorted.length).toLocaleString()} /{" "}
+              {sorted.length.toLocaleString()} ROWS
+            </span>
+          )}
+          {visible < sorted.length && (
+            <button
+              type="button"
+              onClick={() => setVisible((v) => v + pageSize)}
+              className="ml-auto border border-line px-2 py-0.5 text-ink-2 hover:border-accent hover:text-ink"
+            >
+              SHOW MORE +{Math.min(pageSize, sorted.length - visible)}
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
 }

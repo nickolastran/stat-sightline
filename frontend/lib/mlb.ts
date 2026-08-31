@@ -1342,11 +1342,69 @@ export const PLAYER_FIELDING_COLS: TeamStatCol[] = [
   { key: "chances", label: "TC", title: "Total chances" },
   { key: "putOuts", label: "PO", title: "Putouts" },
   { key: "assists", label: "A", title: "Assists" },
+  { key: "fielding", label: "FPCT", title: "Fielding percentage" },
   { key: "errors", label: "E", title: "Errors" },
   { key: "doublePlays", label: "DP", title: "Double plays turned" },
-  { key: "fielding", label: "FPCT", title: "Fielding percentage" },
   { key: "rangeFactorPer9Inn", label: "RF/9", title: "Range factor per nine innings" },
 ];
+
+/* Innings are thirds: "121.2" is 121 innings and two outs, so they are added
+   as outs and written back in the same form rather than as decimals. */
+const outsOf = (v: TeamStatValue): number => {
+  const n = teamStatNum(v);
+  if (n === null) return 0;
+  const whole = Math.trunc(n);
+  return whole * 3 + Math.round((n - whole) * 10);
+};
+
+const inningsOf = (outs: number): string =>
+  `${Math.floor(outs / 3)}.${outs % 3}`;
+
+/**
+ * One row per player rather than one per position. MLB reports fielding per
+ * position, so a shortstop who filled in at second arrives twice and neither
+ * line is his season; the counting stats add up, the rates are recomputed from
+ * the totals (an average of two percentages isn't one), and the position shown
+ * is where he played the most innings, starred if there were others.
+ */
+export function mergeFielding(rows: PlayerStatRow[]): PlayerStatRow[] {
+  const SUM = ["games", "gamesStarted", "chances", "putOuts", "assists", "errors", "doublePlays"];
+  const byPlayer = new Map<number, { row: PlayerStatRow; outs: number; spots: { pos: string; outs: number }[] }>();
+
+  for (const r of rows) {
+    const outs = outsOf(r.values.innings);
+    const seen = byPlayer.get(r.id);
+    if (!seen) {
+      byPlayer.set(r.id, {
+        row: { ...r, values: { ...r.values } },
+        outs,
+        spots: [{ pos: r.position, outs }],
+      });
+      continue;
+    }
+    for (const k of SUM)
+      seen.row.values[k] = (teamStatNum(seen.row.values[k]) ?? 0) + (teamStatNum(r.values[k]) ?? 0);
+    seen.outs += outs;
+    seen.spots.push({ pos: r.position, outs });
+  }
+
+  return [...byPlayer.values()].map(({ row, outs, spots }) => {
+    const po = teamStatNum(row.values.putOuts) ?? 0;
+    const assists = teamStatNum(row.values.assists) ?? 0;
+    const errors = teamStatNum(row.values.errors) ?? 0;
+    /* Chances go unreported often enough that the sum of the three is the
+       safer denominator; it is what a total chance is. */
+    const tc = Math.max(teamStatNum(row.values.chances) ?? 0, po + assists + errors);
+    row.position = spots.reduce((a, b) => (b.outs > a.outs ? b : a)).pos;
+    row.values.innings = inningsOf(outs);
+    row.values.chances = tc;
+    row.values.fielding = tc ? ((po + assists) / tc).toFixed(3).replace(/^0/, "") : null;
+    row.values.rangeFactorPer9Inn = outs
+      ? (((po + assists) * 27) / outs).toFixed(2)
+      : null;
+    return row;
+  });
+}
 
 export const playerCols = (group: StatGroup): TeamStatCol[] =>
   group === "hitting"
@@ -1376,7 +1434,7 @@ export async function getTeamPlayerStats(
     1800
   );
   const columns = playerCols(group);
-  return ((data.stats?.[0]?.splits ?? []) as any[]).map(
+  const rows = ((data.stats?.[0]?.splits ?? []) as any[]).map(
     (s): PlayerStatRow => {
       const stat = s.stat ?? {};
       return {
@@ -1389,6 +1447,18 @@ export async function getTeamPlayerStats(
       };
     }
   );
+  if (group === "fielding") return mergeFielding(rows);
+  /* `playerPool=ALL` answers with every pitcher who ever appeared, each with an
+     empty batting line. A pitcher belongs on a hitting table only if he
+     actually hit — a pinch-hit appearance in a blowout counts, a row of zeros
+     does not. */
+  return group === "hitting"
+    ? rows.filter(
+        (r) =>
+          r.position !== "P" ||
+          (teamStatNum(r.values.plateAppearances) ?? 0) > 0
+      )
+    : rows;
 }
 
 /**
@@ -1469,7 +1539,7 @@ export function breakIndex(games: Game[], breakAt: string | null): number {
 export interface TeamLeaderBoard {
   key: string;
   label: string;
-  group: "hitting" | "pitching";
+  group: StatGroup;
   leaders: { id: number; name: string; value: string }[];
 }
 
@@ -1482,7 +1552,7 @@ export interface TeamLeaderBoard {
 export interface TeamLeaderSpec {
   key: string;
   label: string;
-  group: "hitting" | "pitching";
+  group: StatGroup;
   /** Lower is better — ERA, not home runs. */
   low?: boolean;
   /** Minimum of `key` per team game to qualify. */
@@ -1508,6 +1578,36 @@ const TEAM_LEADER_SPECS: TeamLeaderSpec[] = [
   { key: "strikeOuts", label: "STRIKEOUTS", group: "pitching" },
   { key: "saves", label: "SAVES", group: "pitching" },
 ];
+
+/*
+ * The five a club's own stats tab leads each table with — the same ranking as
+ * the home tab's boards, one name deep, over the rows the table already
+ * carries. Rates keep a qualifying bar for the same reason: a callup with one
+ * good week is not the club's leader in average.
+ */
+export const PLAYER_LEADER_SPECS: Record<StatGroup, TeamLeaderSpec[]> = {
+  hitting: [
+    { key: "avg", label: "BATTING AVG", group: "hitting", min: { key: "plateAppearances", perGame: 3.1 } },
+    { key: "homeRuns", label: "HOME RUNS", group: "hitting" },
+    { key: "rbi", label: "RBI", group: "hitting" },
+    { key: "obp", label: "OBP", group: "hitting", min: { key: "plateAppearances", perGame: 3.1 } },
+    { key: "hits", label: "HITS", group: "hitting" },
+  ],
+  pitching: [
+    { key: "era", label: "ERA", group: "pitching", low: true, min: { key: "inningsPitched", perGame: 1 } },
+    { key: "wins", label: "WINS", group: "pitching" },
+    { key: "strikeOuts", label: "STRIKEOUTS", group: "pitching" },
+    { key: "saves", label: "SAVES", group: "pitching" },
+    { key: "whip", label: "WHIP", group: "pitching", low: true, min: { key: "inningsPitched", perGame: 1 } },
+  ],
+  fielding: [
+    { key: "fielding", label: "FIELDING PCT", group: "fielding", min: { key: "chances", perGame: 1 } },
+    { key: "putOuts", label: "PUTOUTS", group: "fielding" },
+    { key: "assists", label: "ASSISTS", group: "fielding" },
+    { key: "doublePlays", label: "DOUBLE PLAYS", group: "fielding" },
+    { key: "chances", label: "TOTAL CHANCES", group: "fielding" },
+  ],
+};
 
 /** How many names each board shows. */
 export const TEAM_LEADER_COUNT = 3;
@@ -1725,6 +1825,31 @@ export async function getTeamTransactions(
       person: t.person?.fullName ?? "",
     }))
     .sort((a, b) => b.date.localeCompare(a.date));
+}
+
+/**
+ * Everyone a trade moved this season, in the club's own log order. The stats
+ * tables mark these names, because half a season's line for a club is not the
+ * same figure as a whole one — MLB files a trade once per player it moved, so
+ * the row already names the person and the sentence already says which way.
+ */
+export interface TradedPlayer {
+  id: number;
+  name: string;
+  /** The club's own sentence for the move, which says which way it went. */
+  note: string;
+}
+
+export function tradedPlayers(moves: Transaction[]): TradedPlayer[] {
+  const seen = new Map<number, TradedPlayer>();
+  for (const t of moves)
+    if (t.personId && /trade/i.test(t.type) && !seen.has(t.personId))
+      seen.set(t.personId, {
+        id: t.personId,
+        name: t.person,
+        note: t.description || t.type,
+      });
+  return [...seen.values()];
 }
 
 /** A day's moves, in the order the club made them. */

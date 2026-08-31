@@ -2,18 +2,13 @@ import type { Metadata } from "next";
 import { Suspense } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import Panel from "@/components/ui/Panel";
-import MetricCard from "@/components/ui/MetricCard";
-import {
-  Skeleton,
-  SkeletonPanel,
-  SkeletonTiles,
-} from "@/components/ui/Skeleton";
+import { Skeleton, SkeletonPanel } from "@/components/ui/Skeleton";
 import TeamTabs, { isTeamTab, type TeamTab } from "@/components/mlb/TeamTabs";
 import TeamHome from "@/components/mlb/TeamHome";
 import PlayerStatTables from "@/components/mlb/PlayerStatTables";
 import SeasonSelect from "@/components/mlb/SeasonSelect";
 import ParamSelect from "@/components/mlb/ParamSelect";
+import ParamTabs from "@/components/mlb/ParamTabs";
 import {
   SchedulePanel,
   SplitsPanels,
@@ -32,8 +27,7 @@ import {
   getTeamSchedule,
   getTeamSplits,
   getTeamTransactions,
-  getTeamLines,
-  getTeamRecord,
+  tradedPlayers,
   pickPlayerGameType,
   playerCols,
   seasonOf,
@@ -45,14 +39,8 @@ import {
   type PlayerGameType,
   type StatGroup,
   teamLogo,
-  teamStatText,
   todayET,
-  TEAM_HITTING_COLS,
-  TEAM_PITCHING_COLS,
-  type StandingRow,
   type TeamIdentity,
-  type TeamStatCol,
-  type TeamStatRow,
 } from "@/lib/mlb";
 
 /*
@@ -71,12 +59,6 @@ import {
  * getTeamIdentity. A dead MLB API degrades to a notice inside the tab rather
  * than blanking the page.
  */
-
-/** The four stats each group leads with, as MetricCards. */
-const HEADLINE: Record<"hitting" | "pitching", string[]> = {
-  hitting: ["avg", "homeRuns", "runs", "ops"],
-  pitching: ["era", "whip", "strikeOuts", "saves"],
-};
 
 export async function generateMetadata({
   params,
@@ -134,181 +116,7 @@ function Identity({ t, season }: { t: TeamIdentity; season: number }) {
   );
 }
 
-/** Label/value grid — the tail of every panel below its headline tiles. */
-function StatGrid({ items }: { items: [string, string][] }) {
-  return (
-    <dl className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-6">
-      {items.map(([label, value]) => (
-        <div
-          key={label}
-          className="flex items-baseline justify-between gap-2 border border-line bg-bg px-2 py-1.5"
-        >
-          <dt className="text-[10px] tracking-widest text-ink-3">{label}</dt>
-          <dd className="text-xs tabular-nums text-ink">{value}</dd>
-        </div>
-      ))}
-    </dl>
-  );
-}
-
-/* ── Record ─────────────────────────────────────────────────────────── */
-
-function RecordBody({ r }: { r: StandingRow }) {
-  return (
-    <>
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-        <MetricCard label="W-L" value={`${r.wins}-${r.losses}`} />
-        <MetricCard label="PCT" value={r.pct} />
-        <MetricCard
-          label="RUN DIFF"
-          value={r.runDiff > 0 ? `+${r.runDiff}` : String(r.runDiff)}
-        />
-        <MetricCard label="STREAK" value={r.streak} />
-      </div>
-      <StatGrid
-        items={[
-          ["GB", r.gb],
-          ["DIV RANK", r.divRank],
-          ["LG RANK", r.leagueRank],
-          ["MLB RANK", r.sportRank],
-          ["RS", String(r.runsScored)],
-          ["RA", String(r.runsAllowed)],
-          ["L10", r.last10],
-          ["HOME", r.home],
-          ["AWAY", r.away],
-          ["STRK", r.streak],
-        ]}
-      />
-    </>
-  );
-}
-
-async function RecordPanel({ id, season }: { id: number; season: number }) {
-  let record: StandingRow | null;
-  try {
-    record = await getTeamRecord(id, season);
-  } catch {
-    return (
-      <Panel title={`RECORD — ${season} SEASON`}>
-        <Unavailable what="RECORD" />
-      </Panel>
-    );
-  }
-
-  return (
-    <Panel
-      title={`RECORD — ${season} SEASON`}
-      right={
-        record ? (
-          <span className="text-[10px] text-ink-3">{record.division}</span>
-        ) : undefined
-      }
-    >
-      {record ? (
-        <RecordBody r={record} />
-      ) : (
-        <p className="border border-line bg-bg px-3 py-6 text-center text-xs text-ink-3">
-          NO {season} STANDINGS LINE FOR THIS CLUB YET
-        </p>
-      )}
-    </Panel>
-  );
-}
-
-/* ── Season lines ───────────────────────────────────────────────────── */
-
-function StatPanel({
-  group,
-  columns,
-  row,
-  season,
-}: {
-  group: "hitting" | "pitching";
-  columns: TeamStatCol[];
-  row: TeamStatRow | null;
-  season: number;
-}) {
-  const headline = HEADLINE[group];
-  const head = headline
-    .map((k) => columns.find((c) => c.key === k))
-    .filter((c): c is TeamStatCol => !!c);
-  const rest = columns.filter((c) => !headline.includes(c.key));
-
-  return (
-    <Panel title={`TEAM ${group.toUpperCase()} — ${season} SEASON`}>
-      {row ? (
-        <>
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-            {head.map((c) => (
-              <MetricCard
-                key={c.key}
-                label={c.label}
-                value={teamStatText(row.values[c.key])}
-              />
-            ))}
-          </div>
-          <StatGrid
-            items={rest.map((c) => [c.label, teamStatText(row.values[c.key])])}
-          />
-        </>
-      ) : (
-        <p className="border border-line bg-bg px-3 py-6 text-center text-xs text-ink-3">
-          NO {season} {group.toUpperCase()} LINE FOR THIS CLUB YET
-        </p>
-      )}
-    </Panel>
-  );
-}
-
-async function StatPanels({ id, season }: { id: number; season: number }) {
-  let lines: Awaited<ReturnType<typeof getTeamLines>>;
-  try {
-    lines = await getTeamLines(id, season);
-  } catch {
-    return (
-      <Panel title={`TEAM STATS — ${season} SEASON`}>
-        <Unavailable what="TEAM STATS" />
-      </Panel>
-    );
-  }
-
-  return (
-    <>
-      <StatPanel
-        group="hitting"
-        columns={TEAM_HITTING_COLS}
-        row={lines.hitting}
-        season={season}
-      />
-      <StatPanel
-        group="pitching"
-        columns={TEAM_PITCHING_COLS}
-        row={lines.pitching}
-        season={season}
-      />
-    </>
-  );
-}
-
 /* ── Placeholders ───────────────────────────────────────────────────── */
-
-/** Four headline tiles over a label/value grid — the shape of every panel. */
-const StatPanelSkeleton = ({
-  delay = 0,
-  cells = 12,
-}: {
-  delay?: number;
-  cells?: number;
-}) => (
-  <SkeletonPanel delay={delay} right>
-    <SkeletonTiles delay={delay} />
-    <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-6">
-      {Array.from({ length: cells }).map((_, i) => (
-        <Skeleton key={i} className="h-7 w-full" delay={delay + i * 0.04} />
-      ))}
-    </div>
-  </SkeletonPanel>
-);
 
 const RosterSkeleton = () => (
   <SkeletonPanel right>
@@ -390,45 +198,51 @@ async function TeamSchedule({
 
 /* ── Player stats ───────────────────────────────────────────────────── */
 
-const STAT_GROUPS: StatGroup[] = ["hitting", "pitching", "fielding"];
+const STAT_GROUPS: { value: StatGroup; label: string }[] = [
+  { value: "hitting", label: "BATTING" },
+  { value: "pitching", label: "PITCHING" },
+  { value: "fielding", label: "FIELDING" },
+];
+
+/* One group at a time, the way MLB's own stats page reads, rather than three
+   tables stacked: a reader is looking at one of them, and the other two cost a
+   request each. Anything but a group name reads as batting. */
+const pickStatGroup = (raw: string | undefined): StatGroup =>
+  raw === "pitching" || raw === "fielding" ? raw : "hitting";
 
 /**
- * Every player's line, one table per group, for the season and slice of the
- * calendar the controls name. The club's own totals ride along underneath,
- * but only for a regular season: there is no team stats payload for October,
- * and the standings line it leads with would be a blank row.
+ * Every player's line in one group, for the season and slice of the calendar
+ * the controls name — the club's leaders in that group over the table. Its own
+ * totals ride along underneath, but only for a regular season: there is no team
+ * stats payload for October, and the standings line it leads with would be a
+ * blank row.
  */
 async function PlayerStats({
   id,
   season,
   gameType,
+  group,
 }: {
   id: number;
   season: number;
   gameType: PlayerGameType;
+  group: StatGroup;
 }) {
-  const groups = await Promise.all(
-    STAT_GROUPS.map((g) => getTeamPlayerStats(id, season, g, gameType))
-  );
+  const [rows, moves] = await Promise.all([
+    getTeamPlayerStats(id, season, group, gameType),
+    /* The marks beside the names are a nicety — a slow transaction log
+       shouldn't cost the reader their stats. */
+    getTeamTransactions(id, season).catch(() => []),
+  ]);
 
   return (
-    <>
-      {STAT_GROUPS.map((g, i) => (
-        <PlayerStatTables
-          key={g}
-          group={g}
-          columns={playerCols(g)}
-          rows={groups[i]}
-          season={season}
-        />
-      ))}
-      {gameType === "R" && (
-        <>
-          <RecordPanel id={id} season={season} />
-          <StatPanels id={id} season={season} />
-        </>
-      )}
-    </>
+    <PlayerStatTables
+      group={group}
+      columns={playerCols(group)}
+      rows={rows}
+      season={season}
+      traded={tradedPlayers(moves)}
+    />
   );
 }
 
@@ -445,6 +259,7 @@ async function TabBody({
   statSeason,
   first,
   gameType,
+  group,
   half,
 }: {
   tab: TeamTab;
@@ -454,6 +269,8 @@ async function TabBody({
   statSeason: number;
   first: number;
   gameType: PlayerGameType;
+  /** Which table the stats tab is showing. */
+  group: StatGroup;
   half: string | undefined;
 }) {
   try {
@@ -471,7 +288,12 @@ async function TabBody({
         );
       case "stats":
         return (
-          <PlayerStats id={id} season={statSeason} gameType={gameType} />
+          <PlayerStats
+            id={id}
+            season={statSeason}
+            gameType={gameType}
+            group={group}
+          />
         );
       case "roster":
         return <RosterPanel groups={await getTeamRosterGroups(id, season)} />;
@@ -510,10 +332,14 @@ function TabSkeleton({ tab }: { tab: TeamTab }) {
   if (tab === "roster") return <RosterSkeleton />;
   if (tab === "stats")
     return (
-      <>
-        <StatPanelSkeleton cells={10} />
-        <StatPanelSkeleton delay={0.08} />
-      </>
+      <SkeletonPanel right>
+        <div className="mb-3 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-5">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <Skeleton key={i} className="h-20 w-full" delay={i * 0.04} />
+          ))}
+        </div>
+        <Skeleton className="h-96 w-full" delay={0.2} />
+      </SkeletonPanel>
     );
   return (
     <SkeletonPanel right>
@@ -541,7 +367,12 @@ export default async function TeamPage({
   /* The catch-all is optional, so /team/120 arrives with no segment at all —
      that is the home tab, which keeps the club's canonical URL clean. */
   params: Promise<{ id: string; tab?: string[] }>;
-  searchParams: Promise<{ season?: string; type?: string; half?: string }>;
+  searchParams: Promise<{
+    season?: string;
+    type?: string;
+    group?: string;
+    half?: string;
+  }>;
 }) {
   const { id, tab } = await params;
   const teamId = teamIdOf(id);
@@ -570,13 +401,22 @@ export default async function TeamPage({
   const first = Number(team.firstYear) || FIRST_SEASON;
   const statSeason = pickSeason(sp.season, first, season);
   const gameType = pickPlayerGameType(sp.type);
+  const statGroup = pickStatGroup(sp.group);
 
   return (
     <div className="mx-auto max-w-7xl space-y-3 p-3">
       <Identity t={team} season={season} />
       <TeamTabs id={teamId} name={team.name} active={section} />
       {stats && (
-        <div className="flex flex-wrap items-center justify-end gap-3 border border-line bg-surface px-3 py-2">
+        <div className="flex flex-wrap items-center gap-3 border border-line bg-surface px-3 py-2">
+          <ParamTabs
+            param="group"
+            ariaLabel="Stat group"
+            size="lg"
+            value={statGroup}
+            options={STAT_GROUPS}
+          />
+          <div className="ml-auto flex flex-wrap items-center gap-3">
           <ParamSelect
             param="type"
             label="TYPE"
@@ -584,12 +424,13 @@ export default async function TeamPage({
             options={PLAYER_GAME_TYPES}
           />
           <SeasonSelect value={statSeason} first={first} last={season} />
+          </div>
         </div>
       )}
       {/* Keyed on the tab, so switching re-suspends into the skeleton rather
           than holding the last section on screen. */}
       <Suspense
-        key={`${section}-${statSeason}-${gameType}-${sp.half ?? ""}`}
+        key={`${section}-${statSeason}-${gameType}-${statGroup}-${sp.half ?? ""}`}
         fallback={<TabSkeleton tab={section as TeamTab} />}
       >
         <div className="space-y-3">
@@ -600,6 +441,7 @@ export default async function TeamPage({
             statSeason={statSeason}
             first={first}
             gameType={gameType}
+            group={statGroup}
             half={sp.half}
           />
         </div>
