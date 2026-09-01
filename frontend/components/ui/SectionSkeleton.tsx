@@ -65,6 +65,14 @@ export default function SectionSkeleton({ section }: { section: string }) {
         </div>
       );
 
+    case "players":
+      return (
+        <div className="space-y-3">
+          <Controls width="w-56" />
+          <SkeletonTable rows={14} heading={false} />
+        </div>
+      );
+
     case "leaders":
       return (
         <div className="space-y-3">

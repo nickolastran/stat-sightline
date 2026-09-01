@@ -1,15 +1,16 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
-import { AnimatePresence, motion } from "framer-motion";
 import type { Leaderboard, LeaderRow } from "@/lib/mlb";
 import SegmentedControl from "@/components/ui/SegmentedControl";
 import PlayerLink from "@/components/mlb/PlayerLink";
 
 /*
  * Season stat leaders, split into hitting / pitching via a segmented toggle.
- * Each category renders a compact ranked list. Data is fetched server-side
- * and passed in whole; this component only picks which group to show.
+ * Each category renders a compact ranked list over a link to the full board.
+ * Data is fetched server-side and passed in whole; this component only picks
+ * which group to show.
  */
 
 /**
@@ -23,9 +24,8 @@ const tiedRanks = (leaders: LeaderRow[]) =>
     leaders.map((l) => l.rank).filter((r, i, all) => all.indexOf(r) !== i)
   );
 
-/** Rows shown before the board is expanded, and the ceiling once it is. */
-const COLLAPSED = 5;
-const EXPANDED = 20;
+/** Rows a card carries — the rest of the league is a page of its own. */
+const SHOWN = 5;
 
 /** One ranked line: rank (tie-marked), player, value. */
 function Row({ leader, tied }: { leader: LeaderRow; tied: boolean }) {
@@ -45,16 +45,13 @@ function Row({ leader, tied }: { leader: LeaderRow; tied: boolean }) {
 }
 
 /**
- * One category. Every board rests at a flat five rows — a tie straddling the
- * cutoff is cut mid-group rather than allowed to spill, so the grid stays
- * even; the "T-" rank is what marks the players left off. MORE rolls the rest
- * of the top 20 open, cut the same way at its own edge.
+ * One category, flat at five rows — a tie straddling the cutoff is cut mid-
+ * group rather than allowed to spill, so the grid stays even; the "T-" rank is
+ * what marks the players left off. The whole league in this figure is the
+ * player table, ranked and filterable, rather than more rows in a box.
  */
-function Board({ board }: { board: Leaderboard }) {
-  const [open, setOpen] = useState(false);
+function Board({ board, season }: { board: Leaderboard; season: number }) {
   const tied = tiedRanks(board.leaders);
-  const head = board.leaders.slice(0, COLLAPSED);
-  const rest = board.leaders.slice(COLLAPSED, EXPANDED);
 
   return (
     <div className="self-start border border-line bg-bg">
@@ -62,55 +59,27 @@ function Board({ board }: { board: Leaderboard }) {
         {board.label}
       </h3>
       <ol>
-        {head.map((l) => (
+        {board.leaders.slice(0, SHOWN).map((l) => (
           <Row key={l.personId} leader={l} tied={tied.has(l.rank)} />
         ))}
       </ol>
-
-      <AnimatePresence initial={false}>
-        {open && (
-          <motion.div
-            key="rest"
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: "auto", opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.28, ease: [0.4, 0, 0.2, 1] }}
-            className="overflow-hidden"
-          >
-            {/* Top rule stands in for the fifth row's — which `last:` drops so
-                the collapsed card never doubles up against the button. */}
-            <ol className="border-t border-grid">
-              {rest.map((l) => (
-                <Row key={l.personId} leader={l} tied={tied.has(l.rank)} />
-              ))}
-            </ol>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {rest.length > 0 && (
-        <button
-          type="button"
-          onClick={() => setOpen((o) => !o)}
-          aria-expanded={open}
-          className="flex w-full items-center justify-center gap-1 border-t border-line py-1 text-[10px] tracking-[0.2em] text-ink-3 hover:text-ink"
-        >
-          {open ? "LESS" : "MORE"}
-          <motion.span
-            aria-hidden
-            animate={{ rotate: open ? 180 : 0 }}
-            transition={{ duration: 0.28, ease: [0.4, 0, 0.2, 1] }}
-            className="inline-block leading-none"
-          >
-            ▼
-          </motion.span>
-        </button>
-      )}
+      <Link
+        href={`/league/players?season=${season}&group=${board.group}&stat=${board.stat}`}
+        className="flex items-center justify-center gap-1 border-t border-line py-1 text-[10px] tracking-[0.2em] text-ink-3 hover:text-ink"
+      >
+        COMPLETE LIST →
+      </Link>
     </div>
   );
 }
 
-export default function Leaderboards({ boards }: { boards: Leaderboard[] }) {
+export default function Leaderboards({
+  boards,
+  season,
+}: {
+  boards: Leaderboard[];
+  season: number;
+}) {
   const [group, setGroup] = useState<"hitting" | "pitching">("hitting");
   const shown = boards.filter((b) => b.group === group && b.leaders.length > 0);
 
@@ -135,7 +104,7 @@ export default function Leaderboards({ boards }: { boards: Leaderboard[] }) {
       ) : (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
           {shown.map((b) => (
-            <Board key={b.code} board={b} />
+            <Board key={b.code} board={b} season={season} />
           ))}
         </div>
       )}
