@@ -946,6 +946,8 @@ export interface Leaderboard {
   code: string;
   label: string;
   group: "hitting" | "pitching";
+  /** The stat key the full board sorts on — where MORE hands the reader off. */
+  stat: string;
   leaders: LeaderRow[];
 }
 
@@ -955,26 +957,33 @@ export interface Leaderboard {
  * no such leader category, since the figure is a third-party derivation
  * (bWAR, fWAR) rather than an official MLB stat.
  */
-const LEADER_SPECS: { cat: string; group: "hitting" | "pitching"; label: string }[] = [
-  { cat: "battingAverage", group: "hitting", label: "AVG" },
-  { cat: "onBasePlusSlugging", group: "hitting", label: "OPS" },
-  { cat: "hits", group: "hitting", label: "HITS" },
-  { cat: "doubles", group: "hitting", label: "DOUBLES" },
-  { cat: "triples", group: "hitting", label: "TRIPLES" },
-  { cat: "homeRuns", group: "hitting", label: "HOME RUNS" },
-  { cat: "runsBattedIn", group: "hitting", label: "RBI" },
-  { cat: "strikeouts", group: "hitting", label: "STRIKEOUTS" },
-  { cat: "walks", group: "hitting", label: "WALKS" },
-  { cat: "stolenBases", group: "hitting", label: "STOLEN BASES" },
-  { cat: "earnedRunAverage", group: "pitching", label: "ERA" },
-  { cat: "wins", group: "pitching", label: "WINS" },
-  { cat: "losses", group: "pitching", label: "LOSSES" },
-  { cat: "inningsPitched", group: "pitching", label: "INNINGS PITCHED" },
-  { cat: "strikeouts", group: "pitching", label: "STRIKEOUTS" },
-  { cat: "walks", group: "pitching", label: "WALKS" },
-  { cat: "earnedRun", group: "pitching", label: "EARNED RUNS" },
-  { cat: "whip", group: "pitching", label: "WHIP" },
-  { cat: "saves", group: "pitching", label: "SAVES" },
+const LEADER_SPECS: {
+  cat: string;
+  group: "hitting" | "pitching";
+  label: string;
+  /* The same figure under its `stat` key, which is what the full player table
+     sorts on — the leader categories have names of their own. */
+  stat: string;
+}[] = [
+  { cat: "battingAverage", group: "hitting", label: "AVG", stat: "avg" },
+  { cat: "onBasePlusSlugging", group: "hitting", label: "OPS", stat: "ops" },
+  { cat: "hits", group: "hitting", label: "HITS", stat: "hits" },
+  { cat: "doubles", group: "hitting", label: "DOUBLES", stat: "doubles" },
+  { cat: "triples", group: "hitting", label: "TRIPLES", stat: "triples" },
+  { cat: "homeRuns", group: "hitting", label: "HOME RUNS", stat: "homeRuns" },
+  { cat: "runsBattedIn", group: "hitting", label: "RBI", stat: "rbi" },
+  { cat: "strikeouts", group: "hitting", label: "STRIKEOUTS", stat: "strikeOuts" },
+  { cat: "walks", group: "hitting", label: "WALKS", stat: "baseOnBalls" },
+  { cat: "stolenBases", group: "hitting", label: "STOLEN BASES", stat: "stolenBases" },
+  { cat: "earnedRunAverage", group: "pitching", label: "ERA", stat: "era" },
+  { cat: "wins", group: "pitching", label: "WINS", stat: "wins" },
+  { cat: "losses", group: "pitching", label: "LOSSES", stat: "losses" },
+  { cat: "inningsPitched", group: "pitching", label: "INNINGS PITCHED", stat: "inningsPitched" },
+  { cat: "strikeouts", group: "pitching", label: "STRIKEOUTS", stat: "strikeOuts" },
+  { cat: "walks", group: "pitching", label: "WALKS", stat: "baseOnBalls" },
+  { cat: "earnedRun", group: "pitching", label: "EARNED RUNS", stat: "earnedRuns" },
+  { cat: "whip", group: "pitching", label: "WHIP", stat: "whip" },
+  { cat: "saves", group: "pitching", label: "SAVES", stat: "saves" },
 ];
 
 async function oneBoard(
@@ -991,6 +1000,7 @@ async function oneBoard(
     code: `${spec.group}.${spec.cat}`,
     label: spec.label,
     group: spec.group,
+    stat: spec.stat,
     leaders: leaders.map((l): LeaderRow => ({
       rank: l.rank,
       personId: l.person?.id,
@@ -1301,6 +1311,12 @@ export const PLAYER_HITTING_COLS: TeamStatCol[] = [
   { key: "gamesPlayed", label: "G", title: "Games played" },
   { key: "plateAppearances", label: "PA", title: "Plate appearances" },
   { key: "atBats", label: "AB", title: "At-bats" },
+  /* The four rates ride with the at-bats they are figured from, ahead of the
+     counting stats — a line is read for them first. */
+  { key: "avg", label: "AVG", title: "Batting average — hits per at-bat" },
+  { key: "obp", label: "OBP", title: "On-base percentage" },
+  { key: "slg", label: "SLG", title: "Slugging percentage" },
+  { key: "ops", label: "OPS", title: "On-base plus slugging" },
   { key: "runs", label: "R", title: "Runs scored" },
   { key: "hits", label: "H", title: "Hits" },
   { key: "doubles", label: "2B", title: "Doubles" },
@@ -1310,10 +1326,6 @@ export const PLAYER_HITTING_COLS: TeamStatCol[] = [
   { key: "baseOnBalls", label: "BB", title: "Walks (bases on balls)" },
   { key: "strikeOuts", label: "K", title: "Strikeouts" },
   { key: "stolenBases", label: "SB", title: "Stolen bases" },
-  { key: "avg", label: "AVG", title: "Batting average — hits per at-bat" },
-  { key: "obp", label: "OBP", title: "On-base percentage" },
-  { key: "slg", label: "SLG", title: "Slugging percentage" },
-  { key: "ops", label: "OPS", title: "On-base plus slugging" },
 ];
 
 export const PLAYER_PITCHING_COLS: TeamStatCol[] = [
@@ -1459,6 +1471,170 @@ export async function getTeamPlayerStats(
           (teamStatNum(r.values.plateAppearances) ?? 0) > 0
       )
     : rows;
+}
+
+/* ── League-wide player leaders ─────────────────────────────────────── */
+
+/** One line of the full player leaderboard — a stat table row with a rank. */
+export interface StatLeaderRow extends PlayerStatRow {
+  /** MLB's own rank in the sort, ties sharing a number. */
+  rank: number | null;
+  team: string;
+  teamId: number | null;
+}
+
+export interface StatLeaderPage {
+  rows: StatLeaderRow[];
+  /** Everyone who qualifies, not just the rows fetched — what MORE reads. */
+  total: number;
+}
+
+export const LEADER_LEAGUES = [
+  { value: "all", label: "ALL LEAGUES" },
+  { value: "103", label: "AMERICAN LEAGUE" },
+  { value: "104", label: "NATIONAL LEAGUE" },
+];
+
+export const LEADER_POSITIONS = [
+  { value: "all", label: "ALL POSITIONS" },
+  { value: "P", label: "PITCHER" },
+  { value: "C", label: "CATCHER" },
+  { value: "1B", label: "FIRST BASE" },
+  { value: "2B", label: "SECOND BASE" },
+  { value: "3B", label: "THIRD BASE" },
+  { value: "SS", label: "SHORTSTOP" },
+  { value: "LF", label: "LEFT FIELD" },
+  { value: "CF", label: "CENTER FIELD" },
+  { value: "RF", label: "RIGHT FIELD" },
+  { value: "OF", label: "OUTFIELD" },
+  { value: "DH", label: "DESIGNATED HITTER" },
+];
+
+/** What each group is ranked by until the reader picks a column. */
+export const defaultLeaderStat = (group: StatGroup): string =>
+  group === "hitting" ? "avg" : group === "pitching" ? "era" : "fielding";
+
+/** A `?stat=` that names a column of this group's table, else its default. */
+export const pickLeaderStat = (
+  raw: string | undefined,
+  group: StatGroup
+): string =>
+  playerCols(group).some((c) => c.key === raw)
+    ? raw!
+    : defaultLeaderStat(group);
+
+/**
+ * What a player has to do to appear at all — MLB's own rule, which the table
+ * prints under itself so a missing name is explained rather than a mystery.
+ */
+export const QUALIFIER_NOTE: Record<StatGroup, string> = {
+  hitting: "To qualify, a player must have at least 3.1 PA/game",
+  pitching: "To qualify, a pitcher must have at least 1 IP/game",
+  fielding: "Qualified fielders only — MLB's own pool at each position",
+};
+
+/**
+ * Every club a season a trade split was played for — "MIN/HOU", the one the
+ * player is on now last. The board's own payload names only that current club,
+ * and a line reading HOU for fifty-one games says nothing about the
+ * ninety-three before them.
+ *
+ * The per-club rows come back ordered by team id rather than by when they were
+ * played, so `current` is what puts them in order: it is the club MLB reports
+ * the player on, and the rest led it.
+ */
+async function tradedTeams(
+  id: number,
+  season: number,
+  group: StatGroup,
+  gameType: PlayerGameType,
+  current: string
+): Promise<string | null> {
+  const data = await mlb(
+    `/people/${id}/stats?stats=season&group=${group}&season=${season}` +
+      `&sportId=1&gameType=${gameType}&hydrate=team`,
+    1800
+  );
+  /* The payload leads with the combined line, which has no club of its own —
+     the per-club rows are the ones that name a team. */
+  const stops = ((data.stats?.[0]?.splits ?? []) as any[])
+    .map((s) => s.team?.abbreviation)
+    .filter((a): a is string => Boolean(a));
+  if (stops.length < 2) return null;
+  return [...stops.filter((a) => a !== current), current].join("/");
+}
+
+/**
+ * The league's players in one group, ranked by one stat — the full board the
+ * leader cards hand off to.
+ *
+ * The sort, the qualifying pool and the paging are all MLB's: ranking a page
+ * of rows we already hold would rank the wrong 50 players. `limit` is what
+ * MORE grows, so each press is one wider request rather than a stitched-
+ * together list.
+ */
+export async function getStatLeaders({
+  season,
+  group,
+  gameType = "R",
+  stat,
+  league = "all",
+  position = "all",
+  limit = 50,
+  offset = 0,
+}: {
+  season: number;
+  group: StatGroup;
+  gameType?: PlayerGameType;
+  stat: string;
+  /** "103" / "104", or "all" for both. */
+  league?: string;
+  /** A position abbreviation, or "all". */
+  position?: string;
+  limit?: number;
+  /** Rows already on screen — what a page beyond the first starts after. */
+  offset?: number;
+}): Promise<StatLeaderPage> {
+  const data = await mlb(
+    `/stats?stats=season&group=${group}&season=${season}&sportId=1` +
+      `&gameType=${gameType}&playerPool=qualified&hydrate=team` +
+      `&sortStat=${stat}&limit=${limit}&offset=${offset}` +
+      (league === "all" ? "" : `&leagueId=${league}`) +
+      (position === "all" ? "" : `&position=${position}`),
+    1800
+  );
+  const columns = playerCols(group);
+  const board = data.stats?.[0];
+  const splits = (board?.splits ?? []) as any[];
+  const rows = splits.map((s): StatLeaderRow => ({
+    rank: s.rank ?? null,
+    id: s.player?.id,
+    name: s.player?.fullName ?? "—",
+    position: s.position?.abbreviation ?? "",
+    team: s.team?.abbreviation ?? "",
+    teamId: s.team?.id ?? null,
+    values: Object.fromEntries(
+      columns.map((c) => [c.key, s.stat?.[c.key] ?? null])
+    ),
+  }));
+
+  /* Only the handful a trade moved cost a request of their own, and a failed
+     one leaves the club they finished the season on rather than no club. */
+  await Promise.all(
+    rows.map(async (r, i) => {
+      if ((splits[i]?.numTeams ?? 1) < 2) return;
+      const stops = await tradedTeams(
+        r.id,
+        season,
+        group,
+        gameType,
+        r.team
+      ).catch(() => null);
+      if (stops) r.team = stops;
+    })
+  );
+
+  return { total: board?.totalSplits ?? 0, rows };
 }
 
 /**
@@ -1774,27 +1950,99 @@ export interface SplitLine {
   values: Record<string, TeamStatValue>;
 }
 
-/* Home/away and platoon: the four every club's page is read for. */
-const SIT_CODES = "h,a,vl,vr";
+/** A block of related splits, read as one section of the table. */
+export interface SplitSection {
+  label: string;
+  lines: SplitLine[];
+}
 
+/*
+ * The sections a splits page is read in, in MLB's own order. Codes come from
+ * /situationCodes; only the team-level ones are here, and the two sections
+ * that only mean something for a batting order are hitting-only.
+ */
+const SPLIT_SECTIONS: {
+  label: string;
+  codes: string[];
+  hittingOnly?: boolean;
+}[] = [
+  { label: "GAME", codes: ["h", "a", "d", "n", "g", "t"] },
+  { label: "MONTH", codes: ["3", "4", "5", "6", "7", "8", "9", "10"] },
+  { label: "HALF", codes: ["preas", "posas"] },
+  { label: "OPPONENT", codes: ["vl", "vr", "val", "vnl"] },
+  { label: "BASES", codes: ["r0", "ron", "risp", "risp2", "r123", "lo"] },
+  { label: "SCORE", codes: ["sah", "sti", "sbh", "lc"] },
+  { label: "RESULT", codes: ["twn", "tls", "taw", "tal"] },
+  { label: "INNING", codes: ["ig01", "i07", "i08", "i09", "ix"] },
+  { label: "COUNT", codes: ["fp", "ac", "ec", "bc", "2s", "fc"] },
+  {
+    label: "BATTING ORDER",
+    hittingOnly: true,
+    codes: ["b1", "b2", "b3", "b4", "b5", "b6", "b7", "b8", "b9"],
+  },
+  {
+    label: "POSITION",
+    hittingOnly: true,
+    codes: ["p2", "p3", "p4", "p5", "p6", "p7", "p8", "p9", "pD", "pH"],
+  },
+];
+
+/**
+ * Every section of one club's splits. `stats=season` rides along in the same
+ * request so the season total heads the first block — a split only means
+ * something against the line it is a slice of.
+ */
 export async function getTeamSplits(
   id: number,
   season: number,
   group: "hitting" | "pitching"
-): Promise<SplitLine[]> {
+): Promise<SplitSection[]> {
+  const sections = SPLIT_SECTIONS.filter(
+    (s) => !s.hittingOnly || group === "hitting"
+  );
   const data = await mlb(
-    `/teams/${id}/stats?season=${season}&group=${group}&stats=statSplits&sitCodes=${SIT_CODES}`,
+    `/teams/${id}/stats?season=${season}&group=${group}&stats=season,statSplits&sitCodes=${sections
+      .flatMap((s) => s.codes)
+      .join(",")}`,
     1800
   );
   const columns = cols(group);
-  return ((data.stats?.[0]?.splits ?? []) as any[]).map((s): SplitLine => {
-    const stat = s.stat ?? {};
-    return {
-      code: s.split?.code ?? "",
-      label: (s.split?.description ?? "—").toUpperCase(),
-      values: Object.fromEntries(columns.map((c) => [c.key, stat[c.key] ?? null])),
-    };
-  });
+  const values = (stat: any) =>
+    Object.fromEntries(columns.map((c) => [c.key, stat?.[c.key] ?? null]));
+  const typed = (name: string) =>
+    ((data.stats ?? []) as any[]).find((s) => s.type?.displayName === name)
+      ?.splits ?? [];
+
+  const byCode = new Map<string, SplitLine>();
+  for (const s of typed("statSplits") as any[]) {
+    const code = s.split?.code ?? "";
+    /* One code, one line: a club that changed leagues mid-season can come
+       back with the same code twice, and the first is the one on record. */
+    if (code && !byCode.has(code))
+      byCode.set(code, {
+        code,
+        label: (s.split?.description ?? "—").toUpperCase(),
+        values: values(s.stat),
+      });
+  }
+
+  const built = sections
+    .map((sec) => ({
+      label: sec.label,
+      lines: sec.codes
+        .map((c) => byCode.get(c))
+        .filter((l): l is SplitLine => l !== undefined),
+    }))
+    .filter((sec) => sec.lines.length > 0);
+
+  const total = (typed("season") as any[])[0];
+  if (total && built.length > 0)
+    built[0].lines.unshift({
+      code: "total",
+      label: "TOTAL",
+      values: values(total.stat),
+    });
+  return built;
 }
 
 /** One roster move — the transactions tab, newest first. */

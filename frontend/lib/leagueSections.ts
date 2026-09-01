@@ -14,6 +14,7 @@ export const LEAGUE_SECTIONS = [
   { id: "standings", tab: "STANDINGS", title: "STANDINGS" },
   { id: "wildcard", tab: "WILD CARD", title: "WILD CARD RACE", inBar: false },
   { id: "teams", tab: "TEAM STATS", title: "TEAM STATISTICS" },
+  { id: "players", tab: "PLAYER STATS", title: "PLAYER STATISTICS" },
 ] as const;
 
 export type LeagueSection = (typeof LEAGUE_SECTIONS)[number]["id"];
@@ -38,7 +39,7 @@ export const STANDINGS_VIEWS = [
  * only stretch its whitespace. Both the page and its loading placeholder read
  * this, so the skeleton lands at the width the content arrives at.
  */
-const WIDE = new Set(["scoreboard", "leaders", "probables"]);
+const WIDE = new Set(["scoreboard", "leaders", "probables", "players"]);
 
 export const sectionWidth = (id: string) =>
   WIDE.has(id) ? "max-w-[88rem]" : "max-w-7xl";

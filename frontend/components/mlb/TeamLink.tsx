@@ -7,26 +7,33 @@ import { teamHref, teamLogo } from "@/lib/mlb";
  * navigates in place, and an unknown id degrades to plain text rather than a
  * dead link. No handlers, so it stays a server component and works inside the
  * client tables too.
+ *
+ * `logo={false}` for a line that already carries the mark — the player table
+ * leads its names with one, and the same club twice reads as two clubs.
  */
 export default function TeamLink({
   id,
   name,
   className = "",
+  logo = true,
 }: {
   id: number | null | undefined;
   name: string;
   className?: string;
+  logo?: boolean;
 }) {
   const label = (
     <>
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src={teamLogo(id ?? 0)}
-        alt=""
-        width={16}
-        height={16}
-        className="h-4 w-4 shrink-0"
-      />
+      {logo && (
+        /* eslint-disable-next-line @next/next/no-img-element */
+        <img
+          src={teamLogo(id ?? 0)}
+          alt=""
+          width={16}
+          height={16}
+          className="h-4 w-4 shrink-0"
+        />
+      )}
       <span className="truncate">{name}</span>
     </>
   );

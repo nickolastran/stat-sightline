@@ -11,6 +11,9 @@ import ProbablePitchers from "@/components/mlb/ProbablePitchers";
 import GameGrid from "@/components/mlb/GameGrid";
 import ScoreboardDate from "@/components/mlb/ScoreboardDate";
 import ParamSelect from "@/components/mlb/ParamSelect";
+import ParamTabs from "@/components/mlb/ParamTabs";
+import StatLeaders from "@/components/mlb/StatLeaders";
+import { Glossary } from "@/components/mlb/TeamPanels";
 import WildCard from "@/components/mlb/WildCard";
 import StandingsViews from "@/components/mlb/StandingsViews";
 import {
@@ -25,12 +28,22 @@ import {
   getWildCard,
   getTeamStats,
   getLeaderboards,
+  getStatLeaders,
+  playerCols,
+  pickLeaderStat,
+  pickPlayerGameType,
+  LEADER_LEAGUES,
+  LEADER_POSITIONS,
+  PLAYER_GAME_TYPES,
+  QUALIFIER_NOTE,
   todayET,
   seasonOf,
   pickGameType,
   FIRST_SEASON,
   GAME_TYPES,
   type GameType,
+  type PlayerGameType,
+  type StatGroup,
 } from "@/lib/mlb";
 import { getProjections, type StandingsProjection } from "@/lib/api";
 
@@ -85,6 +98,28 @@ function pickDate(raw: string | undefined, today: string): string {
     : today;
 }
 
+/* What the player table reads out of the query string. Its own type because
+   the page resolves it once and both the controls and the body read it. */
+interface PlayerQuery {
+  group: StatGroup;
+  type: PlayerGameType;
+  stat: string;
+  league: string;
+  position: string;
+}
+
+const PLAYER_GROUPS: { value: StatGroup; label: string }[] = [
+  { value: "hitting", label: "BATTING" },
+  { value: "pitching", label: "PITCHING" },
+  { value: "fielding", label: "FIELDING" },
+];
+
+const pickGroup = (raw: string | undefined): StatGroup =>
+  raw === "pitching" || raw === "fielding" ? raw : "hitting";
+
+const inList = (raw: string | undefined, options: { value: string }[]) =>
+  options.some((o) => o.value === raw) ? raw! : "all";
+
 /** The projection, or null if it isn't available — never a thrown error. */
 async function projectionOrNull(season: number): Promise<StandingsProjection | null> {
   return getProjections(season).catch(() => null);
@@ -95,6 +130,7 @@ async function SectionBody({
   date,
   season,
   gameType,
+  players,
   views,
   seasonOver,
 }: {
@@ -102,6 +138,8 @@ async function SectionBody({
   date: string;
   season: number;
   gameType: GameType;
+  /** What the player table is showing — group, sort, filters, page size. */
+  players: PlayerQuery;
   /** A past season, so who made the playoffs is already decided. */
   seasonOver: boolean;
   /** The STANDINGS / WILD CARD buttons, for the two sections that show them. */
@@ -112,7 +150,9 @@ async function SectionBody({
       case "scoreboard":
         return <GameGrid games={await getSchedule(date)} />;
       case "leaders":
-        return <Leaderboards boards={await getLeaderboards(season)} />;
+        return (
+          <Leaderboards boards={await getLeaderboards(season)} season={season} />
+        );
       case "probables":
         return <ProbablePitchers games={await getSchedule(date)} />;
       case "standings": {
@@ -141,6 +181,30 @@ async function SectionBody({
         );
       case "teams":
         return <TeamStats tables={await getTeamStats(season, gameType)} />;
+      case "players": {
+        const columns = playerCols(players.group);
+        const board = await getStatLeaders({
+          season,
+          group: players.group,
+          gameType: players.type,
+          stat: players.stat,
+          league: players.league,
+          position: players.position,
+        });
+        return (
+          <div className="space-y-3">
+            <StatLeaders
+              columns={columns}
+              rows={board.rows}
+              total={board.total}
+              stat={players.stat}
+              query={{ ...players, season }}
+              note={QUALIFIER_NOTE[players.group]}
+            />
+            <Glossary columns={columns} />
+          </div>
+        );
+      }
     }
   } catch {
     return (
@@ -156,7 +220,15 @@ export default async function LeagueSectionPage({
   searchParams,
 }: {
   params: Promise<{ section: string }>;
-  searchParams: Promise<{ season?: string; date?: string; type?: string }>;
+  searchParams: Promise<{
+    season?: string;
+    date?: string;
+    type?: string;
+    group?: string;
+    stat?: string;
+    league?: string;
+    pos?: string;
+  }>;
 }) {
   const { section } = await params;
   const found = findSection(section);
@@ -170,11 +242,13 @@ export default async function LeagueSectionPage({
      Probables is today's slate only, so it reads no searchParams at all and
      stays statically prerenderable. */
   const scoreboard = found.id === "scoreboard";
+  const playerBoard = found.id === "players";
   const seasonal =
     found.id === "leaders" ||
     found.id === "standings" ||
     found.id === "wildcard" ||
-    found.id === "teams";
+    found.id === "teams" ||
+    playerBoard;
   /* Spring training has no wild-card race of its own, and the leader boards
      are regular-season figures. */
   const typed = found.id === "standings" || found.id === "teams";
@@ -182,6 +256,16 @@ export default async function LeagueSectionPage({
   const season = seasonal ? pickSeason(sp.season, current) : current;
   const date = scoreboard ? pickDate(sp.date, today) : today;
   const gameType = typed ? pickGameType(sp.type) : "R";
+  const group = pickGroup(sp.group);
+  const players: PlayerQuery = {
+    group,
+    /* Player boards carry a post-season of their own, which no standings or
+       team table does — so this is the three-way game type, not the two. */
+    type: pickPlayerGameType(sp.type),
+    stat: pickLeaderStat(sp.stat, group),
+    league: inList(sp.league, LEADER_LEAGUES),
+    position: inList(sp.pos, LEADER_POSITIONS),
+  };
 
   /* The standings and the wild-card race are two routes with one control row,
      so switching between them carries the season and game type across rather
@@ -203,6 +287,28 @@ export default async function LeagueSectionPage({
         right={
           scoreboard ? (
             <ScoreboardDate value={date} today={today} />
+          ) : playerBoard ? (
+            <div className="flex flex-wrap items-center gap-3">
+              <ParamSelect
+                param="type"
+                label="TYPE"
+                value={players.type}
+                options={PLAYER_GAME_TYPES}
+              />
+              <ParamSelect
+                param="league"
+                label="LEAGUE"
+                value={players.league}
+                options={LEADER_LEAGUES}
+              />
+              <ParamSelect
+                param="pos"
+                label="POS"
+                value={players.position}
+                options={LEADER_POSITIONS}
+              />
+              <SeasonSelect value={season} first={FIRST_SEASON} last={current} />
+            </div>
           ) : seasonal ? (
             <div className="flex flex-wrap items-center gap-3">
               {typed && (
@@ -221,10 +327,21 @@ export default async function LeagueSectionPage({
           )
         }
       >
+        {playerBoard && (
+          <div className="mb-3 flex">
+            <ParamTabs
+              param="group"
+              ariaLabel="Stat group"
+              size="lg"
+              value={players.group}
+              options={PLAYER_GROUPS}
+            />
+          </div>
+        )}
         {/* Keyed on what the section is showing, so switching year or day
             re-suspends into the skeleton rather than holding the last one. */}
         <Suspense
-          key={`${season}-${date}-${gameType}`}
+          key={`${season}-${date}-${gameType}-${Object.values(players).join("-")}`}
           fallback={<SectionSkeleton section={found.id} />}
         >
           <SectionBody
@@ -232,6 +349,7 @@ export default async function LeagueSectionPage({
             date={date}
             season={season}
             gameType={gameType}
+            players={players}
             seasonOver={season < current}
             views={
               standingsView ? (

@@ -14,7 +14,7 @@ import {
   type PitcherRecord,
   type InjuryEntry,
   type RosterGroup,
-  type SplitLine,
+  type SplitSection,
   type TeamStatCol,
   type Transaction,
 } from "@/lib/mlb";
@@ -33,7 +33,8 @@ function Table({
   align,
   widths,
 }: {
-  /** Column labels; anything after the first is right-aligned. */
+  /** Column labels; anything after the first is right-aligned. Empty for a
+      table that heads its own sections and would only repeat itself. */
   head: string[];
   children: React.ReactNode;
   maxHeight?: string;
@@ -58,21 +59,23 @@ function Table({
             ))}
           </colgroup>
         )}
-        <thead>
-          <tr>
-            {head.map((h, i) => (
-              <th
-                key={h + i}
-                scope="col"
-                className={`sticky top-0 z-10 border-b border-line bg-surface px-3 py-2 text-[10px] font-normal tracking-widest text-ink-3 ${
-                  headAlign(align, i)
-                }`}
-              >
-                {h}
-              </th>
-            ))}
-          </tr>
-        </thead>
+        {head.length > 0 && (
+          <thead>
+            <tr>
+              {head.map((h, i) => (
+                <th
+                  key={h + i}
+                  scope="col"
+                  className={`sticky top-0 z-10 border-b border-line bg-surface px-3 py-2 text-[10px] font-normal tracking-widest text-ink-3 ${
+                    headAlign(align, i)
+                  }`}
+                >
+                  {h}
+                </th>
+              ))}
+            </tr>
+          </thead>
+        )}
         <tbody>{children}</tbody>
       </table>
     </div>
@@ -304,66 +307,114 @@ export function SchedulePanel({
 
 /* ── Splits ─────────────────────────────────────────────────────────── */
 
-function SplitTable({
-  group,
+/* The column labels again at the head of each block, the way MLB's own splits
+   page prints them: fourteen rate columns are unreadable if the reader has to
+   scroll back up to remember which is which. The block headings carry the
+   page's only black text, so the eye finds the sections before the numbers. */
+function SectionHead({
+  label,
   columns,
-  lines,
-  season,
 }: {
-  group: "hitting" | "pitching";
+  label: string;
   columns: TeamStatCol[];
-  lines: SplitLine[];
-  season: number;
 }) {
   return (
-    <Panel title={`${group.toUpperCase()} SPLITS — ${season} SEASON`}>
-      <Table head={["SPLIT", ...columns.map((c) => c.label)]} maxHeight="24rem">
-        {lines.length === 0 && (
-          <Empty what="NO SPLITS FOR THIS SEASON YET" cols={columns.length + 1} />
-        )}
-        {lines.map((l) => (
-          <Row key={l.code}>
-            <td className="px-3 py-1.5 whitespace-nowrap text-ink">{l.label}</td>
-            {columns.map((c) => (
-              <td
-                key={c.key}
-                title={c.title}
-                className="px-3 py-1.5 text-right tabular-nums"
-              >
-                {teamStatText(l.values[c.key])}
-              </td>
-            ))}
-          </Row>
-        ))}
-      </Table>
-    </Panel>
+    <tr className="border-y border-line bg-surface">
+      <th
+        scope="colgroup"
+        className="px-3 py-2 text-left text-[10px] tracking-widest text-ink"
+      >
+        {label}
+      </th>
+      {columns.map((c) => (
+        <th
+          key={c.key}
+          scope="col"
+          title={c.title}
+          className="px-3 py-2 text-right text-[10px] font-normal tracking-widest text-ink"
+        >
+          {c.label}
+        </th>
+      ))}
+    </tr>
   );
 }
 
+/* One group at a time, whole: the tables run to a couple hundred rows between
+   them, and a page that scrolls beats two boxes that scroll inside it. */
 export function SplitsPanels({
-  hitting,
-  pitching,
+  group,
+  sections,
   season,
 }: {
-  hitting: SplitLine[];
-  pitching: SplitLine[];
+  group: "hitting" | "pitching";
+  sections: SplitSection[];
   season: number;
 }) {
+  const columns = group === "hitting" ? TEAM_HITTING_COLS : TEAM_PITCHING_COLS;
   return (
-    <>
-      <SplitTable
-        group="hitting"
-        columns={TEAM_HITTING_COLS}
-        lines={hitting}
-        season={season}
-      />
-      <SplitTable
-        group="pitching"
-        columns={TEAM_PITCHING_COLS}
-        lines={pitching}
-        season={season}
-      />
-    </>
+    <div className="space-y-3">
+      <Panel
+        title={`${group === "hitting" ? "BATTING" : "PITCHING"} SPLITS — ${season} SEASON`}
+      >
+        {/* No table head: every section prints its own. */}
+        <Table head={[]} maxHeight="none">
+          {sections.length === 0 && (
+            <Empty
+              what="NO SPLITS FOR THIS SEASON YET"
+              cols={columns.length + 1}
+            />
+          )}
+          {sections.map((sec) => (
+            <Fragment key={sec.label}>
+              <SectionHead label={sec.label} columns={columns} />
+              {sec.lines.map((l) => (
+                <Row key={sec.label + l.code}>
+                  <td
+                    className={`px-3 py-1.5 whitespace-nowrap ${
+                      l.code === "total" ? "text-ink" : "text-ink-2"
+                    }`}
+                  >
+                    {l.label}
+                  </td>
+                  {columns.map((c) => (
+                    <td
+                      key={c.key}
+                      title={c.title}
+                      className={`px-3 py-1.5 text-right tabular-nums ${
+                        l.code === "total" ? "text-ink" : "text-ink-3"
+                      }`}
+                    >
+                      {teamStatText(l.values[c.key])}
+                    </td>
+                  ))}
+                </Row>
+              ))}
+            </Fragment>
+          ))}
+        </Table>
+      </Panel>
+      <Glossary columns={columns} />
+    </div>
+  );
+}
+
+/* Every abbreviation on the table above, spelled out — the same `title` text
+   the column tooltips carry, for a reader who is not going to hover fourteen
+   headers to find the one they didn't know. The columns are the group's own,
+   so a pitching page never explains SLG. */
+export function Glossary({ columns }: { columns: TeamStatCol[] }) {
+  return (
+    <Panel title="GLOSSARY">
+      <dl className="grid gap-x-6 gap-y-1 text-xs sm:grid-cols-2">
+        {columns.map((c) => (
+          <div key={c.key} className="flex gap-2">
+            <dt className="w-12 shrink-0 text-ink">{c.label}</dt>
+            <dd className="min-w-0 text-ink-2">{c.title}</dd>
+          </div>
+        ))}
+      </dl>
+    </Panel>
   );
 }
 
