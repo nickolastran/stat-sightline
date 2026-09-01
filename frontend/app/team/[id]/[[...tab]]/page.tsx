@@ -197,6 +197,9 @@ const STAT_GROUPS: { value: StatGroup; label: string }[] = [
   { value: "fielding", label: "FIELDING" },
 ];
 
+/* Splits come in two of those three groups — nobody splits a fielding line. */
+const SPLIT_GROUPS = STAT_GROUPS.filter((g) => g.value !== "fielding");
+
 /* One group at a time, the way MLB's own stats page reads, rather than three
    tables stacked: a reader is looking at one of them, and the other two cost a
    request each. Anything but a group name reads as batting. */
@@ -258,7 +261,7 @@ async function TabBody({
   tab: TeamTab;
   id: number;
   season: number;
-  /** The stats, schedule and transactions tabs read their own season. */
+  /** The stats, schedule, splits and transactions tabs read their own season. */
   statSeason: number;
   first: number;
   gameType: PlayerGameType;
@@ -291,12 +294,14 @@ async function TabBody({
       case "roster":
         return <RosterPanel groups={await getTeamRosterGroups(id, season)} />;
       case "splits": {
-        const [hitting, pitching] = await Promise.all([
-          getTeamSplits(id, season, "hitting"),
-          getTeamSplits(id, season, "pitching"),
-        ]);
+        /* No fielding splits — anything but pitching reads as batting. */
+        const g = group === "pitching" ? "pitching" : "hitting";
         return (
-          <SplitsPanels hitting={hitting} pitching={pitching} season={season} />
+          <SplitsPanels
+            group={g}
+            sections={await getTeamSplits(id, statSeason, g)}
+            season={statSeason}
+          />
         );
       }
       case "injuries":
@@ -389,33 +394,39 @@ export default async function TeamPage({
   /* Only the tabs that carry a season control read the query string — every
      other tab stays on the running season. */
   const stats = section === "stats";
-  const dated = stats || section === "schedule" || section === "transactions";
+  const splits = section === "splits";
+  const dated =
+    stats || splits || section === "schedule" || section === "transactions";
   const sp = dated ? await searchParams : {};
   const first = Number(team.firstYear) || FIRST_SEASON;
   const statSeason = pickSeason(sp.season, first, season);
   const gameType = pickPlayerGameType(sp.type);
   const statGroup = pickStatGroup(sp.group);
+  /* Splits come in two groups, not three — there is no fielding split. */
+  const splitGroup = statGroup === "pitching" ? "pitching" : "hitting";
 
   return (
     <div className="mx-auto max-w-7xl space-y-3 p-3">
       <Identity t={team} season={season} />
       <TeamTabs id={teamId} name={team.name} active={section} />
-      {stats && (
+      {(stats || splits) && (
         <div className="flex flex-wrap items-center gap-3 border border-line bg-surface px-3 py-2">
           <ParamTabs
             param="group"
             ariaLabel="Stat group"
             size="lg"
-            value={statGroup}
-            options={STAT_GROUPS}
+            value={splits ? splitGroup : statGroup}
+            options={splits ? SPLIT_GROUPS : STAT_GROUPS}
           />
           <div className="ml-auto flex flex-wrap items-center gap-3">
-          <ParamSelect
-            param="type"
-            label="TYPE"
-            value={gameType}
-            options={PLAYER_GAME_TYPES}
-          />
+          {stats && (
+            <ParamSelect
+              param="type"
+              label="TYPE"
+              value={gameType}
+              options={PLAYER_GAME_TYPES}
+            />
+          )}
           <SeasonSelect value={statSeason} first={first} last={season} />
           </div>
         </div>

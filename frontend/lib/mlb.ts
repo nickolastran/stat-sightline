@@ -1774,27 +1774,99 @@ export interface SplitLine {
   values: Record<string, TeamStatValue>;
 }
 
-/* Home/away and platoon: the four every club's page is read for. */
-const SIT_CODES = "h,a,vl,vr";
+/** A block of related splits, read as one section of the table. */
+export interface SplitSection {
+  label: string;
+  lines: SplitLine[];
+}
 
+/*
+ * The sections a splits page is read in, in MLB's own order. Codes come from
+ * /situationCodes; only the team-level ones are here, and the two sections
+ * that only mean something for a batting order are hitting-only.
+ */
+const SPLIT_SECTIONS: {
+  label: string;
+  codes: string[];
+  hittingOnly?: boolean;
+}[] = [
+  { label: "GAME", codes: ["h", "a", "d", "n", "g", "t"] },
+  { label: "MONTH", codes: ["3", "4", "5", "6", "7", "8", "9", "10"] },
+  { label: "HALF", codes: ["preas", "posas"] },
+  { label: "OPPONENT", codes: ["vl", "vr", "val", "vnl"] },
+  { label: "BASES", codes: ["r0", "ron", "risp", "risp2", "r123", "lo"] },
+  { label: "SCORE", codes: ["sah", "sti", "sbh", "lc"] },
+  { label: "RESULT", codes: ["twn", "tls", "taw", "tal"] },
+  { label: "INNING", codes: ["ig01", "i07", "i08", "i09", "ix"] },
+  { label: "COUNT", codes: ["fp", "ac", "ec", "bc", "2s", "fc"] },
+  {
+    label: "BATTING ORDER",
+    hittingOnly: true,
+    codes: ["b1", "b2", "b3", "b4", "b5", "b6", "b7", "b8", "b9"],
+  },
+  {
+    label: "POSITION",
+    hittingOnly: true,
+    codes: ["p2", "p3", "p4", "p5", "p6", "p7", "p8", "p9", "pD", "pH"],
+  },
+];
+
+/**
+ * Every section of one club's splits. `stats=season` rides along in the same
+ * request so the season total heads the first block — a split only means
+ * something against the line it is a slice of.
+ */
 export async function getTeamSplits(
   id: number,
   season: number,
   group: "hitting" | "pitching"
-): Promise<SplitLine[]> {
+): Promise<SplitSection[]> {
+  const sections = SPLIT_SECTIONS.filter(
+    (s) => !s.hittingOnly || group === "hitting"
+  );
   const data = await mlb(
-    `/teams/${id}/stats?season=${season}&group=${group}&stats=statSplits&sitCodes=${SIT_CODES}`,
+    `/teams/${id}/stats?season=${season}&group=${group}&stats=season,statSplits&sitCodes=${sections
+      .flatMap((s) => s.codes)
+      .join(",")}`,
     1800
   );
   const columns = cols(group);
-  return ((data.stats?.[0]?.splits ?? []) as any[]).map((s): SplitLine => {
-    const stat = s.stat ?? {};
-    return {
-      code: s.split?.code ?? "",
-      label: (s.split?.description ?? "—").toUpperCase(),
-      values: Object.fromEntries(columns.map((c) => [c.key, stat[c.key] ?? null])),
-    };
-  });
+  const values = (stat: any) =>
+    Object.fromEntries(columns.map((c) => [c.key, stat?.[c.key] ?? null]));
+  const typed = (name: string) =>
+    ((data.stats ?? []) as any[]).find((s) => s.type?.displayName === name)
+      ?.splits ?? [];
+
+  const byCode = new Map<string, SplitLine>();
+  for (const s of typed("statSplits") as any[]) {
+    const code = s.split?.code ?? "";
+    /* One code, one line: a club that changed leagues mid-season can come
+       back with the same code twice, and the first is the one on record. */
+    if (code && !byCode.has(code))
+      byCode.set(code, {
+        code,
+        label: (s.split?.description ?? "—").toUpperCase(),
+        values: values(s.stat),
+      });
+  }
+
+  const built = sections
+    .map((sec) => ({
+      label: sec.label,
+      lines: sec.codes
+        .map((c) => byCode.get(c))
+        .filter((l): l is SplitLine => l !== undefined),
+    }))
+    .filter((sec) => sec.lines.length > 0);
+
+  const total = (typed("season") as any[])[0];
+  if (total && built.length > 0)
+    built[0].lines.unshift({
+      code: "total",
+      label: "TOTAL",
+      values: values(total.stat),
+    });
+  return built;
 }
 
 /** One roster move — the transactions tab, newest first. */
