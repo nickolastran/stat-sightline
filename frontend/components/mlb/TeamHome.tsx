@@ -1,3 +1,4 @@
+import Link from "next/link";
 import Panel from "@/components/ui/Panel";
 import GameCard from "@/components/mlb/GameCard";
 import PlayerLink from "@/components/mlb/PlayerLink";
@@ -49,7 +50,14 @@ function RecentGames({ games }: { games: Game[] }) {
       ) : (
         <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-5">
           {shown.map((g) => (
-            <GameCard key={g.pk} game={g} />
+            <Link
+              key={g.pk}
+              href={`/game/${g.pk}`}
+              aria-label={`Box score — ${g.away.name} at ${g.home.name}`}
+              className="block focus-visible:outline-2 focus-visible:outline-accent"
+            >
+              <GameCard game={g} className="hover:border-accent" />
+            </Link>
           ))}
         </div>
       )}
@@ -225,17 +233,19 @@ export default async function TeamHome({
             </Panel>
           )}
         </div>
-        {card ? (
-          <TeamStatCard
-            season={season}
-            hitting={card.hitting}
-            pitching={card.pitching}
-          />
-        ) : (
-          <Panel title={`${season} TEAM STATS`}>
-            <Notice what="TEAM STATS UNAVAILABLE" />
-          </Panel>
-        )}
+        <div className="self-start">
+          {card ? (
+            <TeamStatCard
+              season={season}
+              hitting={card.hitting}
+              pitching={card.pitching}
+            />
+          ) : (
+            <Panel title={`${season} TEAM STATS`}>
+              <Notice what="TEAM STATS UNAVAILABLE" />
+            </Panel>
+          )}
+        </div>
       </div>
     </div>
   );

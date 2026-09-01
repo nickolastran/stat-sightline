@@ -134,17 +134,14 @@ export default function PlayerStatTables({
   ];
 
   return (
-    <Panel
-      title={`${TITLES[group]} STATS — ${season}`}
-      right={<span className="text-[10px] text-ink-3">{rows.length} PLAYERS</span>}
-    >
+    <Panel title={`${TITLES[group]} STATS — ${season}`}>
       <LeaderTiles group={group} rows={rows} />
       <DataTable<PlayerStatRow>
         columns={cols}
         rows={rows}
         rowKey={(r, i) => `${r.id}-${i}`}
         defaultSort={{ key: DEFAULT_SORT[group], dir: "desc" }}
-        pageSize={30}
+        pageSize={Infinity}
         /* The page scrolls, not the table: a roster is read straight down,
            and a box inside a box gives it two scrollbars. */
         maxHeight="none"

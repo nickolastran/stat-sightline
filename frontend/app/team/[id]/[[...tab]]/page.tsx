@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Skeleton, SkeletonPanel } from "@/components/ui/Skeleton";
 import TeamTabs, { isTeamTab, type TeamTab } from "@/components/mlb/TeamTabs";
@@ -106,12 +105,6 @@ function Identity({ t, season }: { t: TeamIdentity; season: number }) {
           {[`${season} SEASON`, ...facts].join(" · ")}
         </p>
       </div>
-      <Link
-        href="/league/teams"
-        className="ml-auto shrink-0 border border-line px-2 py-1 text-[10px] tracking-wider text-ink-2 hover:border-accent hover:text-ink"
-      >
-        ← ALL TEAM STATS
-      </Link>
     </div>
   );
 }
