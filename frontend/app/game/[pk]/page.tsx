@@ -194,11 +194,9 @@ export default async function GamePage({
         </div>
       )}
 
-      {notStarted(game) && (
-        <div className={NARROW}>
-          <Pregame game={game} />
-        </div>
-      )}
+      {/* Like the gamecast, the pre-game bento earns the full width — only the
+          card above it reads at the card's width. */}
+      {notStarted(game) && <Pregame game={game} />}
     </div>
   );
 }

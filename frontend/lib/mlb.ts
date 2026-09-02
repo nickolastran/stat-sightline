@@ -1907,12 +1907,19 @@ export function leaderBoard(
 export async function getTeamLeaders(
   id: number,
   season: number,
-  gameType: PlayerGameType = "R"
+  gameType: PlayerGameType = "R",
+  /** Leave off anyone the club has since moved on from — a pre-game page is
+   *  asking who is available tonight, not who led the season's ledger. */
+  activeOnly = false
 ): Promise<TeamLeaderBoard[]> {
-  const [hitting, pitching] = await Promise.all([
+  const [hitting, pitching, active] = await Promise.all([
     getTeamPlayerStats(id, season, "hitting", gameType),
     getTeamPlayerStats(id, season, "pitching", gameType),
+    activeOnly ? getTeamRoster(id, season, "active") : [],
   ]);
+  const onRoster = activeOnly ? new Set(active.map((r) => r.id)) : null;
+  const rostered = (rows: PlayerStatRow[]) =>
+    onRoster ? rows.filter((r) => onRoster.has(r.id)) : rows;
   /* Games the club has played, as its busiest position player has seen them —
      the denominator every qualifying bar is a multiple of. */
   const teamGames = Math.max(
@@ -1921,7 +1928,11 @@ export async function getTeamLeaders(
   );
 
   return TEAM_LEADER_SPECS.map((spec) =>
-    leaderBoard(spec, spec.group === "hitting" ? hitting : pitching, teamGames)
+    leaderBoard(
+      spec,
+      rostered(spec.group === "hitting" ? hitting : pitching),
+      teamGames
+    )
   );
 }
 
