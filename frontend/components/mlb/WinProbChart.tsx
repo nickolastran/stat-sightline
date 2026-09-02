@@ -21,7 +21,9 @@ import type { Game, PlayProb } from "@/lib/mlb";
 
 const W = 600;
 const H = 150;
-const y = (prob: number) => H - (prob / 100) * H;
+/* The home club reads along the bottom, the way a home line score does — so
+   the axis runs the other way, 100 for the home club at y = H. */
+const y = (prob: number) => (prob / 100) * H;
 
 /** Who a play left in front, and by how much — the home club's number read
  *  from whichever end of the axis it is nearer. */
@@ -72,9 +74,9 @@ export default function WinProbChart({
       </p>
       <div className="flex gap-2">
         <div className="flex w-10 shrink-0 flex-col justify-between text-[10px] tracking-wider text-ink-3">
-          <span>{game.home.abbr}</span>
-          <span>EVEN</span>
           <span>{game.away.abbr}</span>
+          <span>EVEN</span>
+          <span>{game.home.abbr}</span>
         </div>
         <svg
           viewBox={`0 0 ${W} ${H}`}
@@ -90,10 +92,10 @@ export default function WinProbChart({
                 line, so the fill takes its colour from whichever half of the
                 chart the lobe sits in. */}
             <linearGradient id="wp-advantage" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="var(--color-accent)" stopOpacity="0.45" />
-              <stop offset="50%" stopColor="var(--color-accent)" stopOpacity="0" />
+              <stop offset="0%" stopColor="var(--color-warn)" stopOpacity="0.45" />
               <stop offset="50%" stopColor="var(--color-warn)" stopOpacity="0" />
-              <stop offset="100%" stopColor="var(--color-warn)" stopOpacity="0.45" />
+              <stop offset="50%" stopColor="var(--color-accent)" stopOpacity="0" />
+              <stop offset="100%" stopColor="var(--color-accent)" stopOpacity="0.45" />
             </linearGradient>
           </defs>
 

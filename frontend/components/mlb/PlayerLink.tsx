@@ -36,7 +36,7 @@ export default function PlayerLink({
           width={20}
           height={20}
           loading="lazy"
-          className="h-5 w-5 shrink-0 rounded-full bg-surface-2"
+          className="h-5 w-5 shrink-0"
         />
       )}
       <span className="truncate underline decoration-line decoration-dotted underline-offset-2 group-hover/pl:decoration-accent">

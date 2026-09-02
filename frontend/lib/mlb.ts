@@ -63,8 +63,11 @@ export const teamLogo = (id: number) =>
  * for anyone it has no photo of, so a missing headshot needs no fallback of
  * ours — every id returns an image.
  */
+/* The silo cutout rather than the "spot": both are transparent at the corners,
+   but the spot fills its circle with the club's colour, and a list of players
+   from eight clubs reads as eight coloured discs before it reads as faces. */
 export const playerHeadshot = (id: number, size = 60) =>
-  `https://midfield.mlbstatic.com/v1/people/${id}/spots/${size}`;
+  `https://img.mlbstatic.com/mlb-photos/image/upload/w_${size},q_auto:best/v1/people/${id}/headshot/silo/current.png`;
 
 /** Today's date in America/New_York (MLB's game day), as YYYY-MM-DD. */
 export function todayET(): string {
@@ -1907,12 +1910,19 @@ export function leaderBoard(
 export async function getTeamLeaders(
   id: number,
   season: number,
-  gameType: PlayerGameType = "R"
+  gameType: PlayerGameType = "R",
+  /** Leave off anyone the club has since moved on from — a pre-game page is
+   *  asking who is available tonight, not who led the season's ledger. */
+  activeOnly = false
 ): Promise<TeamLeaderBoard[]> {
-  const [hitting, pitching] = await Promise.all([
+  const [hitting, pitching, active] = await Promise.all([
     getTeamPlayerStats(id, season, "hitting", gameType),
     getTeamPlayerStats(id, season, "pitching", gameType),
+    activeOnly ? getTeamRoster(id, season, "active") : [],
   ]);
+  const onRoster = activeOnly ? new Set(active.map((r) => r.id)) : null;
+  const rostered = (rows: PlayerStatRow[]) =>
+    onRoster ? rows.filter((r) => onRoster.has(r.id)) : rows;
   /* Games the club has played, as its busiest position player has seen them —
      the denominator every qualifying bar is a multiple of. */
   const teamGames = Math.max(
@@ -1921,7 +1931,11 @@ export async function getTeamLeaders(
   );
 
   return TEAM_LEADER_SPECS.map((spec) =>
-    leaderBoard(spec, spec.group === "hitting" ? hitting : pitching, teamGames)
+    leaderBoard(
+      spec,
+      rostered(spec.group === "hitting" ? hitting : pitching),
+      teamGames
+    )
   );
 }
 
@@ -2568,6 +2582,8 @@ export interface PlayProb {
   homeScore: number;
   /** The home club's chance after the play, 0–100. */
   homeProb: number;
+  /** How far a home run carried, in feet — null on every other play. */
+  distance: number | null;
 }
 
 export interface LiveGame {
@@ -2593,7 +2609,7 @@ const PLAY_FIELDS =
 
 const PROB_FIELDS =
   "about,inning,halfInning,result,description,awayScore,homeScore," +
-  "homeTeamWinProbability";
+  "homeTeamWinProbability,eventType,playEvents,hitData,totalDistance";
 
 const livePerson = (p: any) =>
   p?.id ? { id: p.id, name: p.fullName ?? "—" } : null;
@@ -2672,6 +2688,14 @@ export async function getLive(pk: number): Promise<LiveGame> {
         awayScore: p.result?.awayScore ?? 0,
         homeScore: p.result?.homeScore ?? 0,
         homeProb: p.homeTeamWinProbability ?? 50,
+        /* Only the ball that left the park gets its flight reported — every
+           other batted ball has a distance too, and none of it is news. */
+        distance:
+          p.result?.eventType === "home_run"
+            ? (((p.playEvents ?? []) as any[])
+                .map((e) => e.hitData?.totalDistance)
+                .find((d) => typeof d === "number") ?? null)
+            : null,
       })
     ),
   };

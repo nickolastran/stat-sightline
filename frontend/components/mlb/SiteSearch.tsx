@@ -87,9 +87,7 @@ export default function SiteSearch() {
                   width={20}
                   height={20}
                   loading="lazy"
-                  className={`h-5 w-5 shrink-0 bg-surface-2 ${
-                    hit.kind === "team" ? "" : "rounded-full"
-                  }`}
+                  className="h-5 w-5 shrink-0"
                 />
                 <span className="min-w-0 flex-1">
                   <span className="block truncate">{hit.name}</span>

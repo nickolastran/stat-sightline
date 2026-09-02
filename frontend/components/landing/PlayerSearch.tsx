@@ -89,7 +89,7 @@ export default function PlayerSearch({
                     width={20}
                     height={20}
                     loading="lazy"
-                    className="h-5 w-5 shrink-0 rounded-full bg-surface-2"
+                    className="h-5 w-5 shrink-0"
                   />
                   <span className="truncate">
                     {p.full_name ?? `#${p.player_id}`}

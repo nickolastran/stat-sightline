@@ -49,7 +49,7 @@ function Identity({ p, right }: { p: PlayerSummary; right?: React.ReactNode }) {
         alt=""
         width={56}
         height={56}
-        className="h-14 w-14 shrink-0 rounded-full bg-surface-2"
+        className="h-14 w-14 shrink-0"
       />
       {p.teamId && (
         /* eslint-disable-next-line @next/next/no-img-element */

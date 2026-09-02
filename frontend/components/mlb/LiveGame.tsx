@@ -1,5 +1,6 @@
 import Link from "next/link";
 import DivisionTable from "@/components/mlb/DivisionTable";
+import { MiniBox } from "@/components/mlb/BoxScoreView";
 import Panel from "@/components/ui/Panel";
 import WinProbChart from "@/components/mlb/WinProbChart";
 import PlayerLink from "@/components/mlb/PlayerLink";
@@ -13,6 +14,7 @@ import {
   getTeamSchedule,
   halfInnings,
   headToHead,
+  inProgress,
   scoringPlays,
   seasonOf,
   teamLogo,
@@ -558,6 +560,14 @@ export function Situation({
 
 /* ── Scoring summary ────────────────────────────────────────────────── */
 
+/* MLB writes a home run as "homers (18)" — the hitter's season total, which
+   the box score already carries. How far it went, it does not say anywhere
+   else, so the distance takes that slot. */
+const withDistance = (p: PlayProb) =>
+  p.distance === null
+    ? p.description
+    : p.description.replace(/\(\d+\)/, `(${p.distance} ft)`);
+
 /** The plays that put a run on the board. Shown twice on the page — once
  *  beside the running totals, once under the full box score. */
 export function ScoringSummary({ plays }: { plays: PlayProb[] }) {
@@ -576,7 +586,7 @@ export function ScoringSummary({ plays }: { plays: PlayProb[] }) {
               <span className="w-14 shrink-0 text-[10px] tracking-wider text-ink-3">
                 {p.half === "top" ? "TOP" : "BOT"} {p.inning}
               </span>
-              <span className="min-w-0 flex-1 text-ink-2">{p.description}</span>
+              <span className="min-w-0 flex-1 text-ink-2">{withDistance(p)}</span>
               <span className="shrink-0 tabular-nums text-ink">
                 {p.awayScore}-{p.homeScore}
               </span>
@@ -701,6 +711,7 @@ export default async function LiveGame({
        three stack, each at the full width of the page. */
     <div className="grid grid-cols-1 gap-2 min-[1440px]:grid-cols-[28rem_minmax(0,1fr)_28rem]">
       <div className="space-y-2">
+        <MiniBox box={box} pk={game.pk} />
         <Panel title="TEAM TOTALS">
           <TeamTotals box={box} />
         </Panel>
@@ -713,14 +724,18 @@ export default async function LiveGame({
         </Panel>
       </div>
 
+      {/* Once the last out is recorded there is no at-bat to watch, so the
+          middle column is the game's runs and nothing else. */}
       <div className="space-y-2">
-        <Panel title="AT BAT">
-          {live.atBat ? (
-            <AtBatPanel game={game} box={box} live={live} zones={zones} />
-          ) : (
-            <Notice what="BETWEEN INNINGS" />
-          )}
-        </Panel>
+        {inProgress(game) && (
+          <Panel title="AT BAT">
+            {live.atBat ? (
+              <AtBatPanel game={game} box={box} live={live} zones={zones} />
+            ) : (
+              <Notice what="BETWEEN INNINGS" />
+            )}
+          </Panel>
+        )}
         <ScoringSummary plays={live.plays} />
       </div>
 
