@@ -63,8 +63,11 @@ export const teamLogo = (id: number) =>
  * for anyone it has no photo of, so a missing headshot needs no fallback of
  * ours — every id returns an image.
  */
+/* The silo cutout rather than the "spot": both are transparent at the corners,
+   but the spot fills its circle with the club's colour, and a list of players
+   from eight clubs reads as eight coloured discs before it reads as faces. */
 export const playerHeadshot = (id: number, size = 60) =>
-  `https://midfield.mlbstatic.com/v1/people/${id}/spots/${size}`;
+  `https://img.mlbstatic.com/mlb-photos/image/upload/w_${size},q_auto:best/v1/people/${id}/headshot/silo/current.png`;
 
 /** Today's date in America/New_York (MLB's game day), as YYYY-MM-DD. */
 export function todayET(): string {
