@@ -12,9 +12,11 @@ import assert from "node:assert/strict";
 import {
   clinchMark,
   clinchPhase,
+  clubCity,
   firstPitch,
   gameStatus,
   gamesBack,
+  halfInnings,
   headToHead,
   inProgress,
   notStarted,
@@ -144,6 +146,18 @@ assert.equal(inProgress({ ...live, detailedState: "Warmup" } as Game), false);
 assert.equal(inProgress(preview), false);
 
 /*
+ * The town a club is read by in a standings table. MLB's own locationName is
+ * where the park is, not what the club is called, so the town is the name with
+ * the club taken off the end — and one club has no town in its name at all.
+ */
+assert.equal(clubCity("Los Angeles Dodgers", "Dodgers"), "Los Angeles");
+assert.equal(clubCity("Chicago White Sox", "White Sox"), "Chicago", "two-word clubs come off whole");
+assert.equal(clubCity("Tampa Bay Rays", "Rays"), "Tampa Bay", "two-word towns survive");
+assert.equal(clubCity("Athletics", "Athletics"), "Athletics", "the club with no town keeps its name");
+assert.equal(clubCity("—", ""), "—", "a row with no club name falls back to the name");
+console.log("clubCity ok");
+
+/*
  * Which plays put a run up. MLB's own scoring-play list is a set of indexes
  * into a payload the page never asks for, so it is read off the running score
  * instead — including the very first play of a game, which has nothing before
@@ -170,6 +184,39 @@ assert.equal(
 );
 assert.deepEqual(scoringPlays([play(0, 0)]), [], "0-0 is not a scoring play");
 assert.deepEqual(scoringPlays([]), []);
+
+/*
+ * The same log cut into half-innings for the play-by-play. A half is a run of
+ * plays sharing inning and side — extras mean the ninth is not the last, and
+ * the runs per half are the score's own movement, whichever club moved it.
+ */
+const at = (inning: number, half: string, awayScore: number, homeScore: number) =>
+  ({ ...play(awayScore, homeScore), inning, half }) as PlayProb;
+
+const halves = halfInnings([
+  at(1, "top", 0, 0),
+  at(1, "top", 2, 0),
+  at(1, "bottom", 2, 0),
+  at(2, "top", 2, 0),
+  at(2, "bottom", 2, 3),
+]);
+assert.deepEqual(
+  halves.map((h) => [h.inning, h.half, h.plays.length, h.runs]),
+  [
+    [1, "top", 2, 2],
+    [1, "bottom", 1, 0],
+    [2, "top", 1, 0],
+    [2, "bottom", 1, 3],
+  ],
+  "one group per half, runs read off the score moving"
+);
+assert.deepEqual(
+  halfInnings([at(9, "bottom", 1, 1), at(10, "top", 1, 1)]).map((h) => h.inning),
+  [9, 10],
+  "extras open a new half rather than folding into the ninth"
+);
+assert.deepEqual(halfInnings([]), []);
+console.log("halfInnings ok");
 
 /*
  * Pre-game win probability. Log5 over two records, tilted for home field — so

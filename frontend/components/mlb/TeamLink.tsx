@@ -14,11 +14,15 @@ import { teamHref, teamLogo } from "@/lib/mlb";
 export default function TeamLink({
   id,
   name,
+  text,
   className = "",
   logo = true,
 }: {
   id: number | null | undefined;
   name: string;
+  /** What to print, when it isn't the whole name — the standings show the
+   *  town alone. The link itself still points at the club's own slug. */
+  text?: string;
   className?: string;
   logo?: boolean;
 }) {
@@ -34,7 +38,7 @@ export default function TeamLink({
           className="h-4 w-4 shrink-0"
         />
       )}
-      <span className="truncate">{name}</span>
+      <span className="truncate">{text ?? name}</span>
     </>
   );
 

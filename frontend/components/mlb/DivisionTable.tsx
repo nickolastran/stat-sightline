@@ -1,3 +1,4 @@
+import Link from "next/link";
 import Panel from "@/components/ui/Panel";
 import TeamLink from "@/components/mlb/TeamLink";
 import { gamesBack, type Division } from "@/lib/mlb";
@@ -11,10 +12,14 @@ import { gamesBack, type Division } from "@/lib/mlb";
 export default function DivisionTable({
   division,
   teamId,
+  full,
 }: {
   division: Division;
   /** The club (or, in a division matchup, the two) to pick out of the table. */
   teamId: number | number[];
+  /** Foot the table with a way through to every division at once — for the
+   *  places that show one table beside something else. */
+  full?: boolean;
 }) {
   const gb = gamesBack(division.teams);
   const rows = [...division.teams].sort(
@@ -32,11 +37,11 @@ export default function DivisionTable({
         <table className="w-full border-collapse text-xs">
           <thead>
             <tr>
-              {["TEAM", "W", "L", "PCT", "GB", "L10", "STRK"].map((h, i) => (
+              {["TEAM", "W", "L", "PCT", "GB", "STRK"].map((h, i) => (
                 <th
                   key={h}
                   scope="col"
-                  className={`border-b border-line bg-surface px-3 py-2 text-[10px] font-normal tracking-widest text-ink-3 ${
+                  className={`border-b border-line bg-surface px-2 py-2 text-[10px] font-normal tracking-widest text-ink-3 ${
                     i === 0 ? "text-left" : "text-right"
                   }`}
                 >
@@ -58,20 +63,21 @@ export default function DivisionTable({
                       : "text-ink-2 hover:bg-surface-2"
                   }`}
                 >
-                  <td className="px-3 py-1.5">
-                    <TeamLink id={r.id} name={r.name} />
+                  <td className="px-2 py-1.5">
+                    {/* The town alone: two clubs never share one inside a
+                        division, and the seven stat columns need the room. */}
+                    <TeamLink id={r.id} name={r.name} text={r.city} />
                   </td>
                   {[
                     String(r.wins),
                     String(r.losses),
                     r.pct,
                     gb(r) === 0 ? "-" : gb(r).toFixed(1),
-                    r.last10,
                     r.streak,
                   ].map((v, i) => (
                     <td
                       key={i}
-                      className="px-3 py-1.5 text-right tabular-nums whitespace-nowrap"
+                      className="px-2 py-1.5 text-right tabular-nums whitespace-nowrap"
                     >
                       {v}
                     </td>
@@ -82,6 +88,14 @@ export default function DivisionTable({
           </tbody>
         </table>
       </div>
+      {full && (
+        <Link
+          href="/league/standings"
+          className="mt-2 block border border-line px-2 py-1.5 text-center text-[10px] tracking-[0.2em] text-ink-3 hover:border-accent hover:text-ink"
+        >
+          FULL STANDINGS
+        </Link>
+      )}
     </Panel>
   );
 }

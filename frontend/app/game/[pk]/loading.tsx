@@ -21,7 +21,7 @@ const HeaderSide = ({ delay = 0 }: { delay?: number }) => (
 
 export default function GameLoading() {
   return (
-    <div className="mx-auto max-w-5xl p-3">
+    <div className="mx-auto max-w-[96rem] p-3">
       <div className="border border-line bg-surface">
         <div className="flex items-center gap-4 border-b border-line px-3 py-2">
           <HeaderSide />

@@ -66,9 +66,6 @@ export const teamLogo = (id: number) =>
 export const playerHeadshot = (id: number, size = 60) =>
   `https://midfield.mlbstatic.com/v1/people/${id}/spots/${size}`;
 
-/** MLB's own live Gameday feed for a game — opened in its own tab. */
-export const gamedayUrl = (pk: number) => `https://www.mlb.com/gameday/${pk}`;
-
 /** Today's date in America/New_York (MLB's game day), as YYYY-MM-DD. */
 export function todayET(): string {
   return new Intl.DateTimeFormat("en-CA", {
@@ -319,7 +316,6 @@ export const TOTAL_ROWS: Record<"hitting" | "pitching", TeamStatCol[]> = {
     { key: "hits", label: "HITS", title: "Hits" },
     { key: "homeRuns", label: "HOME RUNS", title: "Home runs" },
     { key: "totalBases", label: "TOTAL BASES", title: "Total bases" },
-    { key: "rbi", label: "RBI", title: "Runs batted in" },
     { key: "baseOnBalls", label: "WALKS", title: "Walks drawn" },
     { key: "strikeOuts", label: "STRIKEOUTS", title: "Strikeouts taken" },
     { key: "leftOnBase", label: "RUNNERS LOB", title: "Runners left on base" },
@@ -454,6 +450,9 @@ export async function getBoxScore(pk: number): Promise<BoxScore> {
 export interface StandingRow {
   id: number;
   name: string;
+  /** The club's town on its own — "Los Angeles" out of "Los Angeles Dodgers".
+   *  Falls back to the whole name for the club that has none, the Athletics. */
+  city: string;
   divisionId: number;
   division: string;
   leagueId: number;
@@ -524,13 +523,22 @@ export const pickGameType = (raw: string | undefined): GameType =>
  * wild-card payload groups by league and labels each group with an arbitrary
  * one of its divisions.
  */
+/* MLB's own locationName is where the park is rather than what the club is
+   called — the Yankees play in the Bronx and the Rangers in Arlington — so the
+   town is the name with the club taken off the end of it. The one club with no
+   town in its name, the Athletics, keeps the whole thing. */
+export const clubCity = (name: string, clubName: string) =>
+  name.slice(0, name.length - clubName.length).trim() || name;
+
 function standingRow(t: any): StandingRow {
   const splits = t.records?.splitRecords;
   const divisionId = t.team?.division?.id;
   const leagueId = t.team?.league?.id;
+  const name = t.team?.name ?? "—";
   return {
     id: t.team?.id,
-    name: t.team?.name ?? "—",
+    name,
+    city: clubCity(name, t.team?.clubName ?? ""),
     divisionId,
     division: DIVISIONS[divisionId] ?? `DIV ${divisionId}`,
     leagueId,
@@ -2669,6 +2677,41 @@ export async function getLive(pk: number): Promise<LiveGame> {
   };
 }
 
+/* ── Hot and cold zones ─────────────────────────────────────────────── */
+
+/** One cell of the batter's season, as MLB grades it. Zones "01"–"09" are the
+ *  strike zone read left to right and top to bottom, "11"–"14" the four
+ *  quadrants outside it. */
+export interface HeatZone {
+  zone: string;
+  /** The average itself, ".312". */
+  value: string;
+  /** MLB's own grading: cold, cool, lukewarm, warm, hot. */
+  temp: string;
+}
+
+/**
+ * How a hitter has done by part of the zone this season — the shading behind
+ * the live pitch plot.
+ *
+ * MLB grades every cell itself against the rest of the league, so the plot
+ * takes its temperature rather than inventing a scale off thirteen numbers.
+ * A hitter with too few swings comes back empty and the plot simply has no
+ * shading; season-to-date figures move once a day, so this is cached for one
+ * hour rather than on the live game's beat.
+ */
+export async function getHotZones(id: number): Promise<HeatZone[]> {
+  const data = await mlb(
+    `/people/${id}/stats?stats=hotColdZones&group=hitting&fields=stats,splits,stat,name,zones,zone,value,temp`,
+    3600
+  ).catch(() => null);
+  const splits = data?.stats?.[0]?.splits ?? [];
+  const avg = (splits as any[]).find((s) => s.stat?.name === "battingAverage");
+  return ((avg?.stat?.zones ?? []) as any[]).map(
+    (z): HeatZone => ({ zone: z.zone, value: z.value, temp: z.temp })
+  );
+}
+
 /**
  * The plays that put a run on the board — read off the running score rather
  * than off MLB's own scoring-play list, which is a set of indexes into a
@@ -2682,4 +2725,33 @@ export function scoringPlays(plays: PlayProb[]): PlayProb[] {
       p.homeScore !== (before?.homeScore ?? 0)
     );
   });
+}
+
+/** One half-inning of the play log, in the order it was played. */
+export interface HalfInning {
+  inning: number;
+  half: string;
+  /** Runs that crossed in this half — the score's own movement, either club. */
+  runs: number;
+  plays: PlayProb[];
+}
+
+/**
+ * The play log cut into half-innings, so a play-by-play reads the way a
+ * scorecard does rather than as one flat list of four hundred at-bats.
+ */
+export function halfInnings(plays: PlayProb[]): HalfInning[] {
+  const out: HalfInning[] = [];
+  plays.forEach((p, i) => {
+    let half = out.at(-1);
+    if (!half || half.inning !== p.inning || half.half !== p.half) {
+      half = { inning: p.inning, half: p.half, runs: 0, plays: [] };
+      out.push(half);
+    }
+    const before = plays[i - 1];
+    half.runs +=
+      p.awayScore - (before?.awayScore ?? 0) + (p.homeScore - (before?.homeScore ?? 0));
+    half.plays.push(p);
+  });
+  return out;
 }

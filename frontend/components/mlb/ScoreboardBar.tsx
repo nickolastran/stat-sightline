@@ -5,7 +5,6 @@ import Link from "next/link";
 import { motion } from "framer-motion";
 import { sortGames, todayET, type Game } from "@/lib/mlb";
 import GameCard from "@/components/mlb/GameCard";
-import GameFeedLink from "@/components/mlb/GameFeedLink";
 import DatePicker from "@/components/ui/DatePicker";
 import { SkeletonGameCard } from "@/components/ui/Skeleton";
 
@@ -152,7 +151,7 @@ export default function ScoreboardBar() {
           sorted.map((g, i) => (
             <motion.div
               key={g.pk}
-              className="relative w-[220px] shrink-0"
+              className="w-[220px] shrink-0"
               initial={{ opacity: 0, y: 6 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.25, delay: Math.min(i * 0.03, 0.3) }}
@@ -164,13 +163,6 @@ export default function ScoreboardBar() {
               >
                 <GameCard game={g} className="hover:border-accent" />
               </Link>
-              {/* Overlaid rather than nested: an anchor inside the card's own
-                  anchor is invalid HTML. */}
-              <GameFeedLink
-                pk={g.pk}
-                label={`${g.away.name} at ${g.home.name}`}
-                className="absolute right-1.5 top-1.5"
-              />
             </motion.div>
           ))
         )}
