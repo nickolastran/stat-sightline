@@ -2579,6 +2579,8 @@ export interface PlayProb {
   homeScore: number;
   /** The home club's chance after the play, 0–100. */
   homeProb: number;
+  /** How far a home run carried, in feet — null on every other play. */
+  distance: number | null;
 }
 
 export interface LiveGame {
@@ -2604,7 +2606,7 @@ const PLAY_FIELDS =
 
 const PROB_FIELDS =
   "about,inning,halfInning,result,description,awayScore,homeScore," +
-  "homeTeamWinProbability";
+  "homeTeamWinProbability,eventType,playEvents,hitData,totalDistance";
 
 const livePerson = (p: any) =>
   p?.id ? { id: p.id, name: p.fullName ?? "—" } : null;
@@ -2683,6 +2685,14 @@ export async function getLive(pk: number): Promise<LiveGame> {
         awayScore: p.result?.awayScore ?? 0,
         homeScore: p.result?.homeScore ?? 0,
         homeProb: p.homeTeamWinProbability ?? 50,
+        /* Only the ball that left the park gets its flight reported — every
+           other batted ball has a distance too, and none of it is news. */
+        distance:
+          p.result?.eventType === "home_run"
+            ? (((p.playEvents ?? []) as any[])
+                .map((e) => e.hitData?.totalDistance)
+                .find((d) => typeof d === "number") ?? null)
+            : null,
       })
     ),
   };

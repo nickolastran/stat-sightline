@@ -559,6 +559,14 @@ export function Situation({
 
 /* ── Scoring summary ────────────────────────────────────────────────── */
 
+/* MLB writes a home run as "homers (18)" — the hitter's season total, which
+   the box score already carries. How far it went, it does not say anywhere
+   else, so the distance takes that slot. */
+const withDistance = (p: PlayProb) =>
+  p.distance === null
+    ? p.description
+    : p.description.replace(/\(\d+\)/, `(${p.distance} ft)`);
+
 /** The plays that put a run on the board. Shown twice on the page — once
  *  beside the running totals, once under the full box score. */
 export function ScoringSummary({ plays }: { plays: PlayProb[] }) {
@@ -577,7 +585,7 @@ export function ScoringSummary({ plays }: { plays: PlayProb[] }) {
               <span className="w-14 shrink-0 text-[10px] tracking-wider text-ink-3">
                 {p.half === "top" ? "TOP" : "BOT"} {p.inning}
               </span>
-              <span className="min-w-0 flex-1 text-ink-2">{p.description}</span>
+              <span className="min-w-0 flex-1 text-ink-2">{withDistance(p)}</span>
               <span className="shrink-0 tabular-nums text-ink">
                 {p.awayScore}-{p.homeScore}
               </span>
