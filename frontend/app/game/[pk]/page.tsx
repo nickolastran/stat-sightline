@@ -64,8 +64,9 @@ async function GamePane({
   return (
     <div className={NARROW}>
       {/* The gamecast carries the matchup in its own panel; the other two get
-          it as a strip so the game is still readable. */}
-      <Situation box={box} live={live} />
+          it as a strip so the game is still readable. Once it is over there is
+          no matchup to carry — the decisions on the card say how it ended. */}
+      {inProgress(game) && <Situation box={box} live={live} />}
       {tab === "box" ? (
         <>
           <FullBox box={box} />
@@ -145,18 +146,18 @@ export default async function GamePage({
   const log = sp.log === "scoring" ? "scoring" : "all";
   const noLines =
     box.away.batters.length === 0 && box.home.batters.length === 0;
+  /* Any game with lines reads through the three views, over or not: the
+     gamecast still tells the story, and the box and the log are the same
+     tables either way. */
+  const tabbed = !notStarted(game) && !noLines;
 
   return (
     <div className="mx-auto max-w-[96rem] space-y-2 p-3">
       <div className={NARROW}>
         <BoxScoreView game={game} box={box}>
-          {/* A game under way puts its box behind the tabs below; one that is
-            over or has not started reads straight off the card. */}
-          {playing || notStarted(game) ? null : noLines ? (
-            <NoBoxYet game={game} />
-          ) : (
-            <FullBox box={box} />
-          )}
+          {/* Any game with lines puts its box behind the tabs below; one
+            without them says so on the card. */}
+          {tabbed || notStarted(game) ? null : <NoBoxYet game={game} />}
         </BoxScoreView>
       </div>
 
@@ -165,9 +166,9 @@ export default async function GamePage({
           the gamecast, the card on the two that read at the card's width. On
           the gamecast that means insetting the buttons rather than the strip,
           so the rule still reaches the left box. */}
-      {playing && (
+      {tabbed && (
         <>
-          <AutoRefresh seconds={REFRESH_SECONDS} />
+          {playing && <AutoRefresh seconds={REFRESH_SECONDS} />}
           <div className={tab === "gamecast" ? "" : NARROW}>
             <ParamTabs
               param="tab"
@@ -186,7 +187,7 @@ export default async function GamePage({
 
       {/* Keyed on the tab so switching re-suspends into that view's own
           skeleton rather than holding the last one, and its entrance replays. */}
-      {playing && (
+      {tabbed && (
         <div key={tab} className="pane">
           <Suspense fallback={<GameSkeleton tab={tab} />}>
             <GamePane game={game} box={box} tab={tab} log={log} />

@@ -315,6 +315,45 @@ function TeamLines({ team, compact }: { team: BoxTeam; compact?: boolean }) {
   );
 }
 
+/* ── Decisions ───────────────────────────────────────────────────────── */
+
+const armLine = (box: BoxScore, id: number | undefined) =>
+  [...box.away.pitchers, ...box.home.pitchers].find((p) => p.id === id) ?? null;
+
+/** Who got the win, the loss and the save, with what they threw — the three
+ *  names a final line score is read with, and the box doesn't say plainly. */
+function PitchingDecisions({ game, box }: { game: Game; box: BoxScore }) {
+  const arms = (
+    [
+      ["WIN", game.decisions.winner],
+      ["LOSS", game.decisions.loser],
+      ["SAVE", game.decisions.save],
+    ] as const
+  ).flatMap(([role, who]) => (who ? [{ role, who }] : []));
+  if (arms.length === 0) return null;
+
+  return (
+    <div className="flex flex-wrap gap-x-8 gap-y-3 border border-line px-3 py-2">
+      {arms.map(({ role, who }) => {
+        const p = armLine(box, who.id);
+        return (
+          <div key={role} className="min-w-0">
+            <p className="text-[10px] tracking-[0.25em] text-ink-3">{role}</p>
+            <p className="truncate text-sm text-ink">
+              <PlayerLink id={who.id}>{who.name}</PlayerLink>
+            </p>
+            <p className="text-[10px] tabular-nums text-ink-2">
+              {p
+                ? `${p.ip} IP, ${p.h} H, ${p.er} ER, ${p.k} K, ${p.bb} BB`
+                : "—"}
+            </p>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 /* ── Page shell ──────────────────────────────────────────────────────── */
 
 /** Both clubs' batting and pitching lines, one club at a time. Its own export
@@ -446,6 +485,7 @@ export default function BoxScoreView({
       {/* ── Body ──────────────────────────────────────────────── */}
       <div className="space-y-2 p-3">
         <Linescore box={box} game={game} />
+        {game.state === "Final" && <PitchingDecisions game={game} box={box} />}
         {children}
       </div>
     </div>

@@ -14,6 +14,7 @@ import {
   getTeamSchedule,
   halfInnings,
   headToHead,
+  inProgress,
   scoringPlays,
   seasonOf,
   teamLogo,
@@ -723,14 +724,18 @@ export default async function LiveGame({
         </Panel>
       </div>
 
+      {/* Once the last out is recorded there is no at-bat to watch, so the
+          middle column is the game's runs and nothing else. */}
       <div className="space-y-2">
-        <Panel title="AT BAT">
-          {live.atBat ? (
-            <AtBatPanel game={game} box={box} live={live} zones={zones} />
-          ) : (
-            <Notice what="BETWEEN INNINGS" />
-          )}
-        </Panel>
+        {inProgress(game) && (
+          <Panel title="AT BAT">
+            {live.atBat ? (
+              <AtBatPanel game={game} box={box} live={live} zones={zones} />
+            ) : (
+              <Notice what="BETWEEN INNINGS" />
+            )}
+          </Panel>
+        )}
         <ScoringSummary plays={live.plays} />
       </div>
 
