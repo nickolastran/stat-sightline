@@ -14,18 +14,24 @@ export default function ParamTabs({
   options,
   ariaLabel,
   size,
+  variant,
+  className,
 }: {
   param: string;
   value: string;
   options: { value: string; label: string }[];
   ariaLabel: string;
   size?: "sm" | "lg";
+  variant?: "box" | "underline";
+  className?: string;
 }) {
   const setParam = useSetParam();
   return (
     <SegmentedControl<string>
       ariaLabel={ariaLabel}
       size={size}
+      variant={variant}
+      className={className}
       value={value}
       onChange={(v) => setParam(param, v)}
       options={options}

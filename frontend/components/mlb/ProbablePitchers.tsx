@@ -1,6 +1,5 @@
 import { sortGames, teamLogo, type Game, type GameSide } from "@/lib/mlb";
 import PlayerLink from "@/components/mlb/PlayerLink";
-import GameFeedLink from "@/components/mlb/GameFeedLink";
 
 /*
  * Announced starting-pitcher matchups for a slate. Presentational — the
@@ -68,11 +67,6 @@ export default function ProbablePitchers({ games }: { games: Game[] }) {
           <Prob side={g.away} />
           <span className="shrink-0 text-[10px] text-ink-3">@</span>
           <Prob side={g.home} alignRight />
-          <GameFeedLink
-            pk={g.pk}
-            label={`${g.away.name} at ${g.home.name}`}
-            className="shrink-0"
-          />
         </div>
       ))}
     </div>

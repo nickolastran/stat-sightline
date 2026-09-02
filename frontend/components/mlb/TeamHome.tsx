@@ -2,15 +2,13 @@ import Link from "next/link";
 import Panel from "@/components/ui/Panel";
 import GameCard from "@/components/mlb/GameCard";
 import PlayerLink from "@/components/mlb/PlayerLink";
-import TeamLink from "@/components/mlb/TeamLink";
+import DivisionTable from "@/components/mlb/DivisionTable";
 import TeamStatCard from "@/components/mlb/TeamStatCard";
 import {
-  gamesBack,
   getTeamCardStats,
   getTeamLeaders,
   getTeamSchedule,
   getStandings,
-  type Division,
   type Game,
   type TeamLeaderBoard,
 } from "@/lib/mlb";
@@ -61,85 +59,6 @@ function RecentGames({ games }: { games: Game[] }) {
           ))}
         </div>
       )}
-    </Panel>
-  );
-}
-
-/* ── Division standings ─────────────────────────────────────────────── */
-
-function DivisionStandings({
-  division,
-  teamId,
-}: {
-  division: Division;
-  teamId: number;
-}) {
-  const gb = gamesBack(division.teams);
-  const rows = [...division.teams].sort(
-    (a, b) => Number(a.divRank) - Number(b.divRank)
-  );
-
-  return (
-    <Panel
-      title={`${division.name} STANDINGS`}
-      right={
-        <span className="text-[10px] text-ink-3">{division.league}</span>
-      }
-    >
-      <div className="overflow-x-auto border border-line">
-        <table className="w-full border-collapse text-xs">
-          <thead>
-            <tr>
-              {["TEAM", "W", "L", "PCT", "GB", "L10", "STRK"].map((h, i) => (
-                <th
-                  key={h}
-                  scope="col"
-                  className={`border-b border-line bg-surface px-3 py-2 text-[10px] font-normal tracking-widest text-ink-3 ${
-                    i === 0 ? "text-left" : "text-right"
-                  }`}
-                >
-                  {h}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((r) => {
-              const mine = r.id === teamId;
-              return (
-                <tr
-                  key={r.id}
-                  aria-current={mine ? "true" : undefined}
-                  className={`border-b border-grid last:border-b-0 ${
-                    mine
-                      ? "bg-accent/15 font-bold text-ink"
-                      : "text-ink-2 hover:bg-surface-2"
-                  }`}
-                >
-                  <td className="px-3 py-1.5">
-                    <TeamLink id={r.id} name={r.name} />
-                  </td>
-                  {[
-                    String(r.wins),
-                    String(r.losses),
-                    r.pct,
-                    gb(r) === 0 ? "-" : gb(r).toFixed(1),
-                    r.last10,
-                    r.streak,
-                  ].map((v, i) => (
-                    <td
-                      key={i}
-                      className="px-3 py-1.5 text-right tabular-nums whitespace-nowrap"
-                    >
-                      {v}
-                    </td>
-                  ))}
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
     </Panel>
   );
 }
@@ -219,7 +138,7 @@ export default async function TeamHome({
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
         <div className="space-y-3 lg:col-span-2">
           {division ? (
-            <DivisionStandings division={division} teamId={id} />
+            <DivisionTable division={division} teamId={id} />
           ) : (
             <Panel title="DIVISION STANDINGS">
               <Notice what="NO STANDINGS FOR THIS SEASON YET" />

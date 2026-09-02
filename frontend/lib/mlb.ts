@@ -66,9 +66,6 @@ export const teamLogo = (id: number) =>
 export const playerHeadshot = (id: number, size = 60) =>
   `https://midfield.mlbstatic.com/v1/people/${id}/spots/${size}`;
 
-/** MLB's own live Gameday feed for a game — opened in its own tab. */
-export const gamedayUrl = (pk: number) => `https://www.mlb.com/gameday/${pk}`;
-
 /** Today's date in America/New_York (MLB's game day), as YYYY-MM-DD. */
 export function todayET(): string {
   return new Intl.DateTimeFormat("en-CA", {
@@ -223,6 +220,10 @@ export function gameStatus(
   text: string;
   tone: "live" | "final" | "pre";
 } {
+  /* Warmup carries a Top 1 linescore before a pitch is thrown; say so. */
+  if (g.detailedState === "Warmup") {
+    return { text: "WARMUP", tone: "live" };
+  }
   if (g.state === "Live") {
     const half = g.inningState ? g.inningState.slice(0, 3).toUpperCase() : "";
     return { text: `${half} ${g.inning ?? ""}`.trim(), tone: "live" };
@@ -232,14 +233,29 @@ export function gameStatus(
     const extra = g.inning && g.inning > 9 ? `/${g.inning}` : "";
     return { text: g.detailedState.toUpperCase() + extra, tone: "final" };
   }
-  const t = new Intl.DateTimeFormat("en-US", {
+  return { text: clock(g.startTime, timeZone), tone: "pre" };
+}
+
+/** "7:40 PM PDT" — a first pitch in the zone it is being read in. */
+const clock = (iso: string, timeZone: string) =>
+  new Intl.DateTimeFormat("en-US", {
     hour: "numeric",
     minute: "2-digit",
     timeZoneName: "short",
     timeZone,
-  }).format(new Date(g.startTime));
-  return { text: t, tone: "pre" };
-}
+  }).format(new Date(iso));
+
+/** The same clock with the day it falls on — "7:40 PM PDT · TUE, SEP 1, 2026". */
+export const firstPitch = (iso: string, timeZone: string): string =>
+  `${clock(iso, timeZone)} · ${new Intl.DateTimeFormat("en-US", {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    timeZone,
+  })
+    .format(new Date(iso))
+    .toUpperCase()}`;
 
 /* ── Box score ──────────────────────────────────────────────────────── */
 
@@ -287,9 +303,32 @@ export interface BoxTeam {
   hits: number | null;
   errors: number | null;
   lob: number | null;
+  /** The club's running totals, the figures the two sides are compared on. */
+  totals: Record<"hitting" | "pitching", Record<string, TeamStatValue>>;
   batters: BoxBatter[];
   pitchers: BoxPitcher[];
 }
+
+/* What a live game compares the two clubs on — the counting stats that move
+   during a game, not the rates that need a season to mean anything. */
+export const TOTAL_ROWS: Record<"hitting" | "pitching", TeamStatCol[]> = {
+  hitting: [
+    { key: "hits", label: "HITS", title: "Hits" },
+    { key: "homeRuns", label: "HOME RUNS", title: "Home runs" },
+    { key: "totalBases", label: "TOTAL BASES", title: "Total bases" },
+    { key: "baseOnBalls", label: "WALKS", title: "Walks drawn" },
+    { key: "strikeOuts", label: "STRIKEOUTS", title: "Strikeouts taken" },
+    { key: "leftOnBase", label: "RUNNERS LOB", title: "Runners left on base" },
+  ],
+  pitching: [
+    { key: "strikeOuts", label: "STRIKEOUTS", title: "Strikeouts recorded" },
+    { key: "baseOnBalls", label: "WALKS", title: "Walks issued" },
+    { key: "hits", label: "HITS", title: "Hits allowed" },
+    { key: "runs", label: "RUNS", title: "Runs allowed" },
+    { key: "earnedRuns", label: "EARNED RUNS", title: "Earned runs allowed" },
+    { key: "homeRuns", label: "HOME RUNS", title: "Home runs allowed" },
+  ],
+};
 
 export interface BoxInning {
   num: number;
@@ -305,6 +344,11 @@ export interface BoxScore {
   home: BoxTeam;
 }
 
+const total = (stat: any, group: "hitting" | "pitching") =>
+  Object.fromEntries(
+    TOTAL_ROWS[group].map((c) => [c.key, stat?.[c.key] ?? null])
+  );
+
 /** A starter's battingOrder is a round hundred ("100"); subs are "101", "102". */
 const isSub = (order: string | undefined) => !!order && !/00$/.test(order);
 
@@ -319,6 +363,10 @@ function boxTeam(raw: any, line: any): BoxTeam {
     hits: line?.hits ?? null,
     errors: line?.errors ?? null,
     lob: line?.leftOnBase ?? null,
+    totals: {
+      hitting: total(raw.teamStats?.batting, "hitting"),
+      pitching: total(raw.teamStats?.pitching, "pitching"),
+    },
     /* `batters` also carries every pitcher who appeared, batting order or not.
        No battingOrder means the club never sent them to the plate, so they are
        not part of the batting line. */
@@ -402,6 +450,9 @@ export async function getBoxScore(pk: number): Promise<BoxScore> {
 export interface StandingRow {
   id: number;
   name: string;
+  /** The club's town on its own — "Los Angeles" out of "Los Angeles Dodgers".
+   *  Falls back to the whole name for the club that has none, the Athletics. */
+  city: string;
   divisionId: number;
   division: string;
   leagueId: number;
@@ -472,13 +523,22 @@ export const pickGameType = (raw: string | undefined): GameType =>
  * wild-card payload groups by league and labels each group with an arbitrary
  * one of its divisions.
  */
+/* MLB's own locationName is where the park is rather than what the club is
+   called — the Yankees play in the Bronx and the Rangers in Arlington — so the
+   town is the name with the club taken off the end of it. The one club with no
+   town in its name, the Athletics, keeps the whole thing. */
+export const clubCity = (name: string, clubName: string) =>
+  name.slice(0, name.length - clubName.length).trim() || name;
+
 function standingRow(t: any): StandingRow {
   const splits = t.records?.splitRecords;
   const divisionId = t.team?.division?.id;
   const leagueId = t.team?.league?.id;
+  const name = t.team?.name ?? "—";
   return {
     id: t.team?.id,
-    name: t.team?.name ?? "—",
+    name,
+    city: clubCity(name, t.team?.clubName ?? ""),
     divisionId,
     division: DIVISIONS[divisionId] ?? `DIV ${divisionId}`,
     leagueId,
@@ -2250,4 +2310,448 @@ export async function getTeamInjuries(
       return { ...p, since: m?.date ?? "", note: m?.description ?? "" };
     })
     .sort((a, b) => b.since.localeCompare(a.since));
+}
+
+/* ── Pre-game ───────────────────────────────────────────────────────── */
+
+/**
+ * True until the first pitch — what the game page hangs its pre-game view off.
+ * The abstract state alone won't do it: warmup reports as Live, having already
+ * been handed a Top 1 linescore.
+ */
+export const notStarted = (g: Game): boolean =>
+  g.state === "Preview" || g.detailedState === "Warmup";
+
+/** One spot in a posted lineup, in batting order. */
+export interface LineupSpot {
+  id: number;
+  name: string;
+  pos: string;
+}
+
+/**
+ * Everything about a game that only matters before it starts, off one
+ * schedule read: the posted lineups, who is umpiring, what the weather is
+ * doing, who is carrying it, and where the game sits in its series.
+ */
+export interface Pregame {
+  weather: { condition: string; temp: string; wind: string } | null;
+  /** Call signs, TV ahead of radio; MLB lists the same station once per club. */
+  broadcasts: { type: string; name: string }[];
+  officials: { role: string; name: string }[];
+  /** Empty until the club posts the card, a couple of hours out. */
+  away: LineupSpot[];
+  home: LineupSpot[];
+  /** "NYM leads 1-0" — MLB's own wording, once the series has a result. */
+  series: { game: number; total: number; result: string } | null;
+}
+
+const PREGAME_HYDRATE = "weather,officials,broadcasts(all),lineups,seriesStatus";
+
+const spot = (p: any): LineupSpot => ({
+  id: p.id,
+  name: p.fullName ?? "—",
+  pos: p.primaryPosition?.abbreviation ?? "",
+});
+
+export async function getPregame(pk: number): Promise<Pregame | null> {
+  const data = await mlb(
+    `/schedule?sportId=1&gamePk=${pk}&hydrate=${PREGAME_HYDRATE}`,
+    300
+  );
+  const g = data.dates?.[0]?.games?.[0];
+  if (!g) return null;
+
+  const seen = new Set<string>();
+  const w = g.weather;
+  return {
+    weather: w?.condition
+      ? { condition: w.condition, temp: w.temp ?? "", wind: w.wind ?? "" }
+      : null,
+    broadcasts: ((g.broadcasts ?? []) as any[])
+      .filter((b) => b.name && !seen.has(b.name) && seen.add(b.name))
+      .sort((a, b) => Number(b.type === "TV") - Number(a.type === "TV"))
+      .map((b) => ({ type: b.type ?? "", name: b.name })),
+    officials: ((g.officials ?? []) as any[]).map((o) => ({
+      role: o.officialType ?? "",
+      name: o.official?.fullName ?? "—",
+    })),
+    away: ((g.lineups?.awayPlayers ?? []) as any[]).map(spot),
+    home: ((g.lineups?.homePlayers ?? []) as any[]).map(spot),
+    series: g.seriesStatus
+      ? {
+          game: g.seriesStatus.gameNumber ?? 0,
+          total: g.seriesStatus.totalGames ?? 0,
+          result: g.seriesStatus.result ?? "",
+        }
+      : null,
+  };
+}
+
+/* ── The matchup ────────────────────────────────────────────────────── */
+
+/**
+ * The columns a lineup card shows, and the ones a career-against line and a
+ * season line both carry — so the card's two modes fill the same table.
+ */
+export const LINEUP_COLS: TeamStatCol[] = [
+  { key: "hAb", label: "H-AB", title: "Hits and at-bats" },
+  { key: "homeRuns", label: "HR", title: "Home runs" },
+  { key: "rbi", label: "RBI", title: "Runs batted in" },
+  { key: "baseOnBalls", label: "BB", title: "Walks (bases on balls)" },
+  { key: "strikeOuts", label: "K", title: "Strikeouts" },
+  { key: "avg", label: "AVG", title: "Batting average — hits per at-bat" },
+  { key: "obp", label: "OBP", title: "On-base percentage" },
+  { key: "ops", label: "OPS", title: "On-base plus slugging" },
+];
+
+/** A hitter's line as the card reads it, or null where there is no line. */
+export type LineupLine = Record<string, TeamStatValue> | null;
+
+/* Hits and at-bats read as one cell on a matchup line — "3-11", not two
+   columns a reader has to divide themselves. */
+const lineupLine = (stat: any): LineupLine =>
+  stat
+    ? {
+        ...Object.fromEntries(
+          LINEUP_COLS.map((c) => [c.key, stat[c.key] ?? null])
+        ),
+        hAb: `${stat.hits ?? 0}-${stat.atBats ?? 0}`,
+      }
+    : null;
+
+/**
+ * Every listed hitter's career line against today's opposing starter.
+ *
+ * MLB answers this one batter at a time — there is no bulk form — so it is a
+ * request per spot in the order, fired together. A career total against one
+ * pitcher only moves when they next meet, so it caches for a day, and a
+ * batter who has never faced him comes back as null rather than a row of
+ * zeros.
+ */
+export async function getVsPitcher(
+  batters: number[],
+  pitcherId: number
+): Promise<Record<number, LineupLine>> {
+  const lines = await Promise.all(
+    batters.map((id) =>
+      mlb(
+        `/people/${id}/stats?stats=vsPlayerTotal&group=hitting&opposingPlayerId=${pitcherId}`,
+        86400
+      )
+        .then((d) => {
+          const splits = (d.stats?.[0]?.splits ?? []) as any[];
+          const s = splits.find((x) => x.gameType === "R") ?? splits[0];
+          return lineupLine(s?.stat);
+        })
+        .catch(() => null)
+    )
+  );
+  return Object.fromEntries(batters.map((id, i) => [id, lines[i]]));
+}
+
+/** A club's season line for each of its hitters, keyed by player id. */
+export const lineupSeason = (
+  rows: PlayerStatRow[]
+): Record<number, LineupLine> =>
+  Object.fromEntries(rows.map((r) => [r.id, lineupLine(r.values)]));
+
+/*
+ * Home field is worth about .535 across a season — the odds multiplier that
+ * shifts an even matchup to that number.
+ */
+const HOME_FIELD_ODDS = 0.535 / 0.465;
+
+/**
+ * Pre-game win probability, from the two clubs' records alone: log5, the
+ * standard way to turn two winning percentages into a head-to-head number,
+ * tilted for home field. Null before either club has played.
+ *
+ * ponytail: records and home field only — no starters, no bullpen, no park.
+ * A starter-aware number would need projections this API doesn't publish;
+ * blend one in here if it ever does.
+ */
+export function winProbability(
+  g: Game
+): { home: number; away: number } | null {
+  const pct = (s: GameSide) => {
+    const played = (s.wins ?? 0) + (s.losses ?? 0);
+    return s.wins === null || played === 0 ? null : s.wins / played;
+  };
+  const h = pct(g.home);
+  const a = pct(g.away);
+  if (h === null || a === null) return null;
+
+  const denom = h + a - 2 * h * a;
+  /* Two unbeaten clubs, or two winless ones, log5 cannot separate. */
+  const base = denom === 0 ? 0.5 : Math.min(0.99, Math.max(0.01, (h - h * a) / denom));
+  const odds = (base / (1 - base)) * HOME_FIELD_ODDS;
+  const home = odds / (1 + odds);
+  return { home, away: 1 - home };
+}
+
+/** The games two clubs play each other, out of one of their schedules — the
+ *  season series for free, since that schedule is already cached. */
+export const headToHead = (schedule: Game[], oppId: number): Game[] =>
+  schedule
+    .filter((g) => g.away.id === oppId || g.home.id === oppId)
+    .sort((a, b) => a.startTime.localeCompare(b.startTime));
+
+/*
+ * Clubs play a series on consecutive days, so a gap of more than a day and a
+ * half is where one series ends and the next begins. A doubleheader's two
+ * games sit hours apart and stay together.
+ *
+ * ponytail: date proximity rather than a series id — MLB publishes the game's
+ * number in its series but not which other games share it. A series split
+ * around an off-day would read as two; use seriesGameNumber to stitch it if
+ * that ever comes up.
+ */
+const SERIES_GAP_MS = 36 * 3600 * 1000;
+
+export function seriesGames(matchups: Game[], pk: number): Game[] {
+  const i = matchups.findIndex((g) => g.pk === pk);
+  if (i < 0) return [];
+  const at = (n: number) => new Date(matchups[n].startTime).getTime();
+  let lo = i;
+  let hi = i;
+  while (lo > 0 && at(lo) - at(lo - 1) <= SERIES_GAP_MS) lo--;
+  while (hi < matchups.length - 1 && at(hi + 1) - at(hi) <= SERIES_GAP_MS) hi++;
+  return matchups.slice(lo, hi + 1);
+}
+
+/* ── Live game ──────────────────────────────────────────────────────── */
+
+/** A game with a pitch actually being thrown — warmup is Live but isn't this. */
+export const inProgress = (g: Game): boolean =>
+  g.state === "Live" && !notStarted(g);
+
+/** One pitch of the at-bat under way. */
+export interface LivePitch {
+  /** Its number in this at-bat — what the mark on the zone plot is labelled. */
+  number: number;
+  /** "FF", the code the pitch colours are keyed on. */
+  code: string;
+  name: string;
+  /** "Strike Swinging", "Ball", "In play, run(s)". */
+  call: string;
+  speed: number | null;
+  /** Feet from the middle of the plate and off the ground, catcher's view. */
+  x: number | null;
+  z: number | null;
+  outcome: "ball" | "strike" | "in-play";
+}
+
+export interface AtBat {
+  pitcher: { id: number; name: string } | null;
+  /** "R" / "L". */
+  hand: string;
+  batter: { id: number; name: string } | null;
+  side: string;
+  balls: number;
+  strikes: number;
+  outs: number;
+  pitches: LivePitch[];
+  /** This batter's zone in feet — the box the marks are read against. */
+  zoneTop: number;
+  zoneBottom: number;
+}
+
+/** One completed at-bat: what happened, the score after it, and what it did
+ *  to the home club's chances. */
+export interface PlayProb {
+  inning: number;
+  /** "top" or "bottom". */
+  half: string;
+  description: string;
+  awayScore: number;
+  homeScore: number;
+  /** The home club's chance after the play, 0–100. */
+  homeProb: number;
+}
+
+export interface LiveGame {
+  atBat: AtBat | null;
+  onDeck: { id: number; name: string } | null;
+  /** Who is standing on first, second and third — null for an empty bag. */
+  bases: ({ id: number; name: string } | null)[];
+  plays: PlayProb[];
+}
+
+/* The rulebook zone, for the rare pitch that arrives without the batter's own. */
+const ZONE_TOP = 3.4;
+const ZONE_BOTTOM = 1.6;
+
+/* One at-bat's worth of pitches, and the play log the win-probability chart is
+   drawn from. `fields` trims both hard: the untrimmed payloads carry a hot-cold
+   zone breakdown per play and run to hundreds of kilobytes. */
+const PLAY_FIELDS =
+  "currentPlay,result,about,inning,halfInning,count,balls,strikes,outs,matchup," +
+  "batter,pitcher,id,fullName,batSide,pitchHand,code,description,playEvents," +
+  "details,call,type,isStrike,isBall,isInPlay,isPitch,pitchNumber,pitchData," +
+  "startSpeed,strikeZoneTop,strikeZoneBottom,coordinates,pX,pZ";
+
+const PROB_FIELDS =
+  "about,inning,halfInning,result,description,awayScore,homeScore," +
+  "homeTeamWinProbability";
+
+const livePerson = (p: any) =>
+  p?.id ? { id: p.id, name: p.fullName ?? "—" } : null;
+
+function livePitch(e: any): LivePitch {
+  const d = e.details ?? {};
+  const c = e.pitchData?.coordinates ?? {};
+  return {
+    number: e.pitchNumber ?? 0,
+    code: d.type?.code ?? "",
+    name: d.type?.description ?? "—",
+    call: d.description ?? d.call?.description ?? "—",
+    speed: typeof e.pitchData?.startSpeed === "number" ? e.pitchData.startSpeed : null,
+    x: typeof c.pX === "number" ? c.pX : null,
+    z: typeof c.pZ === "number" ? c.pZ : null,
+    outcome: d.isInPlay ? "in-play" : d.isStrike ? "strike" : "ball",
+  };
+}
+
+/**
+ * The state of a game being played: the at-bat under way pitch by pitch, who
+ * is on base and on deck, and every at-bat so far with what it did to the
+ * home club's chances.
+ *
+ * Three small requests rather than the live feed, which is one request but a
+ * quarter of a megabyte and climbing. Short revalidate — this is the part of
+ * the page that has to keep up with the game.
+ */
+export async function getLive(pk: number): Promise<LiveGame> {
+  const [play, line, prob] = await Promise.all([
+    mlb(`/game/${pk}/playByPlay?fields=${PLAY_FIELDS}`, 15),
+    mlb(`/game/${pk}/linescore`, 15),
+    /* Win probability is the one MLB can be missing on a young game. */
+    mlb(`/game/${pk}/winProbability?fields=${PROB_FIELDS}`, 15).catch(() => []),
+  ]);
+
+  const cur = play.currentPlay;
+  const thrown = ((cur?.playEvents ?? []) as any[]).filter((e) => e.isPitch);
+  /* Every pitch carries the zone as measured for this batter; the last one
+     measured is the one the plot is drawn to. */
+  const zone = thrown.at(-1)?.pitchData ?? {};
+  const offense = line.offense ?? {};
+  const defense = line.defense ?? {};
+  /*
+   * The line score is what is happening now; the play log keeps the at-bat
+   * that just ended as its current one until the next batter steps in. So the
+   * matchup is read off the line score — otherwise the panel pairs a batter
+   * with the on-deck hitter from the other club between innings — and the
+   * pitch sequence is shown only while the two agree on whose at-bat it is.
+   */
+  const batter = offense.batter ?? cur?.matchup?.batter;
+  const current = !!batter && cur?.matchup?.batter?.id === batter.id;
+
+  return {
+    atBat: batter
+      ? {
+          pitcher: livePerson(defense.pitcher ?? cur?.matchup?.pitcher),
+          hand: current ? (cur.matchup?.pitchHand?.code ?? "") : "",
+          batter: livePerson(batter),
+          side: current ? (cur.matchup?.batSide?.code ?? "") : "",
+          balls: line.balls ?? 0,
+          strikes: line.strikes ?? 0,
+          outs: line.outs ?? 0,
+          pitches: current ? thrown.map(livePitch) : [],
+          zoneTop: zone.strikeZoneTop ?? ZONE_TOP,
+          zoneBottom: zone.strikeZoneBottom ?? ZONE_BOTTOM,
+        }
+      : null,
+    onDeck: livePerson(offense.onDeck),
+    bases: [offense.first, offense.second, offense.third].map(livePerson),
+    plays: ((prob ?? []) as any[]).map(
+      (p): PlayProb => ({
+        inning: p.about?.inning ?? 0,
+        half: p.about?.halfInning ?? "",
+        description: p.result?.description ?? "",
+        awayScore: p.result?.awayScore ?? 0,
+        homeScore: p.result?.homeScore ?? 0,
+        homeProb: p.homeTeamWinProbability ?? 50,
+      })
+    ),
+  };
+}
+
+/* ── Hot and cold zones ─────────────────────────────────────────────── */
+
+/** One cell of the batter's season, as MLB grades it. Zones "01"–"09" are the
+ *  strike zone read left to right and top to bottom, "11"–"14" the four
+ *  quadrants outside it. */
+export interface HeatZone {
+  zone: string;
+  /** The average itself, ".312". */
+  value: string;
+  /** MLB's own grading: cold, cool, lukewarm, warm, hot. */
+  temp: string;
+}
+
+/**
+ * How a hitter has done by part of the zone this season — the shading behind
+ * the live pitch plot.
+ *
+ * MLB grades every cell itself against the rest of the league, so the plot
+ * takes its temperature rather than inventing a scale off thirteen numbers.
+ * A hitter with too few swings comes back empty and the plot simply has no
+ * shading; season-to-date figures move once a day, so this is cached for one
+ * hour rather than on the live game's beat.
+ */
+export async function getHotZones(id: number): Promise<HeatZone[]> {
+  const data = await mlb(
+    `/people/${id}/stats?stats=hotColdZones&group=hitting&fields=stats,splits,stat,name,zones,zone,value,temp`,
+    3600
+  ).catch(() => null);
+  const splits = data?.stats?.[0]?.splits ?? [];
+  const avg = (splits as any[]).find((s) => s.stat?.name === "battingAverage");
+  return ((avg?.stat?.zones ?? []) as any[]).map(
+    (z): HeatZone => ({ zone: z.zone, value: z.value, temp: z.temp })
+  );
+}
+
+/**
+ * The plays that put a run on the board — read off the running score rather
+ * than off MLB's own scoring-play list, which is a set of indexes into a
+ * payload this page never asks for.
+ */
+export function scoringPlays(plays: PlayProb[]): PlayProb[] {
+  return plays.filter((p, i) => {
+    const before = plays[i - 1];
+    return (
+      p.awayScore !== (before?.awayScore ?? 0) ||
+      p.homeScore !== (before?.homeScore ?? 0)
+    );
+  });
+}
+
+/** One half-inning of the play log, in the order it was played. */
+export interface HalfInning {
+  inning: number;
+  half: string;
+  /** Runs that crossed in this half — the score's own movement, either club. */
+  runs: number;
+  plays: PlayProb[];
+}
+
+/**
+ * The play log cut into half-innings, so a play-by-play reads the way a
+ * scorecard does rather than as one flat list of four hundred at-bats.
+ */
+export function halfInnings(plays: PlayProb[]): HalfInning[] {
+  const out: HalfInning[] = [];
+  plays.forEach((p, i) => {
+    let half = out.at(-1);
+    if (!half || half.inning !== p.inning || half.half !== p.half) {
+      half = { inning: p.inning, half: p.half, runs: 0, plays: [] };
+      out.push(half);
+    }
+    const before = plays[i - 1];
+    half.runs +=
+      p.awayScore - (before?.awayScore ?? 0) + (p.homeScore - (before?.homeScore ?? 0));
+    half.plays.push(p);
+  });
+  return out;
 }

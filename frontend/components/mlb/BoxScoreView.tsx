@@ -15,10 +15,13 @@ import SegmentedControl from "@/components/ui/SegmentedControl";
 import PlayerLink from "@/components/mlb/PlayerLink";
 
 /*
- * Full box score for one game: linescore plus each team's batting and
- * pitching lines. Both payloads are fetched server-side by /game/[pk] and
- * passed in whole; this is a client component only because the team toggle
- * and the local-timezone first-pitch label need the browser.
+ * The card at the top of a game page — who is playing, where it stands, and
+ * the line score — with whatever the page puts under it: the box score
+ * itself on a game that is over, a tab strip on one being played.
+ *
+ * Both payloads are fetched server-side by /game/[pk] and passed in whole;
+ * this is a client component only because the team toggle and the
+ * local-timezone status label need the browser.
  */
 
 /* Both lines run nine stat columns, so batting and pitching sit on the same
@@ -57,7 +60,14 @@ const isBad = (d: string) => /^\((L|BS)\b/.test(d);
 
 /* ── Linescore ───────────────────────────────────────────────────────── */
 
-function Linescore({ box, final }: { box: BoxScore; final: boolean }) {
+function Linescore({ box, game }: { box: BoxScore; game: Game }) {
+  const final = game.state === "Final";
+  /* The one cell being played — the inning, and which club is in it. Between
+     halves MLB says "Middle", and the club coming up to bat is the home one. */
+  const now = game.state === "Live" ? game.inning : null;
+  const nowSide = game.inningState?.toLowerCase().startsWith("top")
+    ? "away"
+    : "home";
   // Extra innings extend past the scheduled 9; a suspended game can fall short.
   const count = Math.max(box.scheduledInnings, box.innings.length);
   const nums = Array.from({ length: count }, (_, i) => i + 1);
@@ -78,7 +88,7 @@ function Linescore({ box, final }: { box: BoxScore; final: boolean }) {
               <th
                 key={n}
                 scope="col"
-                className="w-7 px-1 py-1.5 text-center text-[10px] text-ink-3 tabular-nums"
+                className="w-7 px-1 py-1.5 text-center text-[10px] tabular-nums text-ink-3"
               >
                 {n}
               </th>
@@ -106,14 +116,18 @@ function Linescore({ box, final }: { box: BoxScore; final: boolean }) {
               {nums.map((n) => {
                 const inn = box.innings.find((i) => i.num === n);
                 const runs = inn?.[side] ?? null;
+                const playing = n === now && side === nowSide;
                 // A home team that never had to bat gets an X, the scorecard
-                // convention — but only once the game is over; mid-game the
-                // half simply hasn't happened yet.
-                const blank = inn && final ? "X" : "";
+                // convention — but only once the game is over. A half not yet
+                // played gets a dash; the one under way gets nothing, since
+                // nobody has scored in it *yet*.
+                const blank = inn && final ? "X" : playing ? "" : "–";
                 return (
                   <td
                     key={n}
-                    className="px-1 py-1.5 text-center tabular-nums text-ink-2"
+                    className={`px-1 py-1.5 text-center tabular-nums ${
+                      playing ? "bg-surface-2 font-bold text-ink" : "text-ink-2"
+                    }`}
                   >
                     {runs ?? blank}
                   </td>
@@ -267,6 +281,45 @@ function TeamLines({ team }: { team: BoxTeam }) {
 
 /* ── Page shell ──────────────────────────────────────────────────────── */
 
+/** Both clubs' batting and pitching lines, one club at a time. Its own export
+ *  because on a live game it is a tab rather than the body of the card. */
+export function FullBox({ box }: { box: BoxScore }) {
+  const [side, setSide] = useState<"away" | "home">("away");
+  return (
+    <div className="space-y-2">
+      <SegmentedControl
+        ariaLabel="Team"
+        value={side}
+        onChange={setSide}
+        options={[
+          { value: "away" as const, label: box.away.abbr },
+          { value: "home" as const, label: box.home.abbr },
+        ]}
+      />
+      <TeamLines team={side === "away" ? box.away : box.home} />
+    </div>
+  );
+}
+
+/** A game with cards posted but no pitch thrown — the lines are all zeros, so
+ *  the two probables read better than a table of them. */
+export function NoBoxYet({ game }: { game: Game }) {
+  return (
+    <div className="border border-line px-3 py-6 text-center">
+      <p className="text-xs text-ink-3">NOT STARTED — NO BOX SCORE YET</p>
+      <p className="mt-2 text-[11px] text-ink-2">
+        <PlayerLink id={game.away.probable?.id}>
+          {game.away.probable?.name ?? "TBA"}
+        </PlayerLink>
+        <span className="mx-2 text-ink-3">vs</span>
+        <PlayerLink id={game.home.probable?.id}>
+          {game.home.probable?.name ?? "TBA"}
+        </PlayerLink>
+      </p>
+    </div>
+  );
+}
+
 function HeaderSide({ side }: { side: Game["away"] }) {
   return (
     <div className="flex min-w-0 items-center gap-2">
@@ -290,14 +343,14 @@ function HeaderSide({ side }: { side: Game["away"] }) {
 export default function BoxScoreView({
   game,
   box,
-  right,
+  children,
 }: {
   game: Game;
   box: BoxScore;
-  /** Header slot for the page's own chrome (the gameday ↗ link). */
-  right?: React.ReactNode;
+  /** What sits under the line score — the box score, or nothing on a game
+   *  whose sections the page puts behind its own tabs. */
+  children?: React.ReactNode;
 }) {
-  const [side, setSide] = useState<"away" | "home">("away");
   const st = gameStatus(game, useTimeZone());
   const tone =
     st.tone === "live" ? "text-good" : st.tone === "final" ? "text-ink-3" : "text-accent";
@@ -322,39 +375,12 @@ export default function BoxScoreView({
             <p className="hidden text-[10px] text-ink-3 sm:block">{game.venue}</p>
           )}
         </div>
-        {right}
       </div>
 
       {/* ── Body ──────────────────────────────────────────────── */}
       <div className="space-y-2 p-3">
-        <Linescore box={box} final={game.state === "Final"} />
-        {box.away.batters.length === 0 && box.home.batters.length === 0 ? (
-          <div className="border border-line px-3 py-6 text-center">
-            <p className="text-xs text-ink-3">NOT STARTED — NO BOX SCORE YET</p>
-            <p className="mt-2 text-[11px] text-ink-2">
-              <PlayerLink id={game.away.probable?.id}>
-                {game.away.probable?.name ?? "TBA"}
-              </PlayerLink>
-              <span className="mx-2 text-ink-3">vs</span>
-              <PlayerLink id={game.home.probable?.id}>
-                {game.home.probable?.name ?? "TBA"}
-              </PlayerLink>
-            </p>
-          </div>
-        ) : (
-          <>
-            <SegmentedControl
-              ariaLabel="Team"
-              value={side}
-              onChange={setSide}
-              options={[
-                { value: "away" as const, label: box.away.abbr },
-                { value: "home" as const, label: box.home.abbr },
-              ]}
-            />
-            <TeamLines team={side === "away" ? box.away : box.home} />
-          </>
-        )}
+        <Linescore box={box} game={game} />
+        {children}
       </div>
     </div>
   );
