@@ -12,8 +12,15 @@ import assert from "node:assert/strict";
 import {
   clinchMark,
   clinchPhase,
+  firstPitch,
   gameStatus,
   gamesBack,
+  headToHead,
+  inProgress,
+  notStarted,
+  scoringPlays,
+  seriesGames,
+  winProbability,
   breakIndex,
   latestByGame,
   leaderBoard,
@@ -27,6 +34,7 @@ import {
   type Game,
   type PlayerStatRow,
   type StandingRow,
+  type PlayProb,
   type Transaction,
   type TeamStatRow,
 } from "./mlb";
@@ -108,10 +116,119 @@ assert.equal(gameStatus(preview).tone, "pre");
 const live = { ...preview, state: "Live", inning: 7, inningState: "Top" } as Game;
 assert.equal(gameStatus(live, "Asia/Tokyo").text, "TOP 7", "zone is irrelevant once it starts");
 assert.equal(
+  gameStatus({ ...live, state: "Preview", inning: 1, detailedState: "Warmup" } as Game).text,
+  "WARMUP",
+  "warmup beats the Top 1 linescore it already carries"
+);
+assert.equal(
   gameStatus({ ...preview, state: "Final", inning: 10 } as Game).text,
   "SCHEDULED/10",
   "extra innings ride along with the final state"
 );
+assert.equal(
+  firstPitch(preview.startTime, "America/Los_Angeles"),
+  "7:40 PM PDT · MON, AUG 24, 2026",
+  "a first pitch carries the day it falls on in the reader's own zone"
+);
+
+/*
+ * What counts as not started yet. Warmup is the awkward one: MLB calls it Live
+ * and hands it a first-inning linescore, but no pitch has been thrown.
+ */
+assert.equal(notStarted(preview), true);
+assert.equal(notStarted({ ...live, detailedState: "Warmup" } as Game), true);
+assert.equal(notStarted(live), false);
+assert.equal(notStarted({ ...preview, state: "Final" } as Game), false);
+assert.equal(inProgress({ ...live, detailedState: "In Progress" } as Game), true);
+assert.equal(inProgress({ ...live, detailedState: "Warmup" } as Game), false);
+assert.equal(inProgress(preview), false);
+
+/*
+ * Which plays put a run up. MLB's own scoring-play list is a set of indexes
+ * into a payload the page never asks for, so it is read off the running score
+ * instead — including the very first play of a game, which has nothing before
+ * it to compare against.
+ */
+const play = (awayScore: number, homeScore: number, description = "x") =>
+  ({ inning: 1, half: "top", description, awayScore, homeScore, homeProb: 50 }) as PlayProb;
+
+assert.deepEqual(
+  scoringPlays([play(0, 0), play(1, 0), play(1, 0), play(1, 2)]).map((p) => [
+    p.awayScore,
+    p.homeScore,
+  ]),
+  [
+    [1, 0],
+    [1, 2],
+  ],
+  "only the plays where the score moved"
+);
+assert.equal(
+  scoringPlays([play(3, 0)]).length,
+  1,
+  "a game whose first logged play already scored still reports it"
+);
+assert.deepEqual(scoringPlays([play(0, 0)]), [], "0-0 is not a scoring play");
+assert.deepEqual(scoringPlays([]), []);
+
+/*
+ * Pre-game win probability. Log5 over two records, tilted for home field — so
+ * two identical clubs are not 50/50, the home one is favoured, and the two
+ * sides always add up to the whole.
+ */
+const record = (wins: number, losses: number) => ({ wins, losses }) as Game["home"];
+const odds = (h: [number, number], a: [number, number]) =>
+  winProbability({ home: record(...h), away: record(...a) } as Game);
+
+const even = odds([70, 70], [70, 70])!;
+assert.ok(even.home > even.away, "home field breaks a tie between equal clubs");
+assert.equal(even.home.toFixed(3), "0.535", "and is worth about .535");
+assert.equal((even.home + even.away).toFixed(6), "1.000000", "the two sides are the whole");
+
+const strong = odds([100, 40], [40, 100])!;
+assert.equal(strong.home.toFixed(2), "0.88", "a far better club at home is a heavy favourite");
+assert.ok(odds([60, 80], [90, 50])!.away > 0.5, "a good enough road club still leads");
+assert.equal(odds([0, 0], [0, 0]), null, "no record, no number");
+
+/*
+ * The season series out of one club's schedule, and the run of games that
+ * makes up the series being played — consecutive days, doubleheaders included,
+ * with the rest of the season's meetings left out of it.
+ */
+const meet = (pk: number, day: string) =>
+  ({
+    pk,
+    startTime: `2026-0${day}T23:10:00Z`,
+    state: "Final",
+    away: { id: 121 },
+    home: { id: 139 },
+  }) as Game;
+
+const schedule = [
+  meet(1, "5-04"),
+  /* A game against somebody else, in the middle of the season series. */
+  { ...meet(2, "6-11"), home: { id: 147 } } as Game,
+  meet(3, "8-30"),
+  meet(4, "8-31"),
+  meet(5, "9-01"),
+];
+
+assert.deepEqual(
+  headToHead(schedule, 139).map((g) => g.pk),
+  [1, 3, 4, 5],
+  "only the games against that club, oldest first"
+);
+assert.deepEqual(
+  seriesGames(headToHead(schedule, 139), 4).map((g) => g.pk),
+  [3, 4, 5],
+  "the series is the run of consecutive days around the game"
+);
+assert.deepEqual(
+  seriesGames(headToHead(schedule, 139), 1).map((g) => g.pk),
+  [1],
+  "a one-game series stands alone"
+);
+assert.deepEqual(seriesGames(schedule, 99), [], "an unknown game has no series");
 
 /*
  * Team stat ranks, the other figure the pages derive rather than read: MLB
@@ -377,6 +494,9 @@ assert.deepEqual(
 console.log("clinchMark ok");
 console.log("gamesBack ok");
 console.log("gameStatus ok");
+console.log("winProbability ok");
+console.log("seriesGames ok");
+console.log("scoringPlays ok");
 console.log("latestByGame ok");
 console.log("runningRecords ok");
 console.log("breakIndex ok");

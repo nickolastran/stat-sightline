@@ -112,10 +112,6 @@ export default function ScoreboardBar() {
 
         <DatePicker value={date} today={today} onSelect={setDate} />
 
-        <span className="shrink-0 text-[10px] text-ink-3">
-          {loading ? "…" : `${sorted.length} GAMES`}
-        </span>
-
         <div className="ml-auto flex items-center gap-px">
           <ArrowButton
             label="Scroll to earlier games"

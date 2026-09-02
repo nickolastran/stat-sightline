@@ -290,14 +290,24 @@ function HeaderSide({ side }: { side: Game["away"] }) {
 export default function BoxScoreView({
   game,
   box,
+  pregame,
+  live,
   right,
 }: {
   game: Game;
   box: BoxScore;
+  /** A game the page follows with its own pre-game view — the lines here are
+   *  a table of zeros until first pitch, and that view reads them properly. */
+  pregame?: boolean;
+  /** The live panels, which belong under the line score rather than under the
+   *  batting lines: the at-bat under way is what a reader came for. */
+  live?: React.ReactNode;
   /** Header slot for the page's own chrome (the gameday ↗ link). */
   right?: React.ReactNode;
 }) {
   const [side, setSide] = useState<"away" | "home">("away");
+  const noLines =
+    box.away.batters.length === 0 && box.home.batters.length === 0;
   const st = gameStatus(game, useTimeZone());
   const tone =
     st.tone === "live" ? "text-good" : st.tone === "final" ? "text-ink-3" : "text-accent";
@@ -328,7 +338,10 @@ export default function BoxScoreView({
       {/* ── Body ──────────────────────────────────────────────── */}
       <div className="space-y-2 p-3">
         <Linescore box={box} final={game.state === "Final"} />
-        {box.away.batters.length === 0 && box.home.batters.length === 0 ? (
+        {live}
+        {/* Nothing but zeros before a pitch is thrown, even once the clubs
+            have posted their cards — the pre-game view below reads those. */}
+        {pregame ? null : noLines ? (
           <div className="border border-line px-3 py-6 text-center">
             <p className="text-xs text-ink-3">NOT STARTED — NO BOX SCORE YET</p>
             <p className="mt-2 text-[11px] text-ink-2">

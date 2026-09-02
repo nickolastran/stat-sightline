@@ -2,7 +2,9 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import BoxScoreView from "@/components/mlb/BoxScoreView";
 import GameFeedLink from "@/components/mlb/GameFeedLink";
-import { getBoxScore, getGame } from "@/lib/mlb";
+import LiveGame from "@/components/mlb/LiveGame";
+import Pregame from "@/components/mlb/Pregame";
+import { getBoxScore, getGame, inProgress, notStarted } from "@/lib/mlb";
 
 /*
  * One game's box score as its own page — the target of every card in the
@@ -56,6 +58,8 @@ export default async function GamePage({
       <BoxScoreView
         game={game}
         box={box}
+        pregame={notStarted(game)}
+        live={inProgress(game) ? <LiveGame game={game} box={box} /> : undefined}
         right={
           <GameFeedLink
             pk={game.pk}
@@ -64,6 +68,7 @@ export default async function GamePage({
           />
         }
       />
+      {notStarted(game) && <Pregame game={game} />}
     </div>
   );
 }
