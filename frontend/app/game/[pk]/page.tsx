@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import { notFound } from "next/navigation";
 import AutoRefresh from "@/components/mlb/AutoRefresh";
+import GameSkeleton from "@/components/mlb/GameSkeleton";
 import BoxScoreView, { FullBox, NoBoxYet } from "@/components/mlb/BoxScoreView";
 import LiveGame, {
   PlayByPlay,
@@ -16,6 +18,8 @@ import {
   getLive,
   inProgress,
   notStarted,
+  type BoxScore,
+  type Game,
 } from "@/lib/mlb";
 
 /* A game being played is three views over one payload, one at a time. */
@@ -30,6 +34,61 @@ const LOGS = [
   { value: "all", label: "ALL PLAYS" },
   { value: "scoring", label: "SCORING PLAYS" },
 ];
+
+/* Only the gamecast earns the wide page — its three columns need it. The box
+   score and the play log are the width they always were. */
+const NARROW = "mx-auto max-w-5xl space-y-2";
+
+/**
+ * Whichever view the tabs are on. It owns the live feed rather than the page,
+ * so the header and the tab strip render as soon as the schedule row lands and
+ * only this streams in behind its own skeleton.
+ */
+async function GamePane({
+  game,
+  box,
+  tab,
+  log,
+}: {
+  game: Game;
+  box: BoxScore;
+  tab: string;
+  log: string;
+}) {
+  const live = await getLive(game.pk).catch(() => null);
+  const plays = live?.plays ?? [];
+
+  if (tab === "gamecast")
+    return <LiveGame game={game} box={box} live={live} />;
+
+  return (
+    <div className={NARROW}>
+      {/* The gamecast carries the matchup in its own panel; the other two get
+          it as a strip so the game is still readable. */}
+      <Situation box={box} live={live} />
+      {tab === "box" ? (
+        <>
+          <FullBox box={box} />
+          <ScoringSummary plays={plays} />
+        </>
+      ) : (
+        <PlayByPlay
+          game={game}
+          plays={plays}
+          scoringOnly={log === "scoring"}
+          tabs={
+            <ParamTabs
+              param="log"
+              value={log}
+              options={LOGS}
+              ariaLabel="Which plays"
+            />
+          }
+        />
+      )}
+    </div>
+  );
+}
 
 /*
  * One game's box score as its own page — the target of every card in the
@@ -80,24 +139,16 @@ export default async function GamePage({
   }
   if (!game) notFound();
 
-  /* Every tab of a live game reads one feed, so it is pulled once here rather
-     than by each of them — and a dead feed still leaves the box score. */
   const playing = inProgress(game);
-  const live = playing ? await getLive(game.pk).catch(() => null) : null;
-  const plays = live?.plays ?? [];
   const sp = await searchParams;
   const tab = TABS.some((t) => t.value === sp.tab) ? sp.tab! : "gamecast";
   const log = sp.log === "scoring" ? "scoring" : "all";
   const noLines =
     box.away.batters.length === 0 && box.home.batters.length === 0;
 
-  /* Only the gamecast earns the wide page — its three columns need it. The
-     box score and the play log are the width they always were. */
-  const narrow = "mx-auto max-w-5xl space-y-2";
-
   return (
     <div className="mx-auto max-w-[96rem] space-y-2 p-3">
-      <div className={narrow}>
+      <div className={NARROW}>
         <BoxScoreView game={game} box={box}>
           {/* A game under way puts its box behind the tabs below; one that is
             over or has not started reads straight off the card. */}
@@ -117,7 +168,7 @@ export default async function GamePage({
       {playing && (
         <>
           <AutoRefresh seconds={REFRESH_SECONDS} />
-          <div className={tab === "gamecast" ? "" : narrow}>
+          <div className={tab === "gamecast" ? "" : NARROW}>
             <ParamTabs
               param="tab"
               value={tab}
@@ -133,43 +184,18 @@ export default async function GamePage({
         </>
       )}
 
-      {/* Keyed on the tab so the pane remounts and its entrance replays. */}
+      {/* Keyed on the tab so switching re-suspends into that view's own
+          skeleton rather than holding the last one, and its entrance replays. */}
       {playing && (
         <div key={tab} className="pane">
-          {tab === "gamecast" ? (
-            <LiveGame game={game} box={box} live={live} />
-          ) : (
-            <div className={narrow}>
-              {/* The gamecast carries the matchup in its own panel; the other
-                two get it as a strip so the game is still readable. */}
-              <Situation box={box} live={live} />
-              {tab === "box" ? (
-                <>
-                  <FullBox box={box} />
-                  <ScoringSummary plays={plays} />
-                </>
-              ) : (
-                <PlayByPlay
-                  game={game}
-                  plays={plays}
-                  scoringOnly={log === "scoring"}
-                  tabs={
-                    <ParamTabs
-                      param="log"
-                      value={log}
-                      options={LOGS}
-                      ariaLabel="Which plays"
-                    />
-                  }
-                />
-              )}
-            </div>
-          )}
+          <Suspense fallback={<GameSkeleton tab={tab} />}>
+            <GamePane game={game} box={box} tab={tab} log={log} />
+          </Suspense>
         </div>
       )}
 
       {notStarted(game) && (
-        <div className={narrow}>
+        <div className={NARROW}>
           <Pregame game={game} />
         </div>
       )}
