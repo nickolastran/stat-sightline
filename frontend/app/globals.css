@@ -82,6 +82,27 @@ body {
   }
 }
 
+/* One view swapping for another under a tab strip. Keyed on the tab, so React
+   remounts the pane and the browser replays this from the top — no state, no
+   library, and nothing to unwind if the reader clicks through three tabs in a
+   second. */
+@keyframes pane-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+.pane {
+  animation: pane-in 180ms ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pane {
+    animation: none;
+  }
+}
+
 ::selection {
   background: var(--color-accent);
   color: #ffffff;

@@ -10,7 +10,13 @@ import LiveGame, {
 } from "@/components/mlb/LiveGame";
 import ParamTabs from "@/components/mlb/ParamTabs";
 import Pregame from "@/components/mlb/Pregame";
-import { getBoxScore, getGame, getLive, inProgress, notStarted } from "@/lib/mlb";
+import {
+  getBoxScore,
+  getGame,
+  getLive,
+  inProgress,
+  notStarted,
+} from "@/lib/mlb";
 
 /* A game being played is three views over one payload, one at a time. */
 const TABS = [
@@ -82,7 +88,8 @@ export default async function GamePage({
   const sp = await searchParams;
   const tab = TABS.some((t) => t.value === sp.tab) ? sp.tab! : "gamecast";
   const log = sp.log === "scoring" ? "scoring" : "all";
-  const noLines = box.away.batters.length === 0 && box.home.batters.length === 0;
+  const noLines =
+    box.away.batters.length === 0 && box.home.batters.length === 0;
 
   /* Only the gamecast earns the wide page — its three columns need it. The
      box score and the play log are the width they always were. */
@@ -92,13 +99,13 @@ export default async function GamePage({
     <div className="mx-auto max-w-[96rem] space-y-2 p-3">
       <div className={narrow}>
         <BoxScoreView game={game} box={box}>
-        {/* A game under way puts its box behind the tabs below; one that is
+          {/* A game under way puts its box behind the tabs below; one that is
             over or has not started reads straight off the card. */}
-        {playing || notStarted(game) ? null : noLines ? (
-          <NoBoxYet game={game} />
-        ) : (
-          <FullBox box={box} />
-        )}
+          {playing || notStarted(game) ? null : noLines ? (
+            <NoBoxYet game={game} />
+          ) : (
+            <FullBox box={box} />
+          )}
         </BoxScoreView>
       </div>
 
@@ -126,36 +133,40 @@ export default async function GamePage({
         </>
       )}
 
-      {playing &&
-        (tab === "gamecast" ? (
-          <LiveGame game={game} box={box} live={live} />
-        ) : (
-          <div className={narrow}>
-            {/* The gamecast carries the matchup in its own panel; the other
+      {/* Keyed on the tab so the pane remounts and its entrance replays. */}
+      {playing && (
+        <div key={tab} className="pane">
+          {tab === "gamecast" ? (
+            <LiveGame game={game} box={box} live={live} />
+          ) : (
+            <div className={narrow}>
+              {/* The gamecast carries the matchup in its own panel; the other
                 two get it as a strip so the game is still readable. */}
-            <Situation box={box} live={live} />
-            {tab === "box" ? (
-              <>
-                <FullBox box={box} />
-                <ScoringSummary plays={plays} />
-              </>
-            ) : (
-              <PlayByPlay
-                game={game}
-                plays={plays}
-                scoringOnly={log === "scoring"}
-                tabs={
-                  <ParamTabs
-                    param="log"
-                    value={log}
-                    options={LOGS}
-                    ariaLabel="Which plays"
-                  />
-                }
-              />
-            )}
-          </div>
-        ))}
+              <Situation box={box} live={live} />
+              {tab === "box" ? (
+                <>
+                  <FullBox box={box} />
+                  <ScoringSummary plays={plays} />
+                </>
+              ) : (
+                <PlayByPlay
+                  game={game}
+                  plays={plays}
+                  scoringOnly={log === "scoring"}
+                  tabs={
+                    <ParamTabs
+                      param="log"
+                      value={log}
+                      options={LOGS}
+                      ariaLabel="Which plays"
+                    />
+                  }
+                />
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       {notStarted(game) && (
         <div className={narrow}>
