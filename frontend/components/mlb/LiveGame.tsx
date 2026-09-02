@@ -1,5 +1,6 @@
 import Link from "next/link";
 import DivisionTable from "@/components/mlb/DivisionTable";
+import { MiniBox } from "@/components/mlb/BoxScoreView";
 import Panel from "@/components/ui/Panel";
 import WinProbChart from "@/components/mlb/WinProbChart";
 import PlayerLink from "@/components/mlb/PlayerLink";
@@ -701,6 +702,7 @@ export default async function LiveGame({
        three stack, each at the full width of the page. */
     <div className="grid grid-cols-1 gap-2 min-[1440px]:grid-cols-[28rem_minmax(0,1fr)_28rem]">
       <div className="space-y-2">
+        <MiniBox box={box} pk={game.pk} />
         <Panel title="TEAM TOTALS">
           <TeamTotals box={box} />
         </Panel>

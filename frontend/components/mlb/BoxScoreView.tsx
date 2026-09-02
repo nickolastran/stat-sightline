@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import { useTimeZone } from "@/lib/useTimeZone";
 import {
@@ -11,8 +12,10 @@ import {
   type BoxTeam,
   type Game,
 } from "@/lib/mlb";
+import Panel from "@/components/ui/Panel";
 import SegmentedControl from "@/components/ui/SegmentedControl";
 import PlayerLink from "@/components/mlb/PlayerLink";
+import { shortName } from "@/components/mlb/LineupCard";
 
 /*
  * The card at the top of a game page — who is playing, where it stands, and
@@ -48,6 +51,22 @@ const pitCells = (p: BoxPitcher) => [
   p.k,
   p.bb,
   p.hr,
+  `${p.pitches}-${p.strikes}`,
+  p.era,
+];
+
+/* The rail can't hold nine columns, so the mini box keeps the ones a glance
+   is actually asking for. */
+const BAT_MINI = ["H-AB", "R", "HR", "RBI", "AVG"] as const;
+const PIT_MINI = ["IP", "H", "ER", "BB", "K", "P-S", "ERA"] as const;
+
+const batMiniCells = (b: BoxBatter) => [`${b.h}-${b.ab}`, b.r, b.hr, b.rbi, b.avg];
+const pitMiniCells = (p: BoxPitcher) => [
+  p.ip,
+  p.h,
+  p.er,
+  p.bb,
+  p.k,
   `${p.pitches}-${p.strikes}`,
   p.era,
 ];
@@ -157,20 +176,31 @@ function StatTable({
   caption,
   columns,
   rows,
+  compact,
 }: {
   caption: string;
   columns: readonly string[];
   rows: { key: number; label: React.ReactNode; cells: (string | number)[] }[];
+  /** Narrower columns and no floor on the table width — the mini box lives in
+   *  a 28rem rail and can't ask for the full nine. */
+  compact?: boolean;
 }) {
+  /* Short names leave the stat columns swimming; the rail reads better with
+     them pulled in tight. */
+  const stat = compact ? "px-1" : "px-2";
   return (
     <div className="overflow-x-auto border border-line">
       {/* Fixed layout with one width for every stat column: the numbers land in
           the same place in both tables and don't shift as content changes. */}
-      <table className="w-full min-w-[44rem] table-fixed border-collapse text-xs">
+      <table
+        className={`w-full table-fixed border-collapse text-xs ${
+          compact ? "" : "min-w-[44rem]"
+        }`}
+      >
         <colgroup>
           <col />
           {columns.map((c) => (
-            <col key={c} className="w-14" />
+            <col key={c} className={compact ? "w-10" : "w-14"} />
           ))}
         </colgroup>
         <caption className="border-b border-line px-2 py-1.5 text-left text-[10px] tracking-[0.25em] text-ink-3">
@@ -185,7 +215,7 @@ function StatTable({
               <th
                 key={c}
                 scope="col"
-                className="px-2 py-1 text-right text-[10px] tracking-widest text-ink-3"
+                className={`${stat} py-1 text-right text-[10px] tracking-widest text-ink-3`}
               >
                 {c}
               </th>
@@ -212,7 +242,7 @@ function StatTable({
               {r.cells.map((c, i) => (
                 <td
                   key={i}
-                  className="px-2 py-1 text-right tabular-nums whitespace-nowrap text-ink-2"
+                  className={`${stat} py-1 text-right tabular-nums whitespace-nowrap text-ink-2`}
                 >
                   {c}
                 </td>
@@ -225,12 +255,13 @@ function StatTable({
   );
 }
 
-function TeamLines({ team }: { team: BoxTeam }) {
+function TeamLines({ team, compact }: { team: BoxTeam; compact?: boolean }) {
   return (
     <div className="space-y-2">
       <StatTable
+        compact={compact}
         caption={`${team.abbr} BATTING`}
-        columns={BAT_COLS}
+        columns={compact ? BAT_MINI : BAT_COLS}
         rows={team.batters.map((b) => ({
           key: b.id,
           label: (
@@ -244,21 +275,26 @@ function TeamLines({ team }: { team: BoxTeam }) {
                   {b.order}
                 </span>
               )}
-              <PlayerLink id={b.id}>{b.name}</PlayerLink>
+              <PlayerLink id={b.id} headshot={!compact}>
+                {compact ? shortName(b.name) : b.name}
+              </PlayerLink>
               <span className="ml-1.5 text-[10px] text-ink-3">{b.pos}</span>
             </span>
           ),
-          cells: batCells(b),
+          cells: compact ? batMiniCells(b) : batCells(b),
         }))}
       />
       <StatTable
+        compact={compact}
         caption={`${team.abbr} PITCHING`}
-        columns={PIT_COLS}
+        columns={compact ? PIT_MINI : PIT_COLS}
         rows={team.pitchers.map((p) => ({
           key: p.id,
           label: (
             <span>
-              <PlayerLink id={p.id}>{p.name}</PlayerLink>
+              <PlayerLink id={p.id} headshot={!compact}>
+                {compact ? shortName(p.name) : p.name}
+              </PlayerLink>
               {p.decision &&
                 decisions(p.decision).map((d) => (
                   <span
@@ -272,7 +308,7 @@ function TeamLines({ team }: { team: BoxTeam }) {
                 ))}
             </span>
           ),
-          cells: pitCells(p),
+          cells: compact ? pitMiniCells(p) : pitCells(p),
         }))}
       />
     </div>
@@ -298,6 +334,36 @@ export function FullBox({ box }: { box: BoxScore }) {
       />
       <TeamLines team={side === "away" ? box.away : box.home} />
     </div>
+  );
+}
+
+/** The gamecast's own box score: the same lines, in the columns a 28rem rail
+ *  can hold, with the way through to the full one under them. */
+export function MiniBox({ box, pk }: { box: BoxScore; pk: number }) {
+  const [side, setSide] = useState<"away" | "home">("away");
+  return (
+    <Panel
+      title="BOX SCORE"
+      right={
+        <SegmentedControl
+          ariaLabel="Team"
+          value={side}
+          onChange={setSide}
+          options={[
+            { value: "away" as const, label: box.away.abbr },
+            { value: "home" as const, label: box.home.abbr },
+          ]}
+        />
+      }
+    >
+      <TeamLines team={side === "away" ? box.away : box.home} compact />
+      <Link
+        href={`/game/${pk}?tab=box`}
+        className="mt-2 block border border-line px-2 py-1.5 text-center text-[10px] tracking-[0.2em] text-ink-3 hover:border-accent hover:text-ink"
+      >
+        FULL BOX SCORE
+      </Link>
+    </Panel>
   );
 }
 
