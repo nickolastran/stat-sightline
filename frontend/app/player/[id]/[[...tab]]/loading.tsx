@@ -1,6 +1,7 @@
-import { Skeleton, SkeletonPanel, SkeletonTable } from "@/components/ui/Skeleton";
+import { Skeleton, SkeletonPanel, SkeletonTiles } from "@/components/ui/Skeleton";
 
-/* Instant shell for a player page: identity strip, then the stat groups. */
+/* Instant shell for a player page: identity strip, tab strip, then the
+   section — tiles and panels, which is what the overview opens on. */
 export default function PlayerLoading() {
   return (
     <div className="mx-auto max-w-7xl space-y-3 p-3">
@@ -12,9 +13,15 @@ export default function PlayerLoading() {
           <Skeleton className="h-2.5 w-72" delay={0.14} />
         </div>
       </div>
+      <div className="flex flex-wrap gap-2 border border-line bg-surface p-1">
+        {[0, 1, 2, 3, 4].map((i) => (
+          <Skeleton key={i} className="h-6 w-20" delay={i * 0.05} />
+        ))}
+      </div>
+      <SkeletonTiles />
       {[0, 1].map((i) => (
         <SkeletonPanel key={i} delay={i * 0.1} right>
-          <SkeletonTable rows={3} heading={false} delay={i * 0.1 + 0.05} />
+          <Skeleton className="h-40 w-full" delay={i * 0.1 + 0.05} />
         </SkeletonPanel>
       ))}
     </div>
