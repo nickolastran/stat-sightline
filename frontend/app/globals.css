@@ -21,9 +21,8 @@
   --color-crit: #d03b3b;
   --color-warn: #d99a2b; /* status — between good and crit, never a series */
 
-  --font-mono:
-    ui-monospace, "SFMono-Regular", "Cascadia Mono", "JetBrains Mono", Menlo,
-    Consolas, monospace;
+  --font-sans:
+    "Helvetica Neue", "HelveticaNeue", Helvetica, Arial, sans-serif;
 
   /* Kill every radius utility: sharp corners only. */
   --radius-*: initial;
@@ -53,8 +52,10 @@
 body {
   background: var(--color-bg);
   color: var(--color-ink);
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
   font-size: 14px;
+  /* Stats app: keep numeric columns from jittering now that the face isn't mono. */
+  font-variant-numeric: tabular-nums;
 }
 
 /* One fade for every token-driven colour, everywhere: flipping data-theme
