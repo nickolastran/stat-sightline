@@ -88,10 +88,16 @@ export async function getProjections(
   return res.json();
 }
 
-export async function searchPitchers(q = "", limit = 25): Promise<Pitcher[]> {
+/** `revalidate` seconds turns the lookup into a cached read — for the fixed
+ *  seed lists that don't need to be fresh, unlike the live typeahead. */
+export async function searchPitchers(
+  q = "",
+  limit = 25,
+  revalidate?: number
+): Promise<Pitcher[]> {
   const params = new URLSearchParams({ q, limit: String(limit) });
   const res = await fetch(`${API_URL}/api/pitchers?${params}`, {
-    cache: "no-store",
+    ...(revalidate ? { next: { revalidate } } : { cache: "no-store" as const }),
   });
   if (!res.ok) throw new Error(`searchPitchers failed: ${res.status}`);
   return res.json();
