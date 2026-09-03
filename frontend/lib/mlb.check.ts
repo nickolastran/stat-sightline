@@ -28,6 +28,7 @@ import {
   latestByGame,
   leaderBoard,
   mergeFielding,
+  sumStatLines,
   runningRecords,
   teamHref,
   teamIdOf,
@@ -603,3 +604,37 @@ assert.equal(boardDir([42]), "desc", "one row has no direction to read");
 assert.equal(boardDir([]), "desc", "nor does none");
 assert.equal(boardDir(["121.2", "118.0"]), "desc", "innings compare as the numbers they print as");
 console.log("boardDir ok");
+
+/* ── sumStatLines ───────────────────────────────────────────────────── */
+/*
+ * The running line down a game log and the total under a month are the same
+ * sum, and every way of getting it wrong is a number that looks plausible:
+ * a mean of daily averages, an ERA off decimal innings, an OPS added from two
+ * rounded rates.
+ */
+
+const batLine = (
+  ab: number, h: number, tb: number, bb: number, hbp = 0, sf = 0
+) => ({ atBats: ab, hits: h, totalBases: tb, baseOnBalls: bb, hitByPitch: hbp, sacFlies: sf, avg: ".000" });
+
+const batted = sumStatLines("hitting", [batLine(4, 2, 5, 1), batLine(4, 0, 0, 0), batLine(2, 1, 1, 1, 1, 1)]);
+assert.equal(batted.atBats, 10);
+assert.equal(batted.hits, 3);
+assert.equal(batted.avg, ".300", "average is the summed hits over the summed at-bats");
+assert.equal(batted.slg, ".600", "6 total bases in 10 at-bats");
+assert.equal(batted.obp, ".429", "walks, hit-by-pitch and sac flies all count in on-base: 6 of 14");
+assert.equal(batted.ops, "1.029", "OPS is on-base plus slugging, worked out once from the totals");
+
+const armLine = (ip: string, er: number, h: number, bb: number, k: number, ab: number) =>
+  ({ inningsPitched: ip, earnedRuns: er, hits: h, baseOnBalls: bb, strikeOuts: k, atBats: ab, era: "0.00" });
+
+const pitched = sumStatLines("pitching", [armLine("6.2", 2, 5, 1, 8, 24), armLine("5.1", 1, 3, 2, 6, 19)]);
+assert.equal(pitched.inningsPitched, "12.0", "innings add as thirds: 6.2 + 5.1 is 12.0, not 11.3");
+assert.equal(pitched.era, "2.25", "three earned runs over twelve innings");
+assert.equal(pitched.whip, "0.92", "walks plus hits per inning, off the summed outs");
+assert.equal(pitched.avg, ".186", "opponent average is hits over batters retired at the plate");
+assert.equal(pitched.strikeoutsPer9Inn, "10.50");
+
+assert.equal(sumStatLines("hitting", []).avg, null, "no at-bats is no average, not .000");
+assert.equal(sumStatLines("pitching", []).era, null, "and no innings is no ERA");
+console.log("sumStatLines ok");

@@ -1,6 +1,13 @@
 import { Fragment } from "react";
 import Link from "next/link";
 import Panel from "@/components/ui/Panel";
+import {
+  Table,
+  Row,
+  Empty,
+  SectionHead,
+  headAlign,
+} from "@/components/ui/StatTable";
 import PlayerLink from "@/components/mlb/PlayerLink";
 import TeamLink from "@/components/mlb/TeamLink";
 import {
@@ -24,84 +31,6 @@ import {
  * All four are one payload rendered as a table, so they share this file and
  * the same scrolling frame rather than each inventing its own chrome.
  */
-
-/** The frame every table here sits in — sticky head, scrolls on its own. */
-function Table({
-  head,
-  children,
-  maxHeight = "36rem",
-  align,
-  widths,
-}: {
-  /** Column labels; anything after the first is right-aligned. Empty for a
-      table that heads its own sections and would only repeat itself. */
-  head: string[];
-  children: React.ReactNode;
-  maxHeight?: string;
-  /** One of "l"/"c"/"r" per column, where the default doesn't suit. */
-  align?: string;
-  /** Fixed column widths — for a section split over several tables, which
-      otherwise size their columns to their own longest name and wander. */
-  widths?: string[];
-}) {
-  return (
-    <div
-      className="overflow-auto border border-line"
-      style={{ maxHeight }}
-    >
-      <table
-        className={`w-full border-collapse text-xs ${widths ? "table-fixed" : ""}`}
-      >
-        {widths && (
-          <colgroup>
-            {widths.map((w, i) => (
-              <col key={i} style={{ width: w }} />
-            ))}
-          </colgroup>
-        )}
-        {head.length > 0 && (
-          <thead>
-            <tr>
-              {head.map((h, i) => (
-                <th
-                  key={h + i}
-                  scope="col"
-                  className={`sticky top-0 z-10 border-b border-line bg-surface px-3 py-2 text-[10px] font-normal tracking-widest text-ink-3 ${
-                    headAlign(align, i)
-                  }`}
-                >
-                  {h}
-                </th>
-              ))}
-            </tr>
-          </thead>
-        )}
-        <tbody>{children}</tbody>
-      </table>
-    </div>
-  );
-}
-
-/** Where a head cell sits: the mask if it names this column, else the default. */
-const headAlign = (align: string | undefined, i: number) =>
-  ({ l: "text-left", c: "text-center", r: "text-right" })[align?.[i] ?? ""] ??
-  (i === 0 ? "text-left" : "text-right");
-
-const Row = ({ children }: { children: React.ReactNode }) => (
-  <tr className="border-b border-grid text-ink-2 last:border-b-0 hover:bg-surface-2">
-    {children}
-  </tr>
-);
-
-function Empty({ what, cols }: { what: string; cols: number }) {
-  return (
-    <tr>
-      <td colSpan={cols} className="px-3 py-6 text-center text-xs text-ink-3">
-        {what}
-      </td>
-    </tr>
-  );
-}
 
 /* ── Schedule ───────────────────────────────────────────────────────── */
 
@@ -313,34 +242,6 @@ export function SchedulePanel({
    page prints them: fourteen rate columns are unreadable if the reader has to
    scroll back up to remember which is which. The block headings carry the
    page's only black text, so the eye finds the sections before the numbers. */
-function SectionHead({
-  label,
-  columns,
-}: {
-  label: string;
-  columns: TeamStatCol[];
-}) {
-  return (
-    <tr className="border-y border-line bg-surface">
-      <th
-        scope="colgroup"
-        className="px-3 py-2 text-left text-[10px] tracking-widest text-ink"
-      >
-        {label}
-      </th>
-      {columns.map((c) => (
-        <th
-          key={c.key}
-          scope="col"
-          title={c.title}
-          className="px-3 py-2 text-right text-[10px] font-normal tracking-widest text-ink"
-        >
-          {c.label}
-        </th>
-      ))}
-    </tr>
-  );
-}
 
 /* One group at a time, whole: the tables run to a couple hundred rows between
    them, and a page that scrolls beats two boxes that scroll inside it. */
@@ -348,12 +249,15 @@ export function SplitsPanels({
   group,
   sections,
   season,
+  columns = group === "hitting" ? TEAM_HITTING_COLS : TEAM_PITCHING_COLS,
 }: {
   group: "hitting" | "pitching";
   sections: SplitSection[];
   season: number;
+  /** The club's own columns by default; a player's page passes its narrower
+      per-player set, which is the same table read one line at a time. */
+  columns?: TeamStatCol[];
 }) {
-  const columns = group === "hitting" ? TEAM_HITTING_COLS : TEAM_PITCHING_COLS;
   return (
     <div className="space-y-3">
       <Panel
