@@ -259,7 +259,9 @@ export function SchedulePanel({
                         : "text-ink-2"
                   }`}
                 >
-                  {r.text}
+                  <Link href={`/game/${g.pk}`} className="hover:text-accent">
+                    {r.text}
+                  </Link>
                 </td>
                 {r.final ? (
                   <>
