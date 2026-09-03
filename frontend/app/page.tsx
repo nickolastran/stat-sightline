@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Suspense } from "react";
 import PlayerSearch from "@/components/landing/PlayerSearch";
 import AccessCta from "@/components/landing/AccessCta";
 import { searchPitchers, type Pitcher } from "@/lib/api";
@@ -35,16 +36,37 @@ const FEATURES: {
   },
 ];
 
-export default async function LandingPage() {
-  // Seed quick-entry chips with the highest-workload pitchers; the page
-  // still renders if the API is down (search reports its own error state).
+/*
+ * Quick-entry chips seeded with the highest-workload pitchers. Streamed on
+ * its own so the hero paints without waiting on the warehouse, and the page
+ * still renders if the API is down (search reports its own error state).
+ */
+async function TopPitcherChips() {
   let topPitchers: Pitcher[] = [];
   try {
-    topPitchers = await searchPitchers("", 5);
+    topPitchers = await searchPitchers("", 5, 3600);
   } catch {
     /* API offline — hero renders without chips */
   }
+  if (topPitchers.length === 0) return null;
 
+  return (
+    <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
+      <span className="text-ink-3">HIGH-WORKLOAD:</span>
+      {topPitchers.map((p) => (
+        <Link
+          key={p.player_id}
+          href={`/pitcher/${p.player_id}`}
+          className="border border-line px-2 py-1 text-ink-2 hover:border-accent hover:text-ink"
+        >
+          {p.full_name ?? `#${p.player_id}`}
+        </Link>
+      ))}
+    </div>
+  );
+}
+
+export default function LandingPage() {
   return (
     <div className="mx-auto max-w-6xl px-4">
       {/* ── HERO ─────────────────────────────────────────────── */}
@@ -64,20 +86,9 @@ export default async function LandingPage() {
           </p>
           <div className="mt-10 max-w-2xl">
             <PlayerSearch autoFocus />
-            {topPitchers.length > 0 && (
-              <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
-                <span className="text-ink-3">HIGH-WORKLOAD:</span>
-                {topPitchers.map((p) => (
-                  <Link
-                    key={p.player_id}
-                    href={`/pitcher/${p.player_id}`}
-                    className="border border-line px-2 py-1 text-ink-2 hover:border-accent hover:text-ink"
-                  >
-                    {p.full_name ?? `#${p.player_id}`}
-                  </Link>
-                ))}
-              </div>
-            )}
+            <Suspense fallback={null}>
+              <TopPitcherChips />
+            </Suspense>
           </div>
         </div>
 

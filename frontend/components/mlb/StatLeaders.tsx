@@ -7,6 +7,7 @@ import TeamLink from "@/components/mlb/TeamLink";
 import { useSetParam } from "@/lib/useSetParam";
 import { moreStatLeaders } from "@/app/league/[section]/leaders";
 import {
+  boardDir,
   teamLogo,
   teamStatText,
   type StatLeaderRow,
@@ -18,6 +19,12 @@ import {
  * ranking, so picking a column is a navigation that re-asks for the right
  * fifty players — but SHOW ALL only ever adds to what is already on screen,
  * and the rows read so far never move.
+ *
+ * A first click on a column takes MLB's own order for that stat, which is best
+ * first: most home runs, but lowest ERA. Clicking it again asks for the
+ * opposite and walks the board down to the worst. Which way "opposite" runs is
+ * read off the rows on screen rather than declared per stat, so a column MLB
+ * ranks upside-down flips correctly without a table of exceptions here.
  */
 
 /** One row's own fade — appended rows arrive rather than appear. */
@@ -49,6 +56,7 @@ export default function StatLeaders({
     stat: string;
     league: string;
     position: string;
+    order?: "asc" | "desc";
   };
   note: string;
 }) {
@@ -60,6 +68,17 @@ export default function StatLeaders({
   /* A new sort or filter arrives as new props on the same component — the
      appended pages belong to the slice that asked for them, not this one. */
   useEffect(() => setRows(first), [first]);
+
+  /* Which way the board actually runs — the direction a second click flips. */
+  const dir = boardDir(rows.map((r) => r.values[stat]));
+
+  /* Same column again reverses it; a new column starts from MLB's order. */
+  const sortBy = (key: string) =>
+    startSort(() =>
+      key === stat
+        ? setParam({ order: dir === "desc" ? "asc" : "desc" })
+        : setParam({ stat: key, order: null })
+    );
 
   const showAll = async () => {
     setLoading(true);
@@ -78,7 +97,24 @@ export default function StatLeaders({
   return (
     <div className={`space-y-2 ${sorting ? "opacity-60" : ""}`}>
       <div className="overflow-x-auto border border-line">
-        <table className="w-full border-collapse text-xs">
+        <table className="w-full table-fixed border-collapse text-xs">
+          {/*
+           * Fixed layout, so a column's width comes from here and not from
+           * whatever happens to be in it. Under the browser's own sizing the
+           * widest cell sets the width, and reversing a column swaps 60 for 3
+           * and a long name for a short one — every heading on the row shifts
+           * a few pixels on a sort that was meant to change nothing but the
+           * order. Any space left over is spread across these same widths, so
+           * a ten-column board still fills the panel.
+           */}
+          <colgroup>
+            <col className="w-10" />
+            <col className="w-56" />
+            <col className="w-10" />
+            {columns.map((c) => (
+              <col key={c.key} className="w-16" />
+            ))}
+          </colgroup>
           <thead>
             <tr>
               {["RK", "NAME", "POS"].map((h, i) => (
@@ -98,20 +134,37 @@ export default function StatLeaders({
                   <th
                     key={c.key}
                     scope="col"
-                    aria-sort={active ? "descending" : undefined}
+                    aria-sort={
+                      active
+                        ? dir === "asc"
+                          ? "ascending"
+                          : "descending"
+                        : undefined
+                    }
                     className={`sticky top-0 z-10 border-b border-line p-0 text-right ${
                       active ? "bg-accent/15" : "bg-surface"
                     }`}
                   >
                     <button
                       type="button"
-                      title={c.title}
-                      onClick={() => startSort(() => setParam("stat", c.key))}
+                      title={
+                        active
+                          ? `${c.title} — click to reverse`
+                          : c.title
+                      }
+                      onClick={() => sortBy(c.key)}
                       className={`w-full px-3 py-2 text-right text-[10px] tracking-widest ${
                         active ? "text-ink" : "text-ink-3 hover:text-ink"
                       }`}
                     >
-                      {c.label}
+                      {/* Marker hangs in the padding so the label stays over
+                          its numbers, the same trick SortHeader uses. */}
+                      <span className="relative inline-block -mr-[0.1em]">
+                        {c.label}
+                        <span className="absolute left-full top-1/2 ml-1 w-2.5 -translate-y-1/2 text-center text-[11px] leading-none">
+                          {active ? (dir === "desc" ? "\u25bc" : "\u25b2") : ""}
+                        </span>
+                      </span>
                     </button>
                   </th>
                 );
@@ -138,7 +191,7 @@ export default function StatLeaders({
                 <td className="px-3 py-1.5 text-right tabular-nums text-ink-3">
                   {r.rank ?? "—"}
                 </td>
-                <td className="px-3 py-1.5 whitespace-nowrap">
+                <td className="overflow-hidden px-3 py-1.5 whitespace-nowrap">
                   <span className="flex items-center gap-2">
                     {r.teamId !== null && (
                       /* eslint-disable-next-line @next/next/no-img-element */

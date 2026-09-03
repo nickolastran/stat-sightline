@@ -1578,6 +1578,26 @@ export const defaultLeaderStat = (group: StatGroup): string =>
   group === "hitting" ? "avg" : group === "pitching" ? "era" : "fielding";
 
 /** A `?stat=` that names a column of this group's table, else its default. */
+/**
+ * Which way a board that is already sorted actually runs, read off its own
+ * values rather than declared per stat: MLB ranks most stats high to low but
+ * ERA, WHIP and opponent average low to high, and a column has to know its
+ * current direction to offer the opposite. Missing values are skipped, and a
+ * board with nothing to compare — one row, all ties, all blank — reads as
+ * descending, which is the common case and what MLB's default usually is.
+ */
+export const boardDir = (values: TeamStatValue[]): "asc" | "desc" => {
+  const nums = values
+    .map(teamStatNum)
+    .filter((n): n is number => n !== null);
+  return nums.length > 1 && nums[nums.length - 1] > nums[0] ? "asc" : "desc";
+};
+
+/** The sort direction off the query string — anything else means MLB's own. */
+export const pickLeaderOrder = (
+  raw: string | undefined
+): "asc" | "desc" | undefined => (raw === "asc" || raw === "desc" ? raw : undefined);
+
 export const pickLeaderStat = (
   raw: string | undefined,
   group: StatGroup
@@ -1645,6 +1665,7 @@ export async function getStatLeaders({
   position = "all",
   limit = 50,
   offset = 0,
+  order,
 }: {
   season: number;
   group: StatGroup;
@@ -1657,11 +1678,19 @@ export async function getStatLeaders({
   limit?: number;
   /** Rows already on screen — what a page beyond the first starts after. */
   offset?: number;
+  /**
+   * Numeric direction, overriding MLB's own. Left off, the board arrives the
+   * way MLB ranks that stat — best first, which is descending for a counting
+   * stat but ascending for ERA, WHIP and opponent average. Set it to the
+   * opposite of what came back to read the board from the bottom.
+   */
+  order?: "asc" | "desc";
 }): Promise<StatLeaderPage> {
   const data = await mlb(
     `/stats?stats=season&group=${group}&season=${season}&sportId=1` +
       `&gameType=${gameType}&playerPool=qualified&hydrate=team` +
       `&sortStat=${stat}&limit=${limit}&offset=${offset}` +
+      (order ? `&order=${order}` : "") +
       (league === "all" ? "" : `&leagueId=${league}`) +
       (position === "all" ? "" : `&position=${position}`),
     1800

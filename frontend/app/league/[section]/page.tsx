@@ -29,6 +29,7 @@ import {
   getTeamStats,
   getLeaderboards,
   getStatLeaders,
+  pickLeaderOrder,
   playerCols,
   pickLeaderStat,
   pickPlayerGameType,
@@ -106,6 +107,8 @@ interface PlayerQuery {
   stat: string;
   league: string;
   position: string;
+  /** Set only when the reader has flipped the column off MLB's own order. */
+  order?: "asc" | "desc";
 }
 
 const PLAYER_GROUPS: { value: StatGroup; label: string }[] = [
@@ -190,6 +193,7 @@ async function SectionBody({
           stat: players.stat,
           league: players.league,
           position: players.position,
+          order: players.order,
         });
         return (
           <div className="space-y-3">
@@ -228,6 +232,7 @@ export default async function LeagueSectionPage({
     stat?: string;
     league?: string;
     pos?: string;
+    order?: string;
   }>;
 }) {
   const { section } = await params;
@@ -265,6 +270,7 @@ export default async function LeagueSectionPage({
     stat: pickLeaderStat(sp.stat, group),
     league: inList(sp.league, LEADER_LEAGUES),
     position: inList(sp.pos, LEADER_POSITIONS),
+    order: pickLeaderOrder(sp.order),
   };
 
   /* The standings and the wild-card race are two routes with one control row,
