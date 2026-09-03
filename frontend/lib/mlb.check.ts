@@ -10,6 +10,7 @@
  */
 import assert from "node:assert/strict";
 import {
+  boardDir,
   clinchMark,
   clinchPhase,
   clubCity,
@@ -584,3 +585,21 @@ assert.equal(merged[0].values.chances, 386, "chances fall back to PO + A + E whe
 assert.equal(merged[0].values.fielding, ".984", "pct is recomputed from the totals, not averaged");
 assert.equal(merged[0].values.rangeFactorPer9Inn, "22.60", "range factor is per nine, off the summed outs");
 console.log("mergeFielding ok");
+
+/* ── boardDir ───────────────────────────────────────────────────────── */
+/*
+ * The player board's second click has to reverse whatever MLB just handed
+ * back, and MLB hands ERA back the other way round from home runs. The
+ * direction is therefore read off the rows rather than declared per stat.
+ */
+
+assert.equal(boardDir([60, 56, 55, 40]), "desc", "most home runs first");
+assert.equal(boardDir(["1.97", "2.21", "2.43"]), "asc", "lowest ERA first");
+assert.equal(boardDir([".331", ".311", ".300"]), "desc", "rates read like any other number");
+assert.equal(boardDir([3, 5, 5, 9]), "asc", "reversed board");
+assert.equal(boardDir([null, 60, 55, null]), "desc", "blanks are skipped, not counted as zero");
+assert.equal(boardDir([7, 7, 7]), "desc", "all ties fall back to MLB's usual order");
+assert.equal(boardDir([42]), "desc", "one row has no direction to read");
+assert.equal(boardDir([]), "desc", "nor does none");
+assert.equal(boardDir(["121.2", "118.0"]), "desc", "innings compare as the numbers they print as");
+console.log("boardDir ok");

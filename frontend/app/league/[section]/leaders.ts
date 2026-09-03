@@ -2,6 +2,7 @@
 
 import {
   getStatLeaders,
+  pickLeaderOrder,
   pickLeaderStat,
   pickPlayerGameType,
   seasonOf,
@@ -28,6 +29,7 @@ export async function moreStatLeaders(q: {
   stat: string;
   league: string;
   position: string;
+  order?: string;
   offset: number;
   limit: number;
 }): Promise<StatLeaderRow[]> {
@@ -48,6 +50,7 @@ export async function moreStatLeaders(q: {
     stat: pickLeaderStat(q.stat, group),
     league: inList(q.league, LEADER_LEAGUES),
     position: inList(q.position, LEADER_POSITIONS),
+    order: pickLeaderOrder(q.order),
     limit: Math.min(Math.max(Math.trunc(q.limit) || 0, 1), 1000),
     offset: Math.min(Math.max(Math.trunc(q.offset) || 0, 0), 2000),
   });
