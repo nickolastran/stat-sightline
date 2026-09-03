@@ -635,6 +635,15 @@ assert.equal(pitched.whip, "0.92", "walks plus hits per inning, off the summed o
 assert.equal(pitched.avg, ".186", "opponent average is hits over batters retired at the plate");
 assert.equal(pitched.strikeoutsPer9Inn, "10.50");
 
+/* WAR adds up across seasons, but it is the one decimal in a table of whole
+   numbers: added as binary floats, eleven seasons of it end in a tail. */
+const war = sumStatLines("hitting", [
+  { war: "4.3" }, { war: "2.1" }, { war: "1.3" }, { war: "2.8" },
+]);
+assert.equal(war.war, "10.5", "WAR is a counting stat and adds, written to the tenth it is quoted in");
+assert.equal(sumStatLines("hitting", [{ war: null }]).war, undefined, "no WAR reported is no WAR shown");
+assert.equal(sumStatLines("hitting", [{ woba: ".365" }]).woba, undefined, "wOBA is a rate with no formula here — left off a total, never averaged");
+
 assert.equal(sumStatLines("hitting", []).avg, null, "no at-bats is no average, not .000");
 assert.equal(sumStatLines("pitching", []).era, null, "and no innings is no ERA");
 console.log("sumStatLines ok");

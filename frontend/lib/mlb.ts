@@ -2901,11 +2901,14 @@ export const pickPlayerGroup = (
  * nowhere else. Order follows how a career line is conventionally printed:
  * playing time, the counting stats, then the rates they produce.
  *
- * WAR, OPS+, rOBA and Rbat+ are absent because MLB's API does not serve
- * them — they are Baseball-Reference's own computations, and a park factor
- * this data has no way to apply. Better a column short than a number invented.
+ * The sabermetric figures come from MLB's own `sabermetrics` feed, which
+ * serves FanGraphs' computations — so WAR here is fWAR, and the pair beside
+ * the rates are wOBA and wRC+ rather than Baseball-Reference's rOBA and
+ * OPS+. They are near cousins, not the same number, and are labelled as what
+ * they actually are rather than as what a B-Ref line would call them.
  */
 export const CAREER_HITTING_COLS: TeamStatCol[] = [
+  { key: "war", label: "WAR", title: "Wins above replacement (FanGraphs, via MLB)" },
   { key: "gamesPlayed", label: "G", title: "Games played" },
   { key: "plateAppearances", label: "PA", title: "Plate appearances" },
   { key: "atBats", label: "AB", title: "At-bats" },
@@ -2923,6 +2926,8 @@ export const CAREER_HITTING_COLS: TeamStatCol[] = [
   { key: "obp", label: "OBP", title: "On-base percentage" },
   { key: "slg", label: "SLG", title: "Slugging percentage" },
   { key: "ops", label: "OPS", title: "On-base plus slugging" },
+  { key: "woba", label: "wOBA", title: "Weighted on-base average (FanGraphs, via MLB)" },
+  { key: "wRcPlus", label: "wRC+", title: "Weighted runs created plus — 100 is league average (FanGraphs, via MLB)" },
   { key: "totalBases", label: "TB", title: "Total bases" },
   { key: "groundIntoDoublePlay", label: "GIDP", title: "Grounded into double plays" },
   { key: "hitByPitch", label: "HBP", title: "Hit by pitch" },
@@ -2932,6 +2937,7 @@ export const CAREER_HITTING_COLS: TeamStatCol[] = [
 ];
 
 export const CAREER_PITCHING_COLS: TeamStatCol[] = [
+  { key: "war", label: "WAR", title: "Wins above replacement (FanGraphs, via MLB)" },
   { key: "wins", label: "W", title: "Wins" },
   { key: "losses", label: "L", title: "Losses" },
   { key: "winPercentage", label: "W-L%", title: "Winning percentage" },
@@ -2955,6 +2961,8 @@ export const CAREER_PITCHING_COLS: TeamStatCol[] = [
   { key: "wildPitches", label: "WP", title: "Wild pitches" },
   { key: "battersFaced", label: "BF", title: "Batters faced" },
   { key: "whip", label: "WHIP", title: "Walks and hits per inning pitched" },
+  { key: "fip", label: "FIP", title: "Fielding independent pitching (FanGraphs, via MLB)" },
+  { key: "eraMinus", label: "ERA-", title: "ERA against the league, park adjusted — 100 is average (FanGraphs, via MLB)" },
   { key: "hitsPer9Inn", label: "H9", title: "Hits allowed per nine innings" },
   { key: "homeRunsPer9", label: "HR9", title: "Home runs allowed per nine innings" },
   { key: "walksPer9Inn", label: "BB9", title: "Walks per nine innings" },
@@ -2976,10 +2984,11 @@ export const careerCols = (group: StatGroup): TeamStatCol[] =>
 /* The figures that are ratios of the others: adding them is meaningless, so
    they are dropped from the sum and worked out again from the totals. */
 const RATE_KEYS: Record<StatGroup, string[]> = {
-  hitting: ["avg", "obp", "slg", "ops"],
+  hitting: ["avg", "obp", "slg", "ops", "woba", "wRcPlus"],
   pitching: [
     "era", "whip", "avg", "strikeoutsPer9Inn", "winPercentage",
     "hitsPer9Inn", "homeRunsPer9", "walksPer9Inn", "strikeoutWalkRatio",
+    "fip", "eraMinus",
   ],
   fielding: ["fielding", "rangeFactorPer9Inn"],
 };
@@ -3095,6 +3104,10 @@ export function sumStatLines(
     out.fielding = rate3(po + a, tc);
     out.rangeFactorPer9Inn = outs ? (((po + a) * 27) / outs).toFixed(2) : null;
   }
+  /* Wins above replacement is a counting stat, so it adds — but a decimal
+     one, and eleven seasons of binary floating point end in 30.100000000004
+     unless the sum is pinned back to the one place it is written in. */
+  if (typeof out.war === "number") out.war = out.war.toFixed(1);
   return out;
 }
 
@@ -3230,6 +3243,63 @@ function ledMarks(
   return marks;
 }
 
+/* ── Sabermetrics ───────────────────────────────────────────────────── */
+
+/*
+ * MLB serves these unrounded — a WAR of 11.21668, a wRC+ of 218.663 — so each
+ * is written the way it is actually quoted before it reaches a column.
+ */
+const SABER_FORMAT: Record<string, (n: number) => string> = {
+  war: (n) => n.toFixed(1),
+  woba: (n) => n.toFixed(3).replace(/^0\./, "."),
+  wRcPlus: (n) => Math.round(n).toString(),
+  fip: (n) => n.toFixed(2),
+  eraMinus: (n) => Math.round(n).toString(),
+};
+
+/** The sabermetric keys a group's career table prints. */
+const saberKeys = (group: StatGroup): string[] =>
+  careerCols(group)
+    .map((c) => c.key)
+    .filter((k) => k in SABER_FORMAT);
+
+/**
+ * WAR and its neighbours for a set of seasons, keyed `"<season>:<team id>"`
+ * the way the career rows are — a season a trade split answers with a line
+ * per club and a combined one carrying no club at all, which is exactly the
+ * shape the table already reads.
+ *
+ * One request per season, because the feed answers for a single season at a
+ * time and refuses a list. They go out together and hold for a day.
+ */
+async function getPlayerSabermetrics(
+  id: number,
+  group: StatGroup,
+  seasons: string[]
+): Promise<Map<string, Record<string, TeamStatValue>>> {
+  const keys = saberKeys(group);
+  const out = new Map<string, Record<string, TeamStatValue>>();
+  if (keys.length === 0) return out;
+
+  await Promise.all(
+    seasons.map(async (season) => {
+      const data = await mlb(
+        `/people/${id}/stats?stats=sabermetrics&group=${group}&season=${season}`,
+        86400
+      ).catch(() => null);
+      for (const split of ((data?.stats?.[0]?.splits ?? []) as any[])) {
+        const line: Record<string, TeamStatValue> = {};
+        for (const k of keys) {
+          const n = teamStatNum(split.stat?.[k]);
+          line[k] = n === null ? null : SABER_FORMAT[k](n);
+        }
+        out.set(`${season}:${split.team?.id ?? ""}`, line);
+      }
+    })
+  );
+  return out;
+}
+
 /* ── Career, season by season ───────────────────────────────────────── */
 
 /** One line of the career table — a season with a club, or the career total. */
@@ -3347,6 +3417,19 @@ export async function getPlayerCareer(
     });
 
   const rows = group === "fielding" ? mergeSeasons(group, raw) : orderSeasons(raw);
+
+  /* WAR and its neighbours ride alongside the standard line rather than in a
+     table of their own — a career is read for them as much as for the hits.
+     October has no such feed, so a post-season table simply goes without. */
+  if (!postseason && saberKeys(group).length > 0 && rows.length > 0) {
+    const saber = await getPlayerSabermetrics(
+      id,
+      group,
+      [...new Set(rows.map((r) => r.season))]
+    );
+    for (const r of rows)
+      Object.assign(r.values, saber.get(`${r.season}:${r.teamId ?? ""}`) ?? {});
+  }
   /* A split season's combined line has no league of its own; naming both is
      what the line is for. */
   for (const r of rows)
@@ -3398,6 +3481,15 @@ export async function getPlayerCareer(
       : career[0]?.stat
         ? values(career[0].stat)
         : null;
+
+  /* MLB has no career sabermetric line, so the career's WAR is its seasons
+     added up — which is what a career WAR is. Only that one figure is filled
+     in: everything else on the career line is MLB's own and stays that way,
+     and the rates beside WAR cannot be added at all. */
+  if (total && !postseason && saberKeys(group).includes("war")) {
+    const parts = rows.filter((r) => r.teams === 1).map((r) => r.values);
+    total.war = sumStatLines(group, parts).war ?? null;
+  }
 
   return { rows, total, summaries: summarise(group, rows, total, postseason) };
 }
@@ -3473,26 +3565,47 @@ function orderSeasons(rows: CareerRow[]): CareerRow[] {
   });
 }
 
-/** Counting stats scaled to a full season; the rates are already per-season. */
-function per162(
+/**
+ * The career's counting stats scaled to one season; the rates are already
+ * per-season and pass through untouched.
+ *
+ * What "one season" divides by depends on who is being read. A hitter's line
+ * is stretched to 162 games — the figure quoted as a 162-game average, and
+ * what makes a part-time career comparable to a full one. A pitcher's cannot
+ * be: he appears in a fraction of his club's games by the nature of the job,
+ * and scaling Cole's career by his 335 appearances would have him winning 78
+ * games and throwing 995 innings in a year. His line is divided by the
+ * seasons he pitched instead, which is the average season it is read as.
+ */
+function seasonAverage(
   group: StatGroup,
-  total: Record<string, TeamStatValue>
-): Record<string, TeamStatValue> | null {
-  const games = teamStatNum(total.gamesPlayed) ?? teamStatNum(total.games) ?? 0;
-  if (games <= 0) return null;
+  total: Record<string, TeamStatValue>,
+  seasons: number
+): { label: string; values: Record<string, TeamStatValue> } | null {
+  const games = teamStatNum(total.gamesPlayed) ?? 0;
+  const scale =
+    group === "hitting" ? (games > 0 ? 162 / games : 0) : seasons > 0 ? 1 / seasons : 0;
+  if (scale <= 0) return null;
+
   const rates = new Set(RATE_KEYS[group]);
-  const scaled: Record<string, TeamStatValue> = { ...total };
+  const values: Record<string, TeamStatValue> = { ...total };
   for (const [k, v] of Object.entries(total)) {
     if (rates.has(k)) continue;
     /* Innings print in thirds, so they are scaled as outs and written back. */
     if (k === "inningsPitched" || k === "innings") {
-      scaled[k] = inningsOf(Math.round((outsOf(v) * 162) / games));
+      values[k] = inningsOf(Math.round(outsOf(v) * scale));
       continue;
     }
     const n = teamStatNum(v);
-    if (n !== null) scaled[k] = Math.round((n * 162) / games);
+    if (n === null) continue;
+    /* Everything here is a whole thing counted except WAR, which is written
+       to a tenth — rounding it off would turn 3.8 wins into 4. */
+    values[k] = k === "war" ? (n * scale).toFixed(1) : Math.round(n * scale);
   }
-  return scaled;
+  return {
+    label: group === "hitting" ? "162 GAME AVG" : "PER SEASON",
+    values,
+  };
 }
 
 /** How many seasons a set of lines covers — "9 Yrs". */
@@ -3521,8 +3634,8 @@ function summarise(
     { label: "CAREER", span: yearSpan(rows), band: 0, values: total },
   ];
   if (group !== "fielding" && !postseason) {
-    const avg = per162(group, total);
-    if (avg) out.push({ label: "162 GAME AVG", span: "", band: 0, values: avg });
+    const avg = seasonAverage(group, total, new Set(rows.map((r) => r.season)).size);
+    if (avg) out.push({ label: avg.label, span: "", band: 0, values: avg.values });
   }
 
   const bucket = (key: (r: CareerRow) => string) => {
