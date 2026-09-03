@@ -40,9 +40,7 @@ export default function SegmentedControl<V extends string | number | null>({
       role="group"
       aria-label={ariaLabel}
       className={`${
-        underline
-          ? "flex flex-wrap gap-1 border-b border-line"
-          : "flex flex-wrap gap-px"
+        underline ? "flex flex-wrap gap-1 border-b border-line" : "flex flex-wrap"
       } ${className}`}
     >
       {options.map((o) => {
@@ -60,9 +58,13 @@ export default function SegmentedControl<V extends string | number | null>({
                       ? "border-accent font-bold text-ink"
                       : "border-transparent text-ink-3 hover:text-ink"
                   }`
-                : `border tracking-wide ${pad} ${
+                /* Borders collapse into their neighbour's rather than sitting a
+                   gap apart: two 1px edges and a 1px gap read as a seam three
+                   times the weight of the strip's own outer edge. The active
+                   button is lifted so its accent edge wins the overlap. */
+                : `border -ml-px tracking-wide first:ml-0 ${pad} ${
                     active
-                      ? "border-accent bg-accent/15 font-bold text-ink"
+                      ? "relative z-10 border-accent bg-accent/15 font-bold text-ink"
                       : "border-line text-ink-3 hover:bg-surface-2 hover:text-ink"
                   }`
             }
