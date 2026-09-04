@@ -2902,10 +2902,9 @@ export const pickPlayerGroup = (
  * playing time, the counting stats, then the rates they produce.
  *
  * The sabermetric figures come from MLB's own `sabermetrics` feed, which
- * serves FanGraphs' computations — so WAR here is fWAR, and the pair beside
- * the rates are wOBA and wRC+ rather than Baseball-Reference's rOBA and
- * OPS+. They are near cousins, not the same number, and are labelled as what
- * they actually are rather than as what a B-Ref line would call them.
+ * serves FanGraphs' computations — so WAR here is fWAR, not Baseball-
+ * Reference's. OPS+ has no feed at all and is worked out here against the
+ * league's own line; see leagueRates.
  */
 export const CAREER_HITTING_COLS: TeamStatCol[] = [
   { key: "war", label: "WAR", title: "Wins above replacement (FanGraphs, via MLB)" },
@@ -2926,8 +2925,7 @@ export const CAREER_HITTING_COLS: TeamStatCol[] = [
   { key: "obp", label: "OBP", title: "On-base percentage" },
   { key: "slg", label: "SLG", title: "Slugging percentage" },
   { key: "ops", label: "OPS", title: "On-base plus slugging" },
-  { key: "woba", label: "wOBA", title: "Weighted on-base average (FanGraphs, via MLB)" },
-  { key: "wRcPlus", label: "wRC+", title: "Weighted runs created plus — 100 is league average (FanGraphs, via MLB)" },
+  { key: "opsPlus", label: "OPS+", title: "OPS against his league, adjusted for the parks he played in — 100 is average" },
   { key: "totalBases", label: "TB", title: "Total bases" },
   { key: "groundIntoDoublePlay", label: "GIDP", title: "Grounded into double plays" },
   { key: "hitByPitch", label: "HBP", title: "Hit by pitch" },
@@ -2962,7 +2960,7 @@ export const CAREER_PITCHING_COLS: TeamStatCol[] = [
   { key: "battersFaced", label: "BF", title: "Batters faced" },
   { key: "whip", label: "WHIP", title: "Walks and hits per inning pitched" },
   { key: "fip", label: "FIP", title: "Fielding independent pitching (FanGraphs, via MLB)" },
-  { key: "eraMinus", label: "ERA-", title: "ERA against the league, park adjusted — 100 is average (FanGraphs, via MLB)" },
+  { key: "eraPlus", label: "ERA+", title: "ERA against his league, adjusted for the parks he pitched in — 100 is average" },
   { key: "hitsPer9Inn", label: "H9", title: "Hits allowed per nine innings" },
   { key: "homeRunsPer9", label: "HR9", title: "Home runs allowed per nine innings" },
   { key: "walksPer9Inn", label: "BB9", title: "Walks per nine innings" },
@@ -2984,11 +2982,11 @@ export const careerCols = (group: StatGroup): TeamStatCol[] =>
 /* The figures that are ratios of the others: adding them is meaningless, so
    they are dropped from the sum and worked out again from the totals. */
 const RATE_KEYS: Record<StatGroup, string[]> = {
-  hitting: ["avg", "obp", "slg", "ops", "woba", "wRcPlus"],
+  hitting: ["avg", "obp", "slg", "ops", "opsPlus"],
   pitching: [
     "era", "whip", "avg", "strikeoutsPer9Inn", "winPercentage",
     "hitsPer9Inn", "homeRunsPer9", "walksPer9Inn", "strikeoutWalkRatio",
-    "fip", "eraMinus",
+    "fip", "eraPlus",
   ],
   fielding: ["fielding", "rangeFactorPer9Inn"],
 };
@@ -3251,10 +3249,285 @@ function ledMarks(
  */
 const SABER_FORMAT: Record<string, (n: number) => string> = {
   war: (n) => n.toFixed(1),
-  woba: (n) => n.toFixed(3).replace(/^0\./, "."),
-  wRcPlus: (n) => Math.round(n).toString(),
   fip: (n) => n.toFixed(2),
-  eraMinus: (n) => Math.round(n).toString(),
+};
+
+/** What a season's OPS+ or ERA+ is measured against. */
+export interface LeagueLine {
+  obp: number;
+  slg: number;
+  era: number;
+}
+
+/*
+ * Park factors. A run is not worth the same in every yard, so a plus stat is
+ * measured against the league's line adjusted for the one the player worked
+ * in — Coors inflates a bat and a Petco arm looks better than it is.
+ *
+ * The factor is the club's scoring at home against its scoring on the road,
+ * both sides of the ball, over a three-season window centred on the year:
+ * one season of home-and-road splits is small enough that ordinary noise
+ * moves it several points. It is then halved, since a player spends only half
+ * his schedule in it.
+ *
+ * ponytail: a one-line factor computed off runs, not Baseball-Reference's,
+ * which folds in the league a club actually faced and its own absence from
+ * it. Expect a point or two of daylight against a B-Ref line rather than the
+ * five or ten that no adjustment leaves. If it ever has to match to the unit,
+ * their published per-club, per-season table is the only thing that will do.
+ */
+
+/** How many seasons either side of a year the factor averages over. */
+const PARK_WINDOW = 1;
+
+/** The factor from a window's raw home/road run ratios, halved for the half
+ *  of a schedule played away from it. 1 — no adjustment — when there is none. */
+export const parkFactorOf = (raws: number[]): number =>
+  raws.length === 0
+    ? 1
+    : 1 + (raws.reduce((a, b) => a + b, 0) / raws.length - 1) / 2;
+
+/**
+ * One club-season's raw run ratio: runs scored and allowed per game at home
+ * over the same on the road. Null when MLB has no home-and-road split for it,
+ * which is every season it never played.
+ */
+async function parkRunRatio(
+  teamId: number,
+  season: number
+): Promise<number | null> {
+  const data = await mlb(
+    `/teams/${teamId}/stats?stats=statSplits&sitCodes=h,a` +
+      `&group=hitting,pitching&season=${season}`,
+    86400
+  ).catch(() => null);
+
+  const at = (group: string, code: string) => {
+    const split = ((data?.stats ?? []) as any[])
+      .find((st) => st.group?.displayName === group)
+      ?.splits?.find((sp: any) => sp.split?.code === code);
+    return {
+      runs: teamStatNum(split?.stat?.runs),
+      games: teamStatNum(split?.stat?.gamesPlayed),
+    };
+  };
+  const [hs, ha, ps, pa] = [
+    at("hitting", "h"), at("hitting", "a"),
+    at("pitching", "h"), at("pitching", "a"),
+  ];
+  if (
+    hs.runs === null || ha.runs === null || ps.runs === null || pa.runs === null ||
+    !hs.games || !ha.games
+  )
+    return null;
+
+  const road = (ha.runs + pa.runs) / ha.games;
+  return road > 0 ? (hs.runs + ps.runs) / hs.games / road : null;
+}
+
+/** A club's park factor for one season, over the window around it. */
+async function parkFactor(teamId: number, season: number): Promise<number> {
+  const years = Array.from(
+    { length: PARK_WINDOW * 2 + 1 },
+    (_, i) => season - PARK_WINDOW + i
+  );
+  const raws = await Promise.all(years.map((y) => parkRunRatio(teamId, y)));
+  return parkFactorOf(raws.filter((r): r is number => r !== null));
+}
+
+/** Everything a league's batting line has to carry to give up its rates. */
+const LEAGUE_BAT_KEYS = [
+  "hits", "atBats", "baseOnBalls", "hitByPitch", "sacFlies", "totalBases",
+];
+
+/** Which clubs were in which league that season — what splits the thirty
+ *  clubs' totals into the two lines a plus stat is measured against. */
+async function leaguesOf(season: number): Promise<Map<number, number>> {
+  const data = await mlb(`/teams?sportId=1&season=${season}`, 86400).catch(
+    () => null
+  );
+  return new Map(
+    ((data?.teams ?? []) as any[])
+      .filter((t) => t.id && t.league?.id)
+      .map((t) => [t.id as number, t.league.id as number])
+  );
+}
+
+/*
+ * What the league's pitchers did at the plate. A plus stat measures a hitter
+ * against the hitters, and until the designated hitter went universal in 2022
+ * the National League's line carried nine seasons of pitchers batting .130 in
+ * it — leaving them in understates the league and overstates every bat in it
+ * by the better part of ten points.
+ *
+ * Two-way players are filed under their own position, not P, so Ohtani's bat
+ * stays in the league where it belongs.
+ */
+async function leaguePitcherBats(
+  season: number
+): Promise<Map<number | null, Record<string, number>>> {
+  const out = new Map<number | null, Record<string, number>>();
+  /* One page is enough for a live season; two covers the deepest staffs the
+     hundred-odd years before it. */
+  for (const offset of [0, 1000]) {
+    const data = await mlb(
+      `/stats?stats=season&group=hitting&season=${season}&sportId=1` +
+        `&playerPool=ALL&position=P&limit=1000&offset=${offset}`,
+      86400
+    ).catch(() => null);
+    const splits = (data?.stats?.[0]?.splits ?? []) as any[];
+    if (splits.length === 0) break;
+    for (const sp of splits) {
+      const league = sp.league?.id ?? null;
+      for (const k of new Set<number | null>([league, null])) {
+        const d = out.get(k) ?? out.set(k, {}).get(k)!;
+        for (const stat of LEAGUE_BAT_KEYS)
+          d[stat] = (d[stat] ?? 0) + (teamStatNum(sp.stat?.[stat]) ?? 0);
+      }
+    }
+    if (splits.length < 1000) break;
+  }
+  return out;
+}
+
+/*
+ * The league's own line for a season, added up from its clubs' totals — the
+ * only league line the API will hand over. MLB publishes neither OPS+ nor
+ * ERA+, so both are figured here the conventional way against it. Keyed by
+ * league id, with `null` holding the whole of the majors for the lines that
+ * belong to no one league: a season split across both, and the career total.
+ *
+ * ponytail: no park factor, because no MLB feed publishes one. That is the
+ * whole of the remaining gap to Baseball-Reference — a few points in a
+ * neutral yard, five or six in an extreme one, and in the direction the park
+ * plays. A per-club, per-season park-factor table is what would close it;
+ * both columns say what they are in their own tooltips until there is one.
+ */
+async function leagueRates(
+  season: number,
+  group: StatGroup
+): Promise<Map<number | null, LeagueLine>> {
+  const out = new Map<number | null, LeagueLine>();
+  if (group === "fielding") return out;
+  const [data, leagues, arms] = await Promise.all([
+    mlb(
+      `/teams/stats?season=${season}&group=${group}&stats=season&sportIds=1`,
+      86400
+    ).catch(() => null),
+    leaguesOf(season),
+    /* Only a batting line has pitchers to take out of it. */
+    group === "hitting"
+      ? leaguePitcherBats(season).catch(
+          () => new Map<number | null, Record<string, number>>()
+        )
+      : new Map<number | null, Record<string, number>>(),
+  ]);
+  const splits = (data?.stats?.[0]?.splits ?? []) as any[];
+  if (splits.length === 0) return out;
+
+  /* Every club counts twice: once for its own league, once for the majors. */
+  const tot = new Map<number | null, Record<string, number>>();
+  for (const sp of splits) {
+    const league = leagues.get(sp.team?.id) ?? null;
+    for (const key of new Set<number | null>([league, null])) {
+      const d = tot.get(key) ?? tot.set(key, {}).get(key)!;
+      for (const k of [...LEAGUE_BAT_KEYS, "earnedRuns"])
+        d[k] = (d[k] ?? 0) + (teamStatNum(sp.stat?.[k]) ?? 0);
+      /* Innings print in thirds, so the league's are added as outs. */
+      d.outs = (d.outs ?? 0) + outsOf(sp.stat?.inningsPitched);
+    }
+  }
+
+  /* The bats a plus stat is measured against are the ones it competes with,
+     which never included the pitchers taking their turn. */
+  for (const [key, d] of tot) {
+    const off = arms.get(key);
+    if (!off) continue;
+    for (const k of LEAGUE_BAT_KEYS) d[k] = Math.max(0, d[k] - (off[k] ?? 0));
+  }
+
+  for (const [key, d] of tot) {
+    if (group === "pitching") {
+      if (d.outs > 0) out.set(key, { obp: 0, slg: 0, era: (d.earnedRuns * 27) / d.outs });
+      continue;
+    }
+    const onBase = d.atBats + d.baseOnBalls + d.hitByPitch + d.sacFlies;
+    if (!onBase || !d.atBats) continue;
+    out.set(key, {
+      obp: (d.hits + d.baseOnBalls + d.hitByPitch) / onBase,
+      slg: d.totalBases / d.atBats,
+      era: 0,
+    });
+  }
+  return out;
+}
+
+/**
+ * One line's OPS+ against the league's: on-base and slugging each measured
+ * against it, added, less one — 100 being an average bat. Null wherever
+ * either half is missing, which is a season with no league line and a line
+ * with no plate appearances.
+ */
+export const opsPlus = (
+  values: Record<string, TeamStatValue>,
+  lg: LeagueLine | null | undefined
+): string | null => {
+  const obp = teamStatNum(values.obp);
+  const slg = teamStatNum(values.slg);
+  if (!lg?.obp || !lg?.slg || obp === null || slg === null) return null;
+  return Math.round(100 * (obp / lg.obp + slg / lg.slg - 1)).toString();
+};
+
+/**
+ * The same figure for an arm, the other way up: the league's earned-run
+ * average over his, so that 100 is average and higher is better — which is
+ * why it reads as a plus where the raw ERA reads as a minus.
+ */
+export const eraPlus = (
+  values: Record<string, TeamStatValue>,
+  lg: LeagueLine | null | undefined
+): string | null => {
+  const era = teamStatNum(values.era);
+  if (!lg?.era || era === null || era <= 0) return null;
+  return Math.round((100 * lg.era) / era).toString();
+};
+
+/*
+ * Runs are not linear in the rates that produce them: a park that gives up
+ * three per cent more runs does not give up three per cent more on-base and
+ * slugging, it gives up something nearer half that, because runs scale as
+ * roughly the 1.8th power of what a lineup does at the plate. The factor is
+ * measured in runs, so a rate is adjusted by its root and an earned-run
+ * average — a run rate itself — by the factor whole.
+ *
+ * ponytail: 1.8 is the textbook elasticity, not a fit to this data.
+ */
+const RUN_ELASTICITY = 1.8;
+
+/** A league line as it played in one park — what a plus stat is actually
+ *  measured against, since an average bat in Coors outhits one in Petco. */
+const parked = (lg: LeagueLine, park: number): LeagueLine => {
+  const rate = park ** (1 / RUN_ELASTICITY);
+  return { obp: lg.obp * rate, slg: lg.slg * rate, era: lg.era * park };
+};
+
+/**
+ * A rate carried onto a career line: each season's, weighted by how much of
+ * that season the player actually played. A career ERA+ measured against the
+ * mean of eleven league ERAs would let a season he threw four innings in
+ * count as much as one he threw two hundred.
+ */
+const weightedMean = (
+  parts: { weight: number; value: number | null }[]
+): number | null => {
+  let sum = 0;
+  let weight = 0;
+  for (const p of parts) {
+    if (p.value === null || p.weight <= 0) continue;
+    sum += p.value * p.weight;
+    weight += p.weight;
+  }
+  return weight > 0 ? sum / weight : null;
 };
 
 /** The sabermetric keys a group's career table prints. */
@@ -3327,6 +3600,16 @@ export interface CareerRow {
   led: Record<string, LedScope>;
   values: Record<string, TeamStatValue>;
 }
+
+/**
+ * Fills in the figures a summed line cannot get by adding — OPS+, ERA+, FIP —
+ * from the seasons it covers. Built inside getPlayerCareer, where the league
+ * lines and park factors are, and handed to whatever needs to write one.
+ */
+type FillPlus = (
+  values: Record<string, TeamStatValue>,
+  from: CareerRow[]
+) => void;
 
 /** A line under the table that is not a season — the career, a club, a league. */
 export interface CareerSummary {
@@ -3491,7 +3774,108 @@ export async function getPlayerCareer(
     total.war = sumStatLines(group, parts).war ?? null;
   }
 
-  return { rows, total, summaries: summarise(group, rows, total, postseason) };
+  /* OPS+ and ERA+ are figured here rather than fetched — one league line per
+     season the player had, shared by every player's page and held for a day.
+     The career is measured against the league he actually played in: those
+     same lines, weighted by his own time in each. FIP has a feed but no
+     career line of its own, so it is averaged the same way.
+     October has no league line to be measured against and goes without. */
+  /* Set below once the league lines are in hand, and handed on to the summary
+     bands, which need the same blend over their own slice of the seasons. */
+  let fillPlus: FillPlus | undefined;
+  if (!postseason && group !== "fielding" && rows.length > 0) {
+    const key = group === "hitting" ? "opsPlus" : "eraPlus";
+    const plus = group === "hitting" ? opsPlus : eraPlus;
+    const lg = new Map(
+      await Promise.all(
+        [...new Set(rows.map((r) => r.season))].map(
+          async (season) =>
+            [season, await leagueRates(Number(season), group)] as const
+        )
+      )
+    );
+    /* One factor per club-season on the table. A season a trade split has no
+       park of its own — its halves are below it, and the combined line takes
+       the two weighted by the games played in each. */
+    const clubs = [
+      ...new Set(
+        rows.filter((r) => r.teamId !== null).map((r) => `${r.season}:${r.teamId}`)
+      ),
+    ];
+    const parks = new Map(
+      await Promise.all(
+        clubs.map(async (k) => {
+          const [season, team] = k.split(":");
+          return [k, await parkFactor(Number(team), Number(season))] as const;
+        })
+      )
+    );
+    const parkOf = (r: CareerRow): number => {
+      if (r.teamId !== null) return parks.get(`${r.season}:${r.teamId}`) ?? 1;
+      const halves = rows.filter((o) => o.season === r.season && o.teams === 1);
+      return (
+        weightedMean(
+          halves.map((h) => ({
+            weight: teamStatNum(h.values.gamesPlayed) ?? 0,
+            value: parkOf(h),
+          }))
+        ) ?? 1
+      );
+    };
+
+    /* Measured against his own league, the way a plus stat is defined, with
+       that line moved by the park he played in: a hitter's park raises what
+       an average bat there would have done, and lowers what his own did
+       against it. A season split across both leagues has none of its own, so
+       it falls back to the whole of the majors — as does the career, which is
+       a blend of the lines below weighted by what he did in each. */
+    const lineOf = (r: CareerRow): LeagueLine | null => {
+      const table = lg.get(r.season);
+      const line = table?.get(leagueIdOf(r.league)) ?? table?.get(null) ?? null;
+      return line && parked(line, parkOf(r));
+    };
+    for (const r of rows) r.values[key] = plus(r.values, lineOf(r));
+
+    /*
+     * The same figures on a line that is several seasons added together — the
+     * career, a club, a league. None of them can be summed: a plus stat is a
+     * ratio to a league that changes every year, and FIP is a rate over
+     * innings. Each is the seasons the line covers, blended by what he
+     * actually did in them — a bat by its trips to the plate, an arm by its
+     * outs, never by the club's or the league's playing time.
+     */
+    fillPlus = (values, from) => {
+      const parts = from.map((r) => ({
+        weight:
+          group === "hitting"
+            ? (teamStatNum(r.values.plateAppearances) ?? 0)
+            : outsOf(r.values.inningsPitched),
+        line: lineOf(r),
+        values: r.values,
+      }));
+      const mean = (pick: (p: (typeof parts)[number]) => number | null) =>
+        weightedMean(parts.map((p) => ({ weight: p.weight, value: pick(p) })));
+
+      /* Each season's line is already parked, so the blend carries the parks
+         he played in, in the proportion he played in them. */
+      values[key] = plus(values, {
+        obp: mean((p) => p.line?.obp ?? null) ?? 0,
+        slg: mean((p) => p.line?.slg ?? null) ?? 0,
+        era: mean((p) => p.line?.era ?? null) ?? 0,
+      });
+      if (group === "pitching") {
+        const fip = mean((p) => teamStatNum(p.values.fip));
+        values.fip = fip === null ? null : fip.toFixed(2);
+      }
+    };
+  }
+  if (total && fillPlus) fillPlus(total, rows.filter((r) => r.teams === 1));
+
+  return {
+    rows,
+    total,
+    summaries: summarise(group, rows, total, postseason, fillPlus),
+  };
 }
 
 /**
@@ -3625,7 +4009,9 @@ function summarise(
   total: Record<string, TeamStatValue> | null,
   /** October plays as many games as a run lasts; there is no season to
       average it over, so the per-162 line is left off. */
-  postseason: boolean
+  postseason: boolean,
+  /** What writes the rates a club's or a league's line can't be summed into. */
+  fillPlus?: FillPlus
 ): CareerSummary[] {
   const parts = rows.filter((r) => r.teams === 1);
   if (parts.length === 0 || !total) return [];
@@ -3651,13 +4037,13 @@ function summarise(
   const bands = [bucket((r) => r.team), bucket((r) => r.league)];
   bands.forEach((by, i) => {
     if (by.size < 2) return;
-    for (const [label, lines] of by)
-      out.push({
-        label,
-        span: yearSpan(lines),
-        band: i + 1,
-        values: sumStatLines(group, lines.map((l) => l.values)),
-      });
+    for (const [label, lines] of by) {
+      const values = sumStatLines(group, lines.map((l) => l.values));
+      /* Measured against the league those seasons were played in, not the
+         whole career's — a club line is the years he spent there. */
+      fillPlus?.(values, lines);
+      out.push({ label, span: yearSpan(lines), band: i + 1, values });
+    }
   });
   return out;
 }
@@ -3737,7 +4123,9 @@ export interface GameLogRow {
   running: Record<string, TeamStatValue>;
 }
 
-export interface GameLogMonth {
+/** One band of the log with its own total under it — a month, or, in
+ *  October's log, a year. */
+export interface GameLogGroup {
   label: string;
   /** Newest first, the way a log is read. */
   rows: GameLogRow[];
@@ -3761,8 +4149,10 @@ function gameResult(g: Game | undefined, teamId: number): string {
 }
 
 /**
- * Every game a player appeared in, grouped by month with each month's total
- * under it and the season line to date on every row.
+ * Every game a player appeared in, with each band's total under it and the
+ * line to date on every row. A regular season is one year banded by month;
+ * October is the whole career banded by year, since a post-season is only a
+ * handful of games and is read against the ones before it.
  *
  * MLB's game log carries no score, only who won, so the clubs the player
  * appeared for have their schedules pulled alongside it and joined on the
@@ -3770,17 +4160,25 @@ function gameResult(g: Game | undefined, teamId: number): string {
  * payload the club's own schedule tab already caches.
  *
  * ponytail: the running line re-adds the whole prefix per game rather than
- * carrying an accumulator — 162 games is nothing. Carry one if a log ever
- * covers a career.
+ * carrying an accumulator — a career of Octobers is still under two hundred
+ * games. Carry one if a log ever covers every game of every season.
  */
 export async function getPlayerGameLog(
   id: number,
   season: number,
   group: StatGroup,
   gameType: PlayerGameType = "R"
-): Promise<GameLogMonth[]> {
+): Promise<GameLogGroup[]> {
+  /* October is asked for as a career: the feed answers one season per
+     `seasons=` entry, so the years he played are handed over at once. */
+  const career = gameType === "P";
+  const seasons = career
+    ? await getPlayerSeasons(id).catch(() => [season])
+    : [season];
+  if (seasons.length === 0) return [];
+
   const data = await mlb(
-    `/people/${id}/stats?stats=gameLog&group=${group}&season=${season}` +
+    `/people/${id}/stats?stats=gameLog&group=${group}&seasons=${seasons.join(",")}` +
       `&gameType=${gameType}&sportId=1`,
     900
   );
@@ -3790,14 +4188,25 @@ export async function getPlayerGameLog(
   if (splits.length === 0) return [];
 
   const keys = statLineKeys(group);
-  const clubs = [...new Set(splits.map((s) => s.team?.id).filter(Boolean))];
+  /* A schedule is a club's year, so a career-wide log needs one per club per
+     season he played in it — a handful of requests, all already cached. */
+  const clubs = [
+    ...new Set(
+      splits
+        .filter((s) => s.team?.id)
+        .map((s) => `${s.team.id}:${s.season ?? season}`)
+    ),
+  ];
   const schedules = await Promise.all(
-    clubs.map((t) => getTeamSchedule(t as number, season).catch(() => [] as Game[]))
+    clubs.map((key) => {
+      const [team, year] = key.split(":");
+      return getTeamSchedule(Number(team), Number(year)).catch(() => [] as Game[]);
+    })
   );
   const byPk = new Map(schedules.flat().map((g) => [g.pk, g]));
 
   /* Oldest first while the running line is built, then flipped: a log is
-     read newest first, but a season total only accumulates one way. */
+     read newest first, but a total only accumulates one way. */
   const asc = [...splits].sort((a, b) => String(a.date).localeCompare(String(b.date)));
   const lines = asc.map((s) =>
     Object.fromEntries(keys.map((k) => [k, s.stat?.[k] ?? null]))
@@ -3821,16 +4230,18 @@ export async function getPlayerGameLog(
     };
   });
 
-  const months = new Map<string, GameLogRow[]>();
+  const bands = new Map<string, GameLogRow[]>();
   for (const r of rows) {
-    const key = MONTHS[Number(r.date.slice(5, 7)) - 1] ?? "SEASON";
-    (months.get(key) ?? months.set(key, []).get(key)!).push(r);
+    const key = career
+      ? r.date.slice(0, 4)
+      : (MONTHS[Number(r.date.slice(5, 7)) - 1] ?? "SEASON");
+    (bands.get(key) ?? bands.set(key, []).get(key)!).push(r);
   }
-  return [...months.entries()]
-    .map(([label, monthRows]) => ({
+  return [...bands.entries()]
+    .map(([label, bandRows]) => ({
       label,
-      rows: [...monthRows].reverse(),
-      total: sumStatLines(group, monthRows.map((r) => r.values)),
+      rows: [...bandRows].reverse(),
+      total: sumStatLines(group, bandRows.map((r) => r.values)),
     }))
     .reverse();
 }
@@ -3855,13 +4266,47 @@ export interface AwardGroup {
 export interface PlayerBio {
   birthDate: string;
   birthPlace: string;
+  /** Where he was born, on its own — what says whether he could be drafted. */
+  birthCountry: string;
   debut: string;
   draftYear: number | null;
+  /** Which round and which pick overall, of the draft he actually signed out
+   *  of — MLB reports every draft he was ever taken in. */
+  draftRound: string;
+  draftPick: number | null;
   active: boolean;
   position: string;
   stops: CareerStop[];
   awards: AwardGroup[];
 }
+
+/* The countries the draft covers. A player born anywhere else was signed as
+   an international amateur free agent and has no draft year to print — MLB
+   reports the absence and nothing more, so the birthplace is what tells the
+   two apart. */
+const DRAFT_COUNTRIES = new Set([
+  "USA",
+  "Canada",
+  "Puerto Rico",
+  "U.S. Virgin Islands",
+  "American Samoa",
+  "Guam",
+]);
+
+/** "DRAFTED 2013 · RD 1, PICK 32", "SIGNED INTERNATIONALLY", "UNDRAFTED". */
+export const signingText = (bio: PlayerBio): string => {
+  if (!bio.draftYear)
+    return bio.birthCountry && !DRAFT_COUNTRIES.has(bio.birthCountry)
+      ? "SIGNED INTERNATIONALLY"
+      : "UNDRAFTED";
+  /* Where the draft is on record but the pick isn't, the year alone is still
+     worth printing — it is what every line had before this. */
+  const where = [
+    bio.draftRound && `RD ${bio.draftRound}`,
+    bio.draftPick !== null && `PICK ${bio.draftPick}`,
+  ].filter(Boolean);
+  return `DRAFTED ${bio.draftYear}${where.length ? ` · ${where.join(", ")}` : ""}`;
+};
 
 /* The awards worth leading with, most to least. Everything else keeps its
    place below in the order MLB handed it over. */
@@ -3901,7 +4346,7 @@ async function mlbTeamIds(): Promise<Set<number>> {
  */
 export async function getPlayerBio(id: number): Promise<PlayerBio | null> {
   const [data, awardData, mlbIds, hit, pitch] = await Promise.all([
-    mlb(`/people/${id}`, 86400).catch((e: Error) => {
+    mlb(`/people/${id}?hydrate=draft`, 86400).catch((e: Error) => {
       if (e.message.includes(" 404:")) return null;
       throw e;
     }),
@@ -3912,6 +4357,13 @@ export async function getPlayerBio(id: number): Promise<PlayerBio | null> {
   ]);
   const p = data?.people?.[0];
   if (!p) return null;
+  /* A player taken out of high school and again out of college has a draft
+     on record for each; the one that counts is the one he signed, which is
+     the year MLB reports as his. */
+  const drafts = (p.drafts ?? []) as any[];
+  const draft =
+    drafts.find((d) => Number(d.year) === Number(p.draftYear)) ??
+    drafts[drafts.length - 1];
 
   const stops = new Map<number, { team: string; years: Set<number> }>();
   for (const r of [...hit.rows, ...pitch.rows]) {
@@ -3939,7 +4391,10 @@ export async function getPlayerBio(id: number): Promise<PlayerBio | null> {
       .filter(Boolean)
       .join(", "),
     debut: p.mlbDebutDate ?? "",
+    birthCountry: p.birthCountry ?? "",
     draftYear: p.draftYear ?? null,
+    draftRound: draft?.pickRound ?? "",
+    draftPick: teamStatNum(draft?.pickNumber),
     active: !!p.active,
     position: p.primaryPosition?.name ?? "",
     stops: [...stops.entries()]

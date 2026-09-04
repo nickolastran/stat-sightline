@@ -55,7 +55,7 @@ export function Table({
                   scope="col"
                   className={`sticky top-0 z-10 border-b border-line bg-surface text-[10px] font-normal text-ink-3 ${
                     dense
-                      ? "px-1.5 py-1.5 tracking-wide border-r border-grid last:border-r-0"
+                      ? "px-0.5 py-1.5 text-[12px] tracking-wide border-r border-grid last:border-r-0"
                       : "px-3 py-2 tracking-widest"
                   } ${headAlign(align, i)}`}
                 >

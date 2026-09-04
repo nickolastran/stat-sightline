@@ -2,9 +2,11 @@
 
 MLB advanced metrics platform, Baseball Savant–style. Statcast pitch data is
 pulled with `pybaseball`, cleaned, and upserted into PostgreSQL; a FastAPI
-service serves it to a Next.js frontend that renders strike-zone plots,
-league standings, and leaderboards. A second, database-free pipeline projects
-each club's final record and hangs those columns off the standings tables.
+service serves it to a Next.js frontend that renders strike-zone plots and
+plain-English answers alongside a full league site — scoreboard, standings,
+leaders, team and player pages, and live gamecasts — read straight from the
+public MLB Stats API. A second, database-free pipeline projects each club's
+final record and hangs those columns off the standings tables.
 
 ```
 pybaseball ──► ETL (pandas) ──► PostgreSQL ──► FastAPI ──► Next.js
@@ -12,7 +14,7 @@ pybaseball ──► ETL (pandas) ──► PostgreSQL ──► FastAPI ──�
                                                      ▲          ▲
       MLB Stats API ─► standings pipeline ──────────-┘          │
       (results/schedule)  (games.csv + model.pkl)               │
-                     └──── scoreboard / standings / leaders ────┘
+                     └─ scoreboard / standings / teams / games ─┘
 ```
 
 ## Layout
@@ -26,7 +28,7 @@ pybaseball ──► ETL (pandas) ──► PostgreSQL ──► FastAPI ──�
 | `src/stat_sightline/db/` | Cached SQLAlchemy engine |
 | `sql/` | `01_schema.sql` (tables + indexes), `02_feature_views.sql` (barrel, attack-zone, swing-take views) |
 | `api/` | FastAPI app + `/api/ask`, `/api/pitchers` and `/api/standings` routers |
-| `frontend/` | Next.js 16 app (App Router, Tailwind v4, Recharts) |
+| `frontend/` | Next.js 16 app (App Router, Tailwind v4, Recharts, Framer Motion); `lib/mlb.ts` is the MLB Stats API client every league / team / player / game page reads through |
 | `scripts/` | `init_db.py`, `run_etl.py`, `train_standings.py` |
 | `tests/` | pytest for cleaning, feature math, question parsing, and projection leakage |
 
@@ -207,25 +209,45 @@ every remaining game to answer, and a retrain invalidates it without a restart.
 - `/dashboard` — league overview: today's scoreboard, standings (with projected
   finishes), stat leaders — live from the public MLB Stats API plus our own
   projections endpoint, server-rendered; each source fails independently
-- `/league/[section]` — the reference sections pinned in the league bar:
-  `leaders`, `probables`, `standings` (division / league / all-MLB scopes, every
-  stat column click-sortable, plus the projected-finish columns when our own API
-  answers — they are dropped rather than blanked when it doesn't, so standings
-  never depend on it), `teams` (all 30 clubs' season hitting and pitching lines,
-  click-sortable)
-- `/team/[id]` — one club's season: standings line, team hitting and pitching
-  lines, and its roster, linking on to the player pages
+- `/league/[section]` — the reference sections, declared once in
+  `lib/leagueSections.ts` so a new one is added in a single place:
+  `scoreboard`, `leaders`, `probables`, `standings` (division / league /
+  all-MLB scopes, every stat column click-sortable, plus the projected-finish
+  columns when our own API answers — they are dropped rather than blanked when
+  it doesn't, so standings never depend on it), `wildcard` (the same table read
+  as a race, reached from standings rather than the bar), `teams`, `players`
+- `/team/[id]/[[...tab]]` — one club: `home`, `schedule`, `stats`, `roster`,
+  `splits`, `injuries`, `transactions`. Each tab is a link to its own
+  server-rendered payload rather than local state, so it prefetches and the URL
+  is shareable
+- `/player/[id]/[[...tab]]` — one player: `overview`, `stats`, `bio`, `splits`,
+  `gamelog`. Same trade as the club tabs, except these carry the query string
+  across — season and stat group are picked once, for whichever section is
+  being read
+- `/game/[pk]` — one game as three views over one payload (`gamecast`, `box`,
+  `plays`): before first pitch, lineups, probables, season series and the
+  clubs' form; while it's on, the count and base-out state, the live pitch
+  plot, MLB's win-probability line play by play, and the play log (all plays or
+  scoring only); afterwards, the box score. Re-fetches itself on a timer only
+  while the game is in progress
 - `/pitcher/[id]` — pitch-level analysis: strike-zone scatter, filter panel,
   summary metrics. A non-numeric id falls back to the highest-workload pitcher.
-- `/api/games` — same-origin proxy for the schedule, used by the client
-  scoreboard bar (a date-picker calendar + arrow-paged rail of the day's
-  games, shown on the front page only)
-- `/api/games/{gamePk}` — same-origin proxy for one game's box score
-  (linescore + both teams' batting/pitching lines), fetched when a card in
-  that rail is clicked
+- `/api/games`, `/api/search` — same-origin proxies for the day's schedule and
+  the header typeahead, both reusing `lib/mlb.ts`'s cached server fetch so the
+  client scoreboard bar and search box never hit statsapi cross-origin
+
+Everything under `/league`, `/team`, `/player` and `/game` comes from the public
+MLB Stats API through `lib/mlb.ts`; only `/ask`, `/pitcher` and the projection
+columns touch our own API.
 
 ## Tests
 
 ```bash
-pytest
+pytest                                   # cleaning, feature math, ask parsing, projection leakage
+cd frontend && npx tsx lib/mlb.check.ts  # assertions for lib/mlb.ts's derived values
 ```
+
+`mlb.check.ts` covers the MLB-feed logic that isn't a straight field read —
+clinch marks, games back, head-to-head, log5 win probability, leaderboard
+merging, draft/signing text, park factors — the places where a plausible wrong
+answer is worse than a crash.

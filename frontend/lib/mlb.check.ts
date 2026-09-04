@@ -28,6 +28,10 @@ import {
   latestByGame,
   leaderBoard,
   mergeFielding,
+  eraPlus,
+  opsPlus,
+  parkFactorOf,
+  signingText,
   sumStatLines,
   runningRecords,
   teamHref,
@@ -36,6 +40,7 @@ import {
   ordinal,
   statRank,
   type Game,
+  type PlayerBio,
   type PlayerStatRow,
   type StandingRow,
   type PlayProb,
@@ -642,8 +647,51 @@ const war = sumStatLines("hitting", [
 ]);
 assert.equal(war.war, "10.5", "WAR is a counting stat and adds, written to the tenth it is quoted in");
 assert.equal(sumStatLines("hitting", [{ war: null }]).war, undefined, "no WAR reported is no WAR shown");
-assert.equal(sumStatLines("hitting", [{ woba: ".365" }]).woba, undefined, "wOBA is a rate with no formula here — left off a total, never averaged");
+assert.equal(sumStatLines("hitting", [{ opsPlus: "218" }]).opsPlus, undefined, "OPS+ is a rate against a league — left off a total, never added");
 
 assert.equal(sumStatLines("hitting", []).avg, null, "no at-bats is no average, not .000");
 assert.equal(sumStatLines("pitching", []).era, null, "and no innings is no ERA");
 console.log("sumStatLines ok");
+
+/* OPS+ — the one figure on the career line worked out here rather than read
+   off a feed. Checked against Baseball-Reference's own for seasons whose
+   park factor is near enough to one that the two should land together. */
+const lg2024 = { obp: 0.3121, slg: 0.3992, era: 4.072 };
+assert.equal(opsPlus({ obp: ".458", slg: ".701" }, lg2024), "222", "Judge 2024 — B-Ref has 218 with the park in it");
+assert.equal(opsPlus({ obp: ".312", slg: ".399" }, lg2024), "100", "the league's own line is 100 by construction");
+assert.equal(opsPlus({ obp: ".458", slg: ".701" }, null), null, "a season with no league line has no OPS+");
+assert.equal(opsPlus({ obp: null, slg: ".701" }, lg2024), null, "and neither has a line with no on-base");
+console.log("opsPlus ok");
+
+/* ERA+ is the same idea the other way up — the league over the arm, so that
+   higher is better and a plus is the right sign for it. */
+assert.equal(eraPlus({ era: "4.07" }, lg2024), "100", "the league's own ERA is 100 by construction");
+assert.equal(eraPlus({ era: "2.04" }, lg2024), "200", "half the league's earned runs is twice the league");
+assert.equal(eraPlus({ era: "8.14" }, lg2024), "50", "and twice its earned runs is half");
+assert.equal(eraPlus({ era: "0.00" }, lg2024), null, "a scoreless line has no ratio, not an infinite one");
+assert.equal(eraPlus({ era: "3.00" }, null), null, "a season with no league line has no ERA+");
+assert.equal(eraPlus({ era: "-.--" }, lg2024), null, "and neither has an arm that never pitched");
+console.log("eraPlus ok");
+
+/* How a player got into the game — MLB reports a draft year or nothing, and
+   nothing means two different things depending on where he was born. */
+const bio = (p: Partial<PlayerBio>) =>
+  ({ draftYear: null, birthCountry: "", draftRound: "", draftPick: null, ...p }) as PlayerBio;
+assert.equal(signingText(bio({ draftYear: 2013, birthCountry: "USA", draftRound: "1", draftPick: 32 })), "DRAFTED 2013 · RD 1, PICK 32", "Judge — the 2013 first round, not the 2010 thirty-first");
+assert.equal(signingText(bio({ draftYear: 2011, birthCountry: "USA", draftRound: "5", draftPick: 172 })), "DRAFTED 2011 · RD 5, PICK 172", "Betts");
+assert.equal(signingText(bio({ draftYear: 2013, birthCountry: "USA" })), "DRAFTED 2013", "a draft on record with no pick still prints the year");
+assert.equal(signingText(bio({ birthCountry: "Dominican Republic" })), "SIGNED INTERNATIONALLY", "Soto — no draft covers him");
+assert.equal(signingText(bio({ birthCountry: "Japan" })), "SIGNED INTERNATIONALLY", "Ohtani — posted, not drafted");
+assert.equal(signingText(bio({ birthCountry: "Puerto Rico" })), "UNDRAFTED", "Puerto Rico is in the draft, so a missing year is a missing year");
+assert.equal(signingText(bio({ birthCountry: "USA" })), "UNDRAFTED");
+assert.equal(signingText(bio({})), "UNDRAFTED", "no birthplace either — the safer of the two");
+console.log("signingText ok");
+
+/* A park factor is the club's scoring at home against its scoring on the road,
+   halved — a player only spends half a schedule in his own yard. */
+assert.equal(parkFactorOf([]), 1, "no home-and-road split on record is no adjustment");
+assert.equal(parkFactorOf([1]), 1, "a park that plays neutral leaves the line alone");
+assert.equal(Number(parkFactorOf([1.32]).toFixed(3)), 1.16, "Coors scoring a third again at home is worth 16 points, not 32");
+assert.equal(Number(parkFactorOf([0.88]).toFixed(3)), 0.94, "and a pitcher's park cuts the same way");
+assert.equal(Number(parkFactorOf([1.4, 1.2, 1.3]).toFixed(3)), 1.15, "the window is averaged before it is halved");
+console.log("parkFactorOf ok");

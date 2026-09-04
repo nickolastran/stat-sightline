@@ -9,6 +9,7 @@ import { Table, Row, Empty } from "@/components/ui/StatTable";
 import {
   careerCols,
   playerCols,
+  signingText,
   teamLogo,
   teamStatText,
   FALLBACK_TZ,
@@ -16,7 +17,7 @@ import {
   type CareerRow,
   type CareerTable,
   type Game,
-  type GameLogMonth,
+  type GameLogGroup,
   type PlayerBio,
   type SplitSection,
   type StatGroup,
@@ -81,7 +82,7 @@ const careerCells = (
       <td
         key={c.key}
         title={c.title}
-        className={`px-1.5 py-1 text-right text-[11px] tabular-nums ${RULE} ${
+        className={`px-0.5 py-1 text-right text-[12px] tabular-nums ${RULE} ${
           mark
             ? `font-bold text-ink${mark === "mlb" ? " italic" : ""}`
             : strong
@@ -122,7 +123,7 @@ function CareerTableBody({
   ];
   /* The label of a summary line runs across the four identity columns. */
   const LEAD = 4;
-  const id = `px-1.5 py-1 text-[11px] whitespace-nowrap ${RULE}`;
+  const id = `px-1 py-1 text-[12px] whitespace-nowrap ${RULE}`;
 
   return (
     <Table head={head} maxHeight="none" align={"llll"} dense>
@@ -281,7 +282,6 @@ export function BioPanel({
   height,
   weight,
   age,
-  number,
 }: {
   bio: PlayerBio;
   team: string;
@@ -291,7 +291,6 @@ export function BioPanel({
   height: string;
   weight: number | null;
   age: number | null;
-  number: string;
 }) {
   return (
     <div className="space-y-3">
@@ -323,10 +322,11 @@ export function BioPanel({
             }
           />
           <Fact label="MLB DEBUT" value={dateText(bio.debut)} />
-          <Fact
-            label="NUMBER / DRAFT"
-            value={`${number ? `#${number}` : "—"} · ${bio.draftYear ?? "UNDRAFTED"}`}
-          />
+          {/* A player MLB reports no draft year for was either signed as an
+              international amateur or never drafted at all — which of the two
+              is what the birthplace settles. The shirt number is on the
+              identity bar two inches above, so the box is the signing alone. */}
+          <Fact label="SIGNED" value={signingText(bio)} />
         </dl>
       </Panel>
 
@@ -406,13 +406,27 @@ const dayText = (iso: string) =>
     .format(new Date(`${iso}T12:00:00Z`))
     .toUpperCase();
 
-/** "W 5-4" in the colour of the result, so a log skims. */
-function Result({ text, win }: { text: string; win: boolean | null }) {
+/** "W 5-4" in the colour of the result, so a log skims — and, like the date
+ *  beside it, a way into the game it is the summary of. */
+function Result({
+  text,
+  win,
+  gamePk,
+}: {
+  text: string;
+  win: boolean | null;
+  gamePk: number;
+}) {
   if (!text) return <span className="text-ink-3">—</span>;
   return (
-    <span className={win === null ? "text-ink-2" : win ? "text-good" : "text-crit"}>
+    <Link
+      href={`/game/${gamePk}`}
+      className={`hover:underline ${
+        win === null ? "text-ink-2" : win ? "text-good" : "text-crit"
+      }`}
+    >
       {text}
-    </span>
+    </Link>
   );
 }
 
@@ -422,17 +436,20 @@ function Result({ text, win }: { text: string; win: boolean | null }) {
  * read down for — so they sit apart from the game's own figures.
  */
 export function GameLogPanel({
-  months,
-  season,
+  bands,
+  title,
+  empty,
   columns,
   running,
   controls,
 }: {
-  months: GameLogMonth[];
-  season: number;
+  /** Months of one season, or the years of a career's Octobers. */
+  bands: GameLogGroup[];
+  title: string;
+  empty: string;
   /** The game's own counting line. */
   columns: TeamStatCol[];
-  /** The season-to-date rates printed after it — see lib/mlb's gameLogCols. */
+  /** The line to date printed after it — see lib/mlb's gameLogCols. */
   running: TeamStatCol[];
   controls?: React.ReactNode;
 }) {
@@ -446,13 +463,27 @@ export function GameLogPanel({
 
   return (
     <div className="space-y-3">
-      <Panel title={`GAME LOG — ${season}`} right={controls}>
+      <Panel title={title} right={controls}>
         <Table head={head} maxHeight="none" align={"llc"}>
-          {months.length === 0 && (
-            <Empty what="NO GAMES IN THIS SEASON" cols={head.length} />
-          )}
-          {months.map((m) => (
+          {bands.length === 0 && <Empty what={empty} cols={head.length} />}
+          {bands.map((m, i) => (
             <Fragment key={m.label}>
+              {/* A band of the page's own ground between one block and the
+                  next: a month closed by a total and opened by nothing reads
+                  as one long list at a glance. */}
+              {i > 0 && (
+                <tr aria-hidden className="bg-bg">
+                  <td colSpan={head.length} className="h-3 border-y border-line" />
+                </tr>
+              )}
+              <tr className="bg-surface text-ink">
+                <td
+                  className="px-3 py-1.5 text-[10px] tracking-widest whitespace-nowrap"
+                  colSpan={head.length}
+                >
+                  {m.label}
+                </td>
+              </tr>
               {m.rows.map((r) => (
                 <Row key={r.gamePk}>
                   <td className="px-3 py-1.5 whitespace-nowrap text-ink-2">
@@ -473,22 +504,22 @@ export function GameLogPanel({
                     </span>
                   </td>
                   <td className="px-3 py-1.5 text-center whitespace-nowrap">
-                    <Result text={r.result} win={r.win} />
+                    <Result text={r.result} win={r.win} gamePk={r.gamePk} />
                   </td>
                   {cells(columns, r.values)}
                   {cells(running, r.running, true)}
                 </Row>
               ))}
-              <tr className="border-y border-line bg-surface text-ink">
+              <tr className="border-t border-line bg-surface text-ink">
                 <td
                   className="px-3 py-1.5 text-[10px] tracking-widest whitespace-nowrap"
                   colSpan={3}
                 >
-                  {m.label}
+                  {m.label} TOTAL
                 </td>
                 {cells(columns, m.total, true)}
-                {/* The month's own rates, not the running line — a total row
-                    is a slice, and the season to date is on every game above. */}
+                {/* The band's own rates, not the running line — a total row is
+                    a slice, and the line to date is on every game above. */}
                 {cells(running, m.total, true)}
               </tr>
             </Fragment>
@@ -636,7 +667,7 @@ export function RecentGamesPanel({
   count = 5,
 }: {
   columns: TeamStatCol[];
-  months: GameLogMonth[];
+  months: GameLogGroup[];
   href: string;
   count?: number;
 }) {
@@ -667,7 +698,7 @@ export function RecentGamesPanel({
               </span>
             </td>
             <td className="px-3 py-1.5 text-center whitespace-nowrap">
-              <Result text={r.result} win={r.win} />
+              <Result text={r.result} win={r.win} gamePk={r.gamePk} />
             </td>
             {cells(columns, r.values)}
           </Row>
