@@ -5,6 +5,7 @@ import Panel from "@/components/ui/Panel";
 import { Skeleton, SkeletonPanel, SkeletonTiles } from "@/components/ui/Skeleton";
 import SeasonSelect from "@/components/mlb/SeasonSelect";
 import ParamTabs from "@/components/mlb/ParamTabs";
+import ParamSelect from "@/components/mlb/ParamSelect";
 import PlayerTabs, {
   isPlayerTab,
   type PlayerTab,
@@ -33,13 +34,16 @@ import {
   getPlayerSplits,
   getTeamSchedule,
   groupOptions,
+  pickPlayerGameType,
   pickPlayerGroup,
   playerCols,
+  PLAYER_GAME_TYPES,
   playerHeadshot,
   seasonOf,
   teamLogo,
   todayET,
   type Game,
+  type PlayerGameType,
   type PlayerSummary,
   type StatGroup,
 } from "@/lib/mlb";
@@ -192,6 +196,7 @@ async function TabBody({
   season,
   group,
   groups,
+  gameType,
   controls,
 }: {
   tab: PlayerTab;
@@ -201,6 +206,8 @@ async function TabBody({
   group: StatGroup;
   /** Every line the player has — the stats tab shows them all at once. */
   groups: StatGroup[];
+  /** Which half of the calendar the game log reads. */
+  gameType: PlayerGameType;
   controls: React.ReactNode;
 }) {
   const id = player.id;
@@ -242,7 +249,6 @@ async function TabBody({
             height={player.height}
             weight={player.weight}
             age={player.age}
-            number={player.number}
           />
         );
       }
@@ -259,10 +265,14 @@ async function TabBody({
       }
       case "gamelog": {
         const { game, running } = gameLogCols(group);
+        /* October is not a season's log but a career's, so it is not banded
+           by month and carries no year in its title. */
+        const post = gameType === "P";
         return (
           <GameLogPanel
-            months={await getPlayerGameLog(id, season, group)}
-            season={season}
+            bands={await getPlayerGameLog(id, season, group, gameType)}
+            title={post ? "POSTSEASON GAME LOG" : `GAME LOG — ${season}`}
+            empty={post ? "NO POSTSEASON GAMES ON RECORD" : "NO GAMES IN THIS SEASON"}
             columns={game}
             running={running}
             controls={controls}
@@ -320,7 +330,7 @@ export default async function PlayerPage({
   /* The catch-all is optional, so /player/592450 arrives with no segment at
      all — that is the overview, which keeps the canonical URL clean. */
   params: Promise<{ id: string; tab?: string[] }>;
-  searchParams: Promise<{ season?: string; group?: string }>;
+  searchParams: Promise<{ season?: string; group?: string; type?: string }>;
 }) {
   const { id, tab } = await params;
   const playerId = Number(id);
@@ -345,7 +355,7 @@ export default async function PlayerPage({
     player = await getPlayer(playerId, season);
   } catch {
     return (
-      <div className="mx-auto max-w-7xl p-3">
+      <div className="mx-auto max-w-[96rem] p-3">
         <Unavailable what="PLAYER" />
       </div>
     );
@@ -359,6 +369,11 @@ export default async function PlayerPage({
     (): StatGroup[] => ["hitting", "fielding"]
   );
   const group = pickPlayerGroup(sp.group, groups);
+  /* Only the game log reads it, and only two of the three values mean
+     anything there — a player has no spring-training log worth a tab. */
+  const gameType = pickPlayerGameType(sp.type) === "P" ? "P" : "R";
+  /* October's log is the whole career at once, so there is no year to pick. */
+  const seasonal = !(section === "gamelog" && gameType === "P");
   /* There is no fielding split, so that tab offers one fewer choice than the
      rest and lands on batting when fielding was the standing pick. */
   const splitGroups = groups.filter((g) => g !== "fielding");
@@ -385,18 +400,26 @@ export default async function PlayerPage({
           options={groupOptions(groups)}
         />
       )}
-      {seasons.length > 0 && (
-        /* Pushed right in the control bar, where the group tabs lead; inert
-           in a panel header, which already right-aligns what it is given. */
-        <span className="ml-auto">
+      {/* Pushed right in the control bar, where the group tabs lead; inert
+          in a panel header, which already right-aligns what it is given. */}
+      <span className="ml-auto flex flex-wrap items-center gap-3">
+        {section === "gamelog" && (
+          <ParamSelect
+            param="type"
+            label="TYPE"
+            value={gameType}
+            options={PLAYER_GAME_TYPES.filter((t) => t.value !== "S")}
+          />
+        )}
+        {seasons.length > 0 && seasonal && (
           <SeasonSelect value={season} seasons={seasons} />
-        </span>
-      )}
+        )}
+      </span>
     </div>
   ) : null;
 
   return (
-    <div className="mx-auto max-w-7xl space-y-3 p-3">
+    <div className="mx-auto max-w-[96rem] space-y-3 p-3">
       <Identity p={player} />
       <PlayerTabs id={playerId} active={section} query={query} />
       {/* The career and game-log tables carry the controls in their own
@@ -416,7 +439,7 @@ export default async function PlayerPage({
       {/* Keyed on the view, so switching re-suspends into the skeleton rather
           than holding the last section on screen. */}
       <Suspense
-        key={`${section}-${season}-${group}`}
+        key={`${section}-${season}-${group}-${gameType}`}
         fallback={<TabSkeleton tab={section as PlayerTab} />}
       >
         <TabBody
@@ -425,6 +448,7 @@ export default async function PlayerPage({
           season={season}
           group={group}
           groups={groups}
+          gameType={gameType}
           controls={controls}
         />
       </Suspense>

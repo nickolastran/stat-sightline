@@ -4,7 +4,7 @@ import { Skeleton, SkeletonPanel, SkeletonTiles } from "@/components/ui/Skeleton
    section — tiles and panels, which is what the overview opens on. */
 export default function PlayerLoading() {
   return (
-    <div className="mx-auto max-w-7xl space-y-3 p-3">
+    <div className="mx-auto max-w-[96rem] space-y-3 p-3">
       <div className="flex items-center gap-3 border border-line bg-surface px-3 py-3">
         <Skeleton className="h-14 w-14 shrink-0" />
         <Skeleton className="h-9 w-9 shrink-0" delay={0.06} />
