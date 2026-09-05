@@ -1,4 +1,6 @@
-import { Fragment } from "react";
+"use client";
+
+import { Fragment, useLayoutEffect, useRef, useState } from "react";
 import Link from "next/link";
 import Panel from "@/components/ui/Panel";
 import MetricCard from "@/components/ui/MetricCard";
@@ -11,6 +13,7 @@ import {
   isSplitPart,
   playerCols,
   signingText,
+  sumStatLines,
   teamLogo,
   teamStatText,
   FALLBACK_TZ,
@@ -47,7 +50,7 @@ function Club({ id, abbr }: { id: number | null; abbr: string }) {
 const cells = (
   columns: TeamStatCol[],
   values: Record<string, TeamStatValue>,
-  strong = false
+  strong = false,
 ) =>
   columns.map((c) => (
     <td
@@ -75,7 +78,7 @@ const careerCells = (
   columns: TeamStatCol[],
   values: Record<string, TeamStatValue>,
   led: Record<string, LedScope> = {},
-  strong = false
+  strong = false,
 ) =>
   columns.map((c) => {
     const mark = led[c.key];
@@ -98,18 +101,174 @@ const careerCells = (
 
 const glossaryOf = (columns: TeamStatCol[]) => (
   <div className="mt-3">
-    <Glossary entries={columns.map((c) => ({ label: c.label, title: c.title }))} />
+    <Glossary
+      entries={columns.map((c) => ({ label: c.label, title: c.title }))}
+    />
   </div>
 );
+
+/* ── Selecting a span of rows ───────────────────────────────────────── */
+
+/**
+ * Click one row, then another: the two and every row between them are the
+ * span, and the table prints their line added up beneath it. A third click
+ * starts a new span; clicking the open anchor again cancels it.
+ *
+ * The index is whatever the caller counts rows by — flat across the game
+ * log's months, so a span can run from September back into July.
+ */
+function useSpan() {
+  const [sel, setSel] = useState<[number, number | null] | null>(null);
+  /** Where the last row was clicked — the box opens under the cursor. */
+  const [at, setAt] = useState({ x: 0, y: 0 });
+  const [lo, hi] =
+    sel === null
+      ? [-1, -1]
+      : sel[1] === null
+        ? [sel[0], sel[0]]
+        : [Math.min(sel[0], sel[1]), Math.max(sel[0], sel[1])];
+
+  return {
+    lo,
+    hi,
+    at,
+    /** Both ends picked — one row alone is an anchor, not a total. */
+    closed: sel !== null && sel[1] !== null,
+    holds: (i: number) => i >= lo && i <= hi,
+    /* The date and result cells are links into the game; a click meant for
+       one of those is not a click on the row. */
+    pick: (i: number) => (e: React.MouseEvent) => {
+      if ((e.target as HTMLElement).closest("a")) return;
+      setAt({ x: e.clientX, y: e.clientY });
+      setSel((s) =>
+        s === null || s[1] !== null ? [i, null] : s[0] === i ? null : [s[0], i],
+      );
+    },
+    clear: () => setSel(null),
+  };
+}
+
+/* How a picked row reads. Hover is named again so the shading survives the
+   pointer passing over it — the base Row's hover would otherwise win. */
+const SPAN_ROW = "bg-grid hover:bg-grid";
+
+/**
+ * The picked span's line, in a box of its own — it opens under the click that
+ * closed the span, floats over the table, and is dragged anywhere by its title
+ * bar when it covers the rows the reader wants to see.
+ *
+ * Pointer capture is what makes the drag survive the cursor outrunning the
+ * bar — no window listeners, and nothing to unwind when the box unmounts.
+ */
+function SpanTotal({
+  at,
+  title,
+  columns,
+  values,
+  clear,
+}: {
+  /** Where the closing click landed, in viewport coordinates. */
+  at: { x: number; y: number };
+  title: string;
+  columns: TeamStatCol[];
+  values: Record<string, TeamStatValue>;
+  clear: () => void;
+}) {
+  const box = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState<{ x: number; y: number } | null>(null);
+  /** Where in the box the cursor took hold, so it doesn't jump on grab. */
+  const grab = useRef<{ x: number; y: number } | null>(null);
+
+  /* Kept inside the window: a box put past the edge has no way back. */
+  const place = (x: number, y: number) => {
+    const r = box.current?.getBoundingClientRect();
+    if (!r) return;
+    const fit = (v: number, max: number) => Math.max(0, Math.min(v, max));
+    setPos({
+      x: fit(x, window.innerWidth - r.width),
+      y: fit(y, window.innerHeight - r.height),
+    });
+  };
+
+  /* Before paint, so the box is never seen at the raw click point — which,
+     for a click near the right edge, is half off the screen. */
+  useLayoutEffect(() => place(at.x - 24, at.y + 12), [at.x, at.y]);
+
+  const onMove = (e: React.PointerEvent) => {
+    const held = grab.current;
+    if (held) place(e.clientX - held.x, e.clientY - held.y);
+  };
+
+  return (
+    <div
+      ref={box}
+      style={{ left: pos?.x ?? at.x, top: pos?.y ?? at.y }}
+      /* Hugs its columns, but never so tightly that a short line reads as a
+         tooltip — the floor is written as a min() so a phone can't be forced
+         wider than its own screen. */
+      className="fixed z-40 w-max max-w-[calc(100vw-2rem)] min-w-[min(44rem,calc(100vw-2rem))] border border-line bg-surface p-3 shadow-lg"
+    >
+      <div
+        onPointerDown={(e) => {
+          /* The close button lives in the bar; capturing the pointer for a
+             drag would swallow its click. */
+          if ((e.target as HTMLElement).closest("button")) return;
+          const r = box.current!.getBoundingClientRect();
+          grab.current = { x: e.clientX - r.left, y: e.clientY - r.top };
+          e.currentTarget.setPointerCapture(e.pointerId);
+        }}
+        onPointerMove={onMove}
+        onPointerUp={() => (grab.current = null)}
+        onPointerCancel={() => (grab.current = null)}
+        /* touch-none so a drag on a phone moves the box, not the page. */
+        className="relative mb-2 cursor-grab touch-none select-none active:cursor-grabbing"
+      >
+        <h3 className="px-20 text-center text-xs tracking-[0.2em] text-ink">
+          {title}
+        </h3>
+        <button
+          type="button"
+          onClick={clear}
+          className="absolute top-0 right-0 text-xs tracking-widest text-ink-3 hover:text-ink"
+        >
+          CLEAR [X]
+        </button>
+      </div>
+      {/* Centred and ruled off column by column: a single line of figures with
+          nothing between them is read off the wrong header. */}
+      <Table
+        head={columns.map((c) => c.label)}
+        align={"c".repeat(columns.length)}
+        maxHeight="none"
+        dense
+      >
+        <Row>
+          {columns.map((c) => (
+            <td
+              key={c.key}
+              title={c.title}
+              className={`px-2 py-1.5 text-center text-[12px] tabular-nums text-ink ${RULE}`}
+            >
+              {teamStatText(values[c.key])}
+            </td>
+          ))}
+        </Row>
+      </Table>
+    </div>
+  );
+}
 
 /* ── Career, season by season ───────────────────────────────────────── */
 
 function CareerTableBody({
   table,
+  group,
   columns,
   positions,
 }: {
   table: CareerTable;
+  /** Which line is being added up when a span of seasons is picked. */
+  group: StatGroup;
   columns: TeamStatCol[];
   /** The batting table names where each season was played; the others don't. */
   positions: boolean;
@@ -126,65 +285,101 @@ function CareerTableBody({
   const LEAD = 4;
   const id = `px-1 py-1 text-[12px] whitespace-nowrap ${RULE}`;
 
+  /* A span of seasons, added the way the career line under the table is —
+     the halves of a season a trade split are left out of the sum, since the
+     combined line above them already counts those games. */
+  const span = useSpan();
+  const picked = table.rows
+    .slice(span.lo, span.hi + 1)
+    .filter((r) => !isSplitPart(table.rows, r));
+  const spanTotal =
+    span.closed && picked.length > 0
+      ? sumStatLines(
+          group,
+          picked.map((r) => r.values),
+        )
+      : null;
+  const years = new Set(picked.map((r) => r.season));
+
   return (
-    <Table head={head} maxHeight="none" align={"llll"} dense>
-      {table.rows.length === 0 && table.summaries.length === 0 && (
-        <Empty what="NO SEASONS ON RECORD" cols={head.length} />
-      )}
-      {table.rows.map((r: CareerRow, i) => {
-        /* A season a trade split reads as one line with its halves under it:
+    <>
+      <Table head={head} maxHeight="none" align={"llll"} dense>
+        {table.rows.length === 0 && table.summaries.length === 0 && (
+          <Empty what="NO SEASONS ON RECORD" cols={head.length} />
+        )}
+        {table.rows.map((r: CareerRow, i) => {
+          /* A season a trade split reads as one line with its halves under it:
            the whole season is the figure, the clubs are the detail. */
-        const part = isSplitPart(table.rows, r);
-        return (
-          <Row key={`${r.season}-${r.teamId ?? r.teams}-${i}`}>
-            <td
-              className={`${id} tabular-nums ${
-                part ? "pl-4 text-ink-3" : "text-ink-2"
-              }`}
+          const part = isSplitPart(table.rows, r);
+          return (
+            <Row
+              key={`${r.season}-${r.teamId ?? r.teams}-${i}`}
+              onClick={part ? undefined : span.pick(i)}
+              className={span.holds(i) ? SPAN_ROW : ""}
             >
-              {r.season}
-            </td>
-            <td className={`${id} tabular-nums text-ink-3`}>{r.age ?? "—"}</td>
-            <td className={`${id} text-ink-2`}>
-              {r.teamId === null ? (
-                <span className="text-ink-3">{r.team}</span>
-              ) : (
-                /* No mark beside the three letters: a logo per row, eleven
-                   rows deep, costs the column the width the line needs. */
-                <TeamLink id={r.teamId} name={r.team} logo={false} />
+              <td
+                className={`${id} tabular-nums ${
+                  part ? "pl-4 text-ink-3" : "text-ink-2"
+                }`}
+              >
+                {r.season}
+              </td>
+              <td className={`${id} tabular-nums text-ink-3`}>
+                {r.age ?? "—"}
+              </td>
+              <td className={`${id} text-ink-2`}>
+                {r.teamId === null ? (
+                  <span className="text-ink-3">{r.team}</span>
+                ) : (
+                  /* No mark beside the three letters: a logo per row, eleven
+                     rows deep, costs the column the width the line needs. */
+                  <TeamLink id={r.teamId} name={r.team} logo={false} />
+                )}
+              </td>
+              <td className={`${id} text-ink-3`}>{r.league || "—"}</td>
+              {careerCells(columns, r.values, r.led, !part)}
+              {positions && (
+                <td className={`${id} text-ink-3`}>{r.pos || "—"}</td>
+              )}
+            </Row>
+          );
+        })}
+        {table.summaries.map((sum, i) => (
+          <tr
+            key={`${sum.band}-${sum.label}`}
+            className={`bg-surface text-ink ${
+              /* A rule opens each block — the career, then the clubs, then the
+               leagues — so three kinds of total don't read as one list. */
+              i === 0 || sum.band !== table.summaries[i - 1].band
+                ? "border-t border-line"
+                : ""
+            }`}
+          >
+            <td className={`${id} font-bold tracking-wider`} colSpan={LEAD}>
+              {sum.label}
+              {sum.span && (
+                <span className="ml-1.5 font-normal text-ink-3">
+                  ({sum.span})
+                </span>
               )}
             </td>
-            <td className={`${id} text-ink-3`}>{r.league || "—"}</td>
-            {careerCells(columns, r.values, r.led, !part)}
-            {positions && <td className={`${id} text-ink-3`}>{r.pos || "—"}</td>}
-          </Row>
-        );
-      })}
-      {table.summaries.map((sum, i) => (
-        <tr
-          key={`${sum.band}-${sum.label}`}
-          className={`bg-surface text-ink ${
-            /* A rule opens each block — the career, then the clubs, then the
-               leagues — so three kinds of total don't read as one list. */
-            i === 0 || sum.band !== table.summaries[i - 1].band
-              ? "border-t border-line"
-              : ""
-          }`}
-        >
-          <td
-            className={`${id} font-bold tracking-wider`}
-            colSpan={LEAD}
-          >
-            {sum.label}
-            {sum.span && (
-              <span className="ml-1.5 font-normal text-ink-3">({sum.span})</span>
-            )}
-          </td>
-          {careerCells(columns, sum.values, {}, true)}
-          {positions && <td className={id} />}
-        </tr>
-      ))}
-    </Table>
+            {careerCells(columns, sum.values, {}, true)}
+            {positions && <td className={id} />}
+          </tr>
+        ))}
+      </Table>
+      {spanTotal && (
+        <SpanTotal
+          at={span.at}
+          title={`SELECTED · ${picked[0].season}–${
+            picked[picked.length - 1].season
+          } · ${years.size} YR${years.size === 1 ? "" : "S"}`}
+          columns={columns}
+          values={spanTotal}
+          clear={span.clear}
+        />
+      )}
+    </>
   );
 }
 
@@ -224,6 +419,7 @@ export function CareerPanel({ sections }: { sections: CareerSection[] }) {
             <Panel title={`CAREER ${STAT_GROUP_LABEL[group]}`}>
               <CareerTableBody
                 table={regular}
+                group={group}
                 columns={columns}
                 positions={positions}
               />
@@ -232,6 +428,7 @@ export function CareerPanel({ sections }: { sections: CareerSection[] }) {
               <Panel title={`POSTSEASON ${STAT_GROUP_LABEL[group]}`}>
                 <CareerTableBody
                   table={postseason}
+                  group={group}
                   columns={columns}
                   positions={positions}
                 />
@@ -242,9 +439,8 @@ export function CareerPanel({ sections }: { sections: CareerSection[] }) {
       })}
       <p className="border border-line bg-bg px-3 py-2 text-[10px] text-ink-3">
         <span className="font-bold text-ink">BOLD</span> season figures led the
-        league.{" "}
-        <span className="font-bold italic text-ink">BOLD ITALIC</span> led all
-        major leagues.
+        league. <span className="font-bold italic text-ink">BOLD ITALIC</span>{" "}
+        led all major leagues.
       </p>
       {glossaryOf(legend)}
     </div>
@@ -297,9 +493,7 @@ export function BioPanel({
         <dl className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
           <Fact
             label="TEAM"
-            value={
-              teamId ? <TeamLink id={teamId} name={team} /> : team || "—"
-            }
+            value={teamId ? <TeamLink id={teamId} name={team} /> : team || "—"}
           />
           <Fact label="POSITION" value={bio.position || "—"} />
           <Fact
@@ -436,6 +630,7 @@ function Result({
  */
 export function GameLogPanel({
   bands,
+  group,
   title,
   empty,
   columns,
@@ -444,6 +639,8 @@ export function GameLogPanel({
 }: {
   /** Months of one season, or the years of a career's Octobers. */
   bands: GameLogGroup[];
+  /** Which line is being added up when a span of games is picked. */
+  group: StatGroup;
   title: string;
   empty: string;
   /** The game's own counting line. */
@@ -460,6 +657,22 @@ export function GameLogPanel({
     ...running.map((c) => c.label),
   ];
 
+  /* Games are picked across the whole log, not within a month, so the span is
+     indexed off one flat list and each band knows where in it it starts. */
+  const flat = bands.flatMap((m) => m.rows);
+  const starts: number[] = [];
+  bands.reduce((n, m) => (starts.push(n), n + m.rows.length), 0);
+
+  const span = useSpan();
+  const picked = flat.slice(span.lo, span.hi + 1);
+  const spanTotal =
+    span.closed && picked.length > 0
+      ? sumStatLines(
+          group,
+          picked.map((r) => r.values),
+        )
+      : null;
+
   return (
     <div className="space-y-3">
       <Panel title={title} right={controls}>
@@ -472,7 +685,10 @@ export function GameLogPanel({
                   as one long list at a glance. */}
               {i > 0 && (
                 <tr aria-hidden className="bg-bg">
-                  <td colSpan={head.length} className="h-3 border-y border-line" />
+                  <td
+                    colSpan={head.length}
+                    className="h-3 border-y border-line"
+                  />
                 </tr>
               )}
               <tr className="bg-surface text-ink">
@@ -483,32 +699,42 @@ export function GameLogPanel({
                   {m.label}
                 </td>
               </tr>
-              {m.rows.map((r) => (
-                <Row key={r.gamePk}>
-                  <td className="px-3 py-1.5 whitespace-nowrap text-ink-2">
-                    <Link href={`/game/${r.gamePk}`} className="hover:text-accent">
-                      {dayText(r.date)}
-                    </Link>
-                  </td>
-                  <td className="px-3 py-1.5 whitespace-nowrap">
-                    <span className="flex items-center gap-1.5">
-                      <span className="w-4 shrink-0 text-right text-[10px] text-ink-3">
-                        {r.home ? "vs" : "@"}
+              {m.rows.map((r, j) => {
+                const k = starts[i] + j;
+                return (
+                  <Row
+                    key={r.gamePk}
+                    onClick={span.pick(k)}
+                    className={span.holds(k) ? SPAN_ROW : ""}
+                  >
+                    <td className="px-3 py-1.5 whitespace-nowrap text-ink-2">
+                      <Link
+                        href={`/game/${r.gamePk}`}
+                        className="hover:text-accent"
+                      >
+                        {dayText(r.date)}
+                      </Link>
+                    </td>
+                    <td className="px-3 py-1.5 whitespace-nowrap">
+                      <span className="flex items-center gap-1.5">
+                        <span className="w-4 shrink-0 text-right text-[10px] text-ink-3">
+                          {r.home ? "vs" : "@"}
+                        </span>
+                        {r.opp ? (
+                          <Club id={r.opp.id} abbr={r.opp.abbr} />
+                        ) : (
+                          <span className="text-ink-3">—</span>
+                        )}
                       </span>
-                      {r.opp ? (
-                        <Club id={r.opp.id} abbr={r.opp.abbr} />
-                      ) : (
-                        <span className="text-ink-3">—</span>
-                      )}
-                    </span>
-                  </td>
-                  <td className="px-3 py-1.5 text-center whitespace-nowrap">
-                    <Result text={r.result} win={r.win} gamePk={r.gamePk} />
-                  </td>
-                  {cells(columns, r.values)}
-                  {cells(running, r.running, true)}
-                </Row>
-              ))}
+                    </td>
+                    <td className="px-3 py-1.5 text-center whitespace-nowrap">
+                      <Result text={r.result} win={r.win} gamePk={r.gamePk} />
+                    </td>
+                    {cells(columns, r.values)}
+                    {cells(running, r.running, true)}
+                  </Row>
+                );
+              })}
               <tr className="border-t border-line bg-surface text-ink">
                 <td
                   className="px-3 py-1.5 text-[10px] tracking-widest whitespace-nowrap"
@@ -524,6 +750,20 @@ export function GameLogPanel({
             </Fragment>
           ))}
         </Table>
+        {spanTotal && (
+          <SpanTotal
+            at={span.at}
+            /* The span's own rates ride along with its counting line — the
+               running columns on a game row are the season to date, which a
+               slice of it is not. */
+            title={`SELECTED · ${picked.length} GAMES · ${dayText(
+              picked[picked.length - 1].date,
+            )} → ${dayText(picked[0].date)}`}
+            columns={[...columns, ...running]}
+            values={spanTotal}
+            clear={span.clear}
+          />
+        )}
       </Panel>
       {glossaryOf([...columns, ...running])}
     </div>
@@ -545,7 +785,10 @@ export function HeadlineTiles({ line }: { line: StatLine }) {
 
 function SeeAll({ href }: { href: string }) {
   return (
-    <Link href={href} className="text-[10px] tracking-[0.2em] text-ink-3 hover:text-accent">
+    <Link
+      href={href}
+      className="text-[10px] tracking-[0.2em] text-ink-3 hover:text-accent"
+    >
       SEE ALL →
     </Link>
   );
@@ -587,11 +830,16 @@ export function SplitsSummaryPanel({
     <Panel title={`SPLITS — ${season}`} right={<SeeAll href={href} />}>
       <Table head={["SPLIT", ...columns.map((c) => c.label)]} maxHeight="none">
         {lines.length === 0 && (
-          <Empty what="NO SPLITS FOR THIS SEASON YET" cols={columns.length + 1} />
+          <Empty
+            what="NO SPLITS FOR THIS SEASON YET"
+            cols={columns.length + 1}
+          />
         )}
         {lines.map((l) => (
           <Row key={l.code}>
-            <td className="px-3 py-1.5 whitespace-nowrap text-ink-2">{l.label}</td>
+            <td className="px-3 py-1.5 whitespace-nowrap text-ink-2">
+              {l.label}
+            </td>
             {cells(columns, l.values)}
           </Row>
         ))}
@@ -622,15 +870,14 @@ export function SeasonSummaryPanel({
   const columns = playerCols(group);
   const label = STAT_GROUP_LABEL[group];
   const rows: [string, Record<string, TeamStatValue>][] = [
-    ...seasonRows.map(
-      (r): [string, Record<string, TeamStatValue>] => [
-        seasonRows.length > 1 ? `REGULAR SEASON · ${r.team}` : "REGULAR SEASON",
-        r.values,
-      ]
-    ),
-    ...postRows.map(
-      (r): [string, Record<string, TeamStatValue>] => ["POSTSEASON", r.values]
-    ),
+    ...seasonRows.map((r): [string, Record<string, TeamStatValue>] => [
+      seasonRows.length > 1 ? `REGULAR SEASON · ${r.team}` : "REGULAR SEASON",
+      r.values,
+    ]),
+    ...postRows.map((r): [string, Record<string, TeamStatValue>] => [
+      "POSTSEASON",
+      r.values,
+    ]),
   ];
 
   return (
@@ -676,7 +923,9 @@ export function RecentGamesPanel({
   return (
     <Panel title="RECENT GAMES" right={<SeeAll href={href} />}>
       <Table head={head} maxHeight="none" align={"llc"}>
-        {rows.length === 0 && <Empty what="NO GAMES PLAYED YET" cols={head.length} />}
+        {rows.length === 0 && (
+          <Empty what="NO GAMES PLAYED YET" cols={head.length} />
+        )}
         {rows.map((r) => (
           <Row key={r.gamePk}>
             <td className="px-3 py-1.5 whitespace-nowrap text-ink-2">

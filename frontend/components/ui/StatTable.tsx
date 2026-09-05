@@ -72,8 +72,22 @@ export function Table({
   );
 }
 
-export const Row = ({ children }: { children: React.ReactNode }) => (
-  <tr className="border-b border-grid text-ink-2 last:border-b-0 hover:bg-surface-2">
+export const Row = ({
+  children,
+  className = "",
+  onClick,
+}: {
+  children: React.ReactNode;
+  /** Extra classes — a selected row, say. Rides on top of the base chrome. */
+  className?: string;
+  onClick?: React.MouseEventHandler<HTMLTableRowElement>;
+}) => (
+  <tr
+    onClick={onClick}
+    className={`border-b border-grid text-ink-2 last:border-b-0 hover:bg-surface-2 ${
+      onClick ? "cursor-pointer" : ""
+    } ${className}`}
+  >
     {children}
   </tr>
 );
