@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Skeleton, SkeletonPanel } from "@/components/ui/Skeleton";
 import TeamTabs, { isTeamTab, type TeamTab } from "@/components/mlb/TeamTabs";
@@ -105,6 +106,12 @@ function Identity({ t, season }: { t: TeamIdentity; season: number }) {
           {[`${season} SEASON`, ...facts].join(" · ")}
         </p>
       </div>
+      <Link
+        href={`/compare/teams?ids=${t.id}&season=${season}`}
+        className="ml-auto shrink-0 rounded border border-line px-2 py-1 text-[10px] tracking-[0.2em] text-ink-3 hover:border-accent hover:text-ink"
+      >
+        COMPARE
+      </Link>
     </div>
   );
 }

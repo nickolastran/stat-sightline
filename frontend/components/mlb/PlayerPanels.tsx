@@ -8,6 +8,7 @@ import Glossary from "@/components/mlb/Glossary";
 import { Table, Row, Empty } from "@/components/ui/StatTable";
 import {
   careerCols,
+  isSplitPart,
   playerCols,
   signingText,
   teamLogo,
@@ -133,9 +134,7 @@ function CareerTableBody({
       {table.rows.map((r: CareerRow, i) => {
         /* A season a trade split reads as one line with its halves under it:
            the whole season is the figure, the clubs are the detail. */
-        const part =
-          r.teams === 1 &&
-          table.rows.some((o) => o.season === r.season && o.teams > 1);
+        const part = isSplitPart(table.rows, r);
         return (
           <Row key={`${r.season}-${r.teamId ?? r.teams}-${i}`}>
             <td

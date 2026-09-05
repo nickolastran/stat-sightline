@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import Panel from "@/components/ui/Panel";
 import { Skeleton, SkeletonPanel, SkeletonTiles } from "@/components/ui/Skeleton";
@@ -116,6 +117,12 @@ function Identity({ p }: { p: PlayerSummary }) {
           {[p.team.toUpperCase(), ...facts].join(" · ")}
         </p>
       </div>
+      <Link
+        href={`/compare?ids=${p.id}`}
+        className="ml-auto shrink-0 rounded border border-line px-2 py-1 text-[10px] tracking-[0.2em] text-ink-3 hover:border-accent hover:text-ink"
+      >
+        COMPARE
+      </Link>
     </div>
   );
 }
