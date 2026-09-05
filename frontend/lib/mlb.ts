@@ -2977,6 +2977,70 @@ export const careerCols = (group: StatGroup): TeamStatCol[] =>
       ? CAREER_PITCHING_COLS
       : CAREER_FIELDING_COLS;
 
+/* ── The advanced line ──────────────────────────────────────────────── */
+
+/*
+ * What MLB's sabermetrics feed carries beyond the standard line. The feed is
+ * already fetched for every career table — WAR rides on it — so these cost
+ * nothing new to show; they were simply being dropped on the floor.
+ *
+ * Rbat's neighbour Rfield is deliberately absent: the feed calls it
+ * `fielding`, which is already the key of a fielding line's own FPCT, and one
+ * key meaning two things would have the sabermetric figure overwrite the
+ * percentage on the fielding table.
+ */
+export const ADVANCED_HITTING_COLS: TeamStatCol[] = [
+  { key: "war", label: "WAR", title: "Wins above replacement (FanGraphs, via MLB)" },
+  { key: "rar", label: "RAR", title: "Runs above replacement" },
+  { key: "woba", label: "wOBA", title: "Weighted on-base average — every way of reaching base at its run value" },
+  { key: "wRc", label: "wRC", title: "Weighted runs created" },
+  { key: "wRcPlus", label: "wRC+", title: "Weighted runs created against the league, park-adjusted — 100 is average" },
+  { key: "wRaa", label: "wRAA", title: "Weighted runs above average" },
+  { key: "batting", label: "Rbat", title: "Batting runs above average" },
+  { key: "baseRunning", label: "Rbaser", title: "Base-running runs above average" },
+  { key: "positional", label: "Rpos", title: "Positional adjustment runs" },
+  { key: "replacement", label: "Rrep", title: "Runs above a replacement-level player" },
+  { key: "spd", label: "SPD", title: "Speed score" },
+  { key: "ubr", label: "UBR", title: "Ultimate base running — base-running run value outside stolen bases" },
+  { key: "wSb", label: "wSB", title: "Weighted stolen-base runs" },
+  { key: "wGdp", label: "wGDP", title: "Weighted double-play runs" },
+];
+
+export const ADVANCED_PITCHING_COLS: TeamStatCol[] = [
+  { key: "war", label: "WAR", title: "Wins above replacement (FanGraphs, via MLB)" },
+  { key: "ra9War", label: "RA9-WAR", title: "Wins above replacement figured from runs allowed rather than FIP" },
+  { key: "rar", label: "RAR", title: "Runs above replacement" },
+  { key: "fip", label: "FIP", title: "Fielding independent pitching" },
+  { key: "xfip", label: "xFIP", title: "FIP with a league-average home-run rate on fly balls" },
+  { key: "fipMinus", label: "FIP-", title: "FIP against the league — 100 is average, lower is better" },
+  { key: "eraMinus", label: "ERA-", title: "ERA against the league — 100 is average, lower is better" },
+  { key: "pli", label: "pLI", title: "Average leverage index on entering a game" },
+  { key: "inli", label: "inLI", title: "Average leverage index over innings pitched" },
+  { key: "gmli", label: "gmLI", title: "Average leverage index at the moment of entry" },
+  { key: "exli", label: "exLI", title: "Average leverage index on leaving a game" },
+  { key: "sd", label: "SD", title: "Shutdowns — relief outings that meaningfully helped the club win" },
+  { key: "md", label: "MD", title: "Meltdowns — relief outings that meaningfully hurt it" },
+];
+
+/** The feed has no fielding line at all, so that group has no advanced view. */
+export const advancedCols = (group: StatGroup): TeamStatCol[] =>
+  group === "hitting"
+    ? ADVANCED_HITTING_COLS
+    : group === "pitching"
+      ? ADVANCED_PITCHING_COLS
+      : [];
+
+/*
+ * Which advanced figures a career line is the sum of. Runs and wins over a
+ * baseline accumulate the way hits do; a rate against the league does not.
+ * The ones left out are shown blank on a career line rather than added into
+ * a number that would mean nothing — a summed wRC+ of 344 is not a career.
+ */
+const ADVANCED_ADDITIVE = new Set([
+  "war", "rar", "wRaa", "wRc", "batting", "baseRunning", "positional",
+  "replacement", "ubr", "wSb", "wGdp", "ra9War", "sd", "md",
+]);
+
 /* ── Summing stat lines ─────────────────────────────────────────────── */
 
 /* The figures that are ratios of the others: adding them is meaningless, so
@@ -3250,6 +3314,32 @@ function ledMarks(
 const SABER_FORMAT: Record<string, (n: number) => string> = {
   war: (n) => n.toFixed(1),
   fip: (n) => n.toFixed(2),
+  /* Runs and wins over a baseline are quoted to a tenth, the plus/minus
+     stats as whole numbers, leverage to a hundredth, and wOBA as the rate it
+     is — ".421", without its leading zero, like every other rate here. */
+  rar: (n) => n.toFixed(1),
+  ra9War: (n) => n.toFixed(1),
+  wRaa: (n) => n.toFixed(1),
+  batting: (n) => n.toFixed(1),
+  baseRunning: (n) => n.toFixed(1),
+  positional: (n) => n.toFixed(1),
+  replacement: (n) => n.toFixed(1),
+  ubr: (n) => n.toFixed(1),
+  wSb: (n) => n.toFixed(1),
+  wGdp: (n) => n.toFixed(1),
+  spd: (n) => n.toFixed(1),
+  wRc: (n) => n.toFixed(0),
+  wRcPlus: (n) => n.toFixed(0),
+  fipMinus: (n) => n.toFixed(0),
+  eraMinus: (n) => n.toFixed(0),
+  sd: (n) => n.toFixed(0),
+  md: (n) => n.toFixed(0),
+  xfip: (n) => n.toFixed(2),
+  pli: (n) => n.toFixed(2),
+  inli: (n) => n.toFixed(2),
+  gmli: (n) => n.toFixed(2),
+  exli: (n) => n.toFixed(2),
+  woba: (n) => n.toFixed(3).replace(/^0\./, "."),
 };
 
 /** What a season's OPS+ or ERA+ is measured against. */
@@ -3532,8 +3622,7 @@ const weightedMean = (
 
 /** The sabermetric keys a group's career table prints. */
 const saberKeys = (group: StatGroup): string[] =>
-  careerCols(group)
-    .map((c) => c.key)
+  [...new Set([...careerCols(group), ...advancedCols(group)].map((c) => c.key))]
     .filter((k) => k in SABER_FORMAT);
 
 /**
@@ -3766,12 +3855,21 @@ export async function getPlayerCareer(
         : null;
 
   /* MLB has no career sabermetric line, so the career's WAR is its seasons
-     added up — which is what a career WAR is. Only that one figure is filled
-     in: everything else on the career line is MLB's own and stays that way,
-     and the rates beside WAR cannot be added at all. */
-  if (total && !postseason && saberKeys(group).includes("war")) {
+     added up — which is what a career WAR is. The same holds for the runs and
+     wins the advanced view is read for. Everything else on the career line is
+     MLB's own and stays that way, and the rates beside WAR — wOBA, wRC+, the
+     minus stats, leverage — cannot be added at all, so they stay blank rather
+     than becoming a figure that would mean nothing. */
+  if (total && !postseason) {
     const parts = rows.filter((r) => r.teams === 1).map((r) => r.values);
-    total.war = sumStatLines(group, parts).war ?? null;
+    for (const key of saberKeys(group).filter((k) => ADVANCED_ADDITIVE.has(k))) {
+      const nums = parts
+        .map((p) => teamStatNum(p[key]))
+        .filter((n): n is number => n !== null);
+      total[key] = nums.length
+        ? SABER_FORMAT[key](nums.reduce((a, b) => a + b, 0))
+        : null;
+    }
   }
 
   /* OPS+ and ERA+ are figured here rather than fetched — one league line per
@@ -3922,6 +4020,27 @@ function mergeSeasons(group: StatGroup, rows: CareerRow[]): CareerRow[] {
 
 /** An empty table — what a caller falls back to when the career won't load. */
 export const EMPTY_CAREER: CareerTable = { rows: [], total: null, summaries: [] };
+
+/** True for a per-club line of a season a trade split, which sits under the
+ *  season's combined line on the career table rather than standing on its
+ *  own. Shared by the career table's own indenting and by whichever line
+ *  reads a season as a single row. */
+export function isSplitPart(rows: CareerRow[], r: CareerRow): boolean {
+  return r.teams === 1 && rows.some((o) => o.season === r.season && o.teams > 1);
+}
+
+/** The one row that is a season's whole line — the lone team's row in an
+ *  ordinary year, the combined line in a season split by trade. Powers the
+ *  compare page's season scope, where a per-club split has no meaning. */
+export function wholeSeasonRow(
+  table: CareerTable,
+  season: number
+): CareerRow | null {
+  const s = String(season);
+  return (
+    table.rows.find((r) => r.season === s && !isSplitPart(table.rows, r)) ?? null
+  );
+}
 
 /** "AL", "NL", or "" for anything MLB didn't name. */
 const leagueAbbr = (id: number | undefined): string =>

@@ -21,8 +21,9 @@ export function Table({
   dense = false,
 }: {
   /** Column labels; anything after the first is right-aligned. Empty for a
-      table that heads its own sections and would only repeat itself. */
-  head: string[];
+      table that heads its own sections and would only repeat itself. A plain
+      string in every case but the compare page's headshot-and-name columns. */
+  head: React.ReactNode[];
   children: React.ReactNode;
   maxHeight?: string;
   /** One of "l"/"c"/"r" per column, where the default doesn't suit. */
@@ -51,7 +52,7 @@ export function Table({
             <tr>
               {head.map((h, i) => (
                 <th
-                  key={h + i}
+                  key={i}
                   scope="col"
                   className={`sticky top-0 z-10 border-b border-line bg-surface text-[10px] font-normal text-ink-3 ${
                     dense

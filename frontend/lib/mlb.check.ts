@@ -39,6 +39,8 @@ import {
   transactionMonths,
   ordinal,
   statRank,
+  isSplitPart,
+  wholeSeasonRow,
   type Game,
   type PlayerBio,
   type PlayerStatRow,
@@ -46,6 +48,8 @@ import {
   type PlayProb,
   type Transaction,
   type TeamStatRow,
+  type CareerRow,
+  type CareerTable,
 } from "./mlb";
 
 const row = (p: Partial<StandingRow>) =>
@@ -695,3 +699,35 @@ assert.equal(Number(parkFactorOf([1.32]).toFixed(3)), 1.16, "Coors scoring a thi
 assert.equal(Number(parkFactorOf([0.88]).toFixed(3)), 0.94, "and a pitcher's park cuts the same way");
 assert.equal(Number(parkFactorOf([1.4, 1.2, 1.3]).toFixed(3)), 1.15, "the window is averaged before it is halved");
 console.log("parkFactorOf ok");
+
+/* The compare page reads a season as one row, but a season split by trade is
+   several rows on the career table — the per-club halves and the combined
+   line over them. Whichever one isn't a "part" is the season's whole line. */
+const careerRow = (p: Partial<CareerRow>): CareerRow => ({
+  season: "",
+  team: "",
+  teamName: "",
+  teamId: null,
+  age: null,
+  league: "",
+  pos: "",
+  teams: 1,
+  led: {},
+  values: {},
+  ...p,
+});
+const splitRows = [
+  careerRow({ season: "2021", teamId: 1, values: { h: 1 } }),
+  careerRow({ season: "2022", teamId: 2, values: { h: 2 } }),
+  careerRow({ season: "2022", teamId: 3, values: { h: 3 } }),
+  careerRow({ season: "2022", teamId: null, teams: 2, values: { h: 5 } }),
+];
+const splitTable: CareerTable = { rows: splitRows, total: null, summaries: [] };
+
+assert.equal(isSplitPart(splitRows, splitRows[1]), true, "a per-club line of a split season sits under the combined one");
+assert.equal(isSplitPart(splitRows, splitRows[0]), false, "an ordinary season stands on its own");
+assert.equal(isSplitPart(splitRows, splitRows[3]), false, "the combined line itself is not a part");
+assert.equal(wholeSeasonRow(splitTable, 2021)?.values.h, 1, "an ordinary season reads as its own line");
+assert.equal(wholeSeasonRow(splitTable, 2022)?.values.h, 5, "a split season reads as the combined line, not either club's half");
+assert.equal(wholeSeasonRow(splitTable, 1999), null, "a season never played has no line to read");
+console.log("wholeSeasonRow ok");
