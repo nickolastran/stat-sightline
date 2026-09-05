@@ -1,25 +1,22 @@
 @import "tailwindcss";
 
 /*
- * Design tokens — "brutalist-technical" chrome.
- * The @theme block is the DARK default (unchanged look). A light theme is
- * layered on by overriding the same --color-* vars under
- * :root[data-theme="light"]; every `bg-bg`/`text-ink` utility reads the var,
- * so flipping the attribute repaints the whole app. See ThemeToggle.
+ * Design tokens — "brutalist-technical" chrome. Light theme only: warm paper,
+ * ink hierarchy on top. Every `bg-bg`/`text-ink` utility reads a --color-* var.
  */
 @theme {
-  --color-bg: #0d0d0d; /* page plane */
-  --color-surface: #1a1a19; /* card / chart surface (validator surface) */
-  --color-surface-2: #222220; /* hover / raised */
-  --color-ink: #ffffff; /* primary */
-  --color-ink-2: #c3c2b7; /* secondary */
-  --color-ink-3: #898781; /* muted: axis, labels, captions */
-  --color-grid: #2c2c2a; /* hairline gridlines */
-  --color-line: rgba(255, 255, 255, 0.1); /* hairline borders */
-  --color-accent: #3987e5; /* categorical slot 1 (blue) doubles as UI accent */
+  --color-bg: #f4f2ec; /* warm paper */
+  --color-surface: #ffffff; /* card / chart surface */
+  --color-surface-2: #e9e6dc; /* hover / raised */
+  --color-ink: #16150f; /* primary */
+  --color-ink-2: #45433b; /* secondary */
+  --color-ink-3: #78756b; /* muted: axis, labels, captions */
+  --color-grid: #ddd9cd; /* hairline gridlines */
+  --color-line: rgba(0, 0, 0, 0.14); /* hairline borders */
+  --color-accent: #2668c9; /* categorical slot 1 (blue) doubles as UI accent */
   --color-good: #0ca30c; /* status — reserved, never a series */
-  --color-crit: #d03b3b;
-  --color-warn: #d99a2b; /* status — between good and crit, never a series */
+  --color-crit: #c62d2d;
+  --color-warn: #b07714; /* status — between good and crit, never a series */
 
   --font-sans:
     "Helvetica Neue", "HelveticaNeue", Helvetica, Arial, sans-serif;
@@ -28,25 +25,8 @@
   --radius-*: initial;
 }
 
-/* Light theme: warm paper, same ink hierarchy inverted. Overrides only the
-   token values — no utility class needs to know which theme is active. */
-:root[data-theme="light"] {
-  --color-bg: #f4f2ec; /* warm paper */
-  --color-surface: #ffffff;
-  --color-surface-2: #e9e6dc; /* hover / raised */
-  --color-ink: #16150f; /* primary */
-  --color-ink-2: #45433b; /* secondary */
-  --color-ink-3: #78756b; /* muted: axis, labels, captions */
-  --color-grid: #ddd9cd; /* hairline gridlines */
-  --color-line: rgba(0, 0, 0, 0.14); /* hairline borders */
-  --color-accent: #2668c9; /* darker blue for AA contrast on white */
-  --color-crit: #c62d2d;
-  --color-warn: #b07714; /* darker amber for AA contrast on white */
-  color-scheme: light;
-}
-
 :root {
-  color-scheme: dark;
+  color-scheme: light;
 }
 
 body {
