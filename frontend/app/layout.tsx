@@ -33,7 +33,7 @@ export default function RootLayout({
               ASK
             </Link>
             <Link
-              href="/#access"
+              href="/signin"
               className="border border-accent bg-accent px-3 py-1.5 font-bold text-white hover:opacity-90"
             >
               SIGN IN
