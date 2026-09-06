@@ -2201,7 +2201,10 @@ async function buildSplits(
       ?.splits ?? [];
 
   const byCode = new Map<string, SplitLine>();
-  for (const s of typed("statSplits") as any[]) {
+  for (const s of [
+    ...typed("statSplits"),
+    ...typed("careerStatSplits"),
+  ] as any[]) {
     const code = s.split?.code ?? "";
     /* One code, one line: a club that changed leagues mid-season — or a
        player traded across one — can come back with the same code twice, and
@@ -2223,7 +2226,10 @@ async function buildSplits(
     }))
     .filter((sec) => sec.lines.length > 0);
 
-  const total = (typed("season") as any[])[0];
+  /* The line the slices are read against — a season's, or a career's on the
+     career view, which answers under its own type name. */
+  const total = ((typed("season") as any[])[0] ??
+    (typed("career") as any[])[0]) as any;
   if (total && built.length > 0)
     built[0].lines.unshift({
       code: "total",
@@ -4477,17 +4483,26 @@ const PLAYER_SPLIT_SECTIONS = [
   ...SPLIT_SECTIONS,
 ];
 
-/** One player's season sliced every way MLB reports, section by section. */
+/**
+ * One player's season sliced every way MLB reports, section by section — or
+ * his whole career, which MLB answers for on the same codes under a different
+ * pair of type names. A career has no "last 7 days", so that section goes.
+ */
 export async function getPlayerSplits(
   id: number,
-  season: number,
+  season: number | "career",
   group: "hitting" | "pitching",
 ): Promise<SplitSection[]> {
+  const career = season === "career";
   return buildSplits(
     (codes) =>
-      `/people/${id}/stats?stats=season,statSplits&group=${group}&season=${season}&sitCodes=${codes}`,
+      career
+        ? `/people/${id}/stats?stats=career,careerStatSplits&group=${group}&sitCodes=${codes}`
+        : `/people/${id}/stats?stats=season,statSplits&group=${group}&season=${season}&sitCodes=${codes}`,
     playerCols(group),
-    PLAYER_SPLIT_SECTIONS.filter((s) => !s.hittingOnly || group === "hitting"),
+    (career ? SPLIT_SECTIONS : PLAYER_SPLIT_SECTIONS).filter(
+      (s) => !s.hittingOnly || group === "hitting",
+    ),
   );
 }
 

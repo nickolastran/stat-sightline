@@ -253,7 +253,8 @@ export function SplitsPanels({
 }: {
   group: "hitting" | "pitching";
   sections: SplitSection[];
-  season: number;
+  /** The year the slices come from, or the whole of a player's career. */
+  season: number | "career";
   /** The club's own columns by default; a player's page passes its narrower
       per-player set, which is the same table read one line at a time. */
   columns?: TeamStatCol[];
@@ -261,13 +262,19 @@ export function SplitsPanels({
   return (
     <div className="space-y-3">
       <Panel
-        title={`${group === "hitting" ? "BATTING" : "PITCHING"} SPLITS — ${season} SEASON`}
+        title={`${group === "hitting" ? "BATTING" : "PITCHING"} SPLITS — ${
+          season === "career" ? "CAREER" : `${season} SEASON`
+        }`}
       >
         {/* No table head: every section prints its own. */}
         <Table head={[]} maxHeight="none">
           {sections.length === 0 && (
             <Empty
-              what="NO SPLITS FOR THIS SEASON YET"
+              what={
+                season === "career"
+                  ? "NO CAREER SPLITS ON RECORD"
+                  : "NO SPLITS FOR THIS SEASON YET"
+              }
               cols={columns.length + 1}
             />
           )}
