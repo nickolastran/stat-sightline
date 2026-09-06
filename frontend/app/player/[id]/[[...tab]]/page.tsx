@@ -278,6 +278,7 @@ async function TabBody({
         return (
           <GameLogPanel
             bands={await getPlayerGameLog(id, season, group, gameType)}
+            group={group}
             title={post ? "POSTSEASON GAME LOG" : `GAME LOG — ${season}`}
             empty={post ? "NO POSTSEASON GAMES ON RECORD" : "NO GAMES IN THIS SEASON"}
             columns={game}

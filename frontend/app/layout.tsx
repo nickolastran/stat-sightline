@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import ThemeToggle from "@/components/ThemeToggle";
 import SiteSearch from "@/components/mlb/SiteSearch";
 import LeagueBar from "@/components/mlb/LeagueBar";
 import ScoreboardSlot from "@/components/mlb/ScoreboardSlot";
@@ -13,19 +12,11 @@ export const metadata: Metadata = {
     "Pitch-level Statcast warehouse: strike-zone plots, arsenal breakdowns, matchup forecasting.",
 };
 
-// Resolve the theme before first paint so there is no flash. Runs before
-// React hydrates; the html attribute it sets is why <html> suppresses the
-// hydration warning.
-const NO_FLASH = `(function(){try{var t=localStorage.getItem('theme');if(!t){t=matchMedia('(prefers-color-scheme: light)').matches?'light':'dark';}document.documentElement.dataset.theme=t;}catch(e){document.documentElement.dataset.theme='dark';}})();`;
-
 export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
-      <head>
-        <script dangerouslySetInnerHTML={{ __html: NO_FLASH }} />
-      </head>
+    <html lang="en">
       {/* A column, so the footer sits at the bottom of a short page rather
           than floating up under the content. */}
       <body className="flex min-h-screen flex-col antialiased">
@@ -42,14 +33,11 @@ export default function RootLayout({
               ASK
             </Link>
             <Link
-              href="/#access"
+              href="/signin"
               className="border border-accent bg-accent px-3 py-1.5 font-bold text-white hover:opacity-90"
             >
               SIGN IN
             </Link>
-            <span className="ml-1">
-              <ThemeToggle />
-            </span>
           </nav>
         </header>
         <LeagueBar />
