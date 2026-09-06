@@ -3461,7 +3461,7 @@ export type LedScope = "league" | "mlb";
  * rather than per player, so every player's page shares the same cached
  * payloads, and they hold for a day.
  */
-async function seasonLeaders(
+export async function seasonLeaders(
   season: number,
   group: StatGroup,
   leagues: number[],
@@ -3501,7 +3501,7 @@ async function seasonLeaders(
  * compared against the majors only: the combined line belongs to no one
  * league, and each club's half is checked against the league it was played in.
  */
-function ledMarks(
+export function ledMarks(
   group: StatGroup,
   values: Record<string, TeamStatValue>,
   leaders: Map<string, string>,
@@ -3919,6 +3919,9 @@ export interface CareerRow {
   teams: number;
   /** Which figures on this line led their league or the majors, by column. */
   led: Record<string, LedScope>;
+  /** The majors he won that season — empty on a split season's halves, which
+   *  would otherwise print the same MVP twice under one year. */
+  awards: PlayerAward[];
   values: Record<string, TeamStatValue>;
 }
 
@@ -3973,14 +3976,20 @@ export async function getPlayerCareer(
   group: StatGroup,
   postseason = false,
 ): Promise<CareerTable> {
-  const data = await mlb(
-    `/people/${id}/stats?stats=yearByYear,career&group=${group}&sportId=1` +
-      `&hydrate=team${postseason ? "&gameType=P" : ""}`,
-    86400,
-  ).catch((e: Error) => {
-    if (e.message.includes(" 404:")) return null;
-    throw e;
-  });
+  const [data, awards] = await Promise.all([
+    mlb(
+      `/people/${id}/stats?stats=yearByYear,career&group=${group}&sportId=1` +
+        `&hydrate=team${postseason ? "&gameType=P" : ""}`,
+      86400,
+    ).catch((e: Error) => {
+      if (e.message.includes(" 404:")) return null;
+      throw e;
+    }),
+    /* What he won each year, the way a printed career line carries it. The
+       same request backs the bio and all three groups' tables, so Next's
+       fetch cache answers every one of them but the first. */
+    getPlayerAwards(id).catch((): PlayerAward[] => []),
+  ]);
 
   const keys = statLineKeys(group);
   const values = (stat: any) =>
@@ -4010,6 +4019,7 @@ export async function getPlayerCareer(
         league: teams > 1 ? "" : leagueAbbr(s.league?.id),
         teams,
         led: {},
+        awards: [],
         values: values(s.stat),
       };
     });
@@ -4034,6 +4044,15 @@ export async function getPlayerCareer(
       r.league = leagueSpan(
         rows.filter((o: CareerRow) => o.season === r.season && o.teams === 1),
       );
+
+  /* An award belongs to the season, not to either club he played it for, so
+     it goes on the line that is the whole season — the combined line where a
+     trade split one, and the lone club's line otherwise. October's table is
+     the same seasons over again and would say each award a second time. */
+  if (!postseason)
+    for (const r of rows)
+      if (!isSplitPart(rows, r))
+        r.awards = lineAwards(awards.filter((a) => a.season === r.season));
 
   /* The marks on the line. Only a regular season has leader boards, and a
      fielding line is not one anybody leads. */
@@ -4622,7 +4641,12 @@ export interface CareerStop {
 
 /** An award, folded together across the years it was won. */
 export interface AwardGroup {
+  /** MLB's id, so the bio line can point at the award's own page. */
+  id: string;
+  /** As printed — "AL Silver Slugger (RF)". */
   name: string;
+  /** Where it sits among the majors; see MAJOR_AWARDS. */
+  rank: number;
   seasons: string[];
 }
 
@@ -4671,26 +4695,250 @@ export const signingText = (bio: PlayerBio): string => {
   return `DRAFTED ${bio.draftYear}${where.length ? ` · ${where.join(", ")}` : ""}`;
 };
 
-/* The awards worth leading with, most to least. Everything else keeps its
-   place below in the order MLB handed it over. */
-const AWARD_RANK = [
-  "MVP",
-  "Cy Young",
-  "Rookie of the Year",
-  "World Series",
-  "Gold Glove",
-  "Silver Slugger",
-  "All-MLB",
-  "All-Star",
-  "Hank Aaron",
-  "Roberto Clemente",
-  "Home Run Derby",
-];
+/* ── Awards ─────────────────────────────────────────────────────────── */
 
-const awardRank = (name: string) => {
-  const i = AWARD_RANK.findIndex((a) => name.includes(a));
-  return i === -1 ? AWARD_RANK.length : i;
+/*
+ * The awards a career is actually read for, by MLB's own id — a bio that also
+ * lists Player of the Week for the third time in a July buries the MVP under
+ * it. Everything outside this table is dropped rather than ranked last: the
+ * feed carries a couple of hundred club, farm and winter-league honours, and
+ * none of them belong on a major-league line.
+ *
+ * `short` is what the career table prints in its AWARDS column; the vote-taken
+ * ones are written the way a printed line writes them — "MVP-1" for the win.
+ * MLB publishes only the winner of a vote, never the ballot, so a finish of
+ * second or twelfth is not on record anywhere here; see the award page.
+ *
+ * `pos` marks the awards given per position, which the bio names — a Silver
+ * Slugger is an outfielder's or a catcher's, and that is most of the fact.
+ */
+const MAJOR_AWARDS: Record<
+  string,
+  { label: string; short: string; rank: number; pos?: true }
+> = {
+  WSCHAMP: { label: "World Series Champion", short: "WS", rank: 0 },
+  WSMVP: { label: "World Series MVP", short: "WS-MVP", rank: 1 },
+  ALCSMVP: { label: "ALCS MVP", short: "LCS-MVP", rank: 2 },
+  NLCSMVP: { label: "NLCS MVP", short: "LCS-MVP", rank: 2 },
+  ALMVP: { label: "AL MVP", short: "MVP-1", rank: 3 },
+  NLMVP: { label: "NL MVP", short: "MVP-1", rank: 3 },
+  ALCY: { label: "AL Cy Young", short: "CY-1", rank: 4 },
+  NLCY: { label: "NL Cy Young", short: "CY-1", rank: 4 },
+  ALROY: { label: "AL Rookie of the Year", short: "ROY-1", rank: 5 },
+  NLROY: { label: "NL Rookie of the Year", short: "ROY-1", rank: 5 },
+  ALPG: { label: "AL Platinum Glove", short: "PG", rank: 6, pos: true },
+  NLPG: { label: "NL Platinum Glove", short: "PG", rank: 6, pos: true },
+  ALSS: { label: "AL Silver Slugger", short: "SS", rank: 7, pos: true },
+  NLSS: { label: "NL Silver Slugger", short: "SS", rank: 7, pos: true },
+  ALGG: { label: "AL Gold Glove", short: "GG", rank: 8, pos: true },
+  NLGG: { label: "NL Gold Glove", short: "GG", rank: 8, pos: true },
+  MLBAFIRST: { label: "All-MLB First Team", short: "AM1", rank: 9, pos: true },
+  MLBSECOND: {
+    label: "All-MLB Second Team",
+    short: "AM2",
+    rank: 10,
+    pos: true,
+  },
+  ASMVP: { label: "All-Star Game MVP", short: "AS-MVP", rank: 11 },
+  ALAS: { label: "AL All-Star", short: "AS", rank: 12 },
+  NLAS: { label: "NL All-Star", short: "AS", rank: 12 },
 };
+
+/*
+ * Which of them ride on the career line itself, and in what order inside a
+ * season — "AS,MVP-1,SS", the way a printed line writes it. Deliberately
+ * narrower than the highlights above: a World Series ring or an All-MLB team
+ * belongs in the bio, not in a column read across twenty seasons.
+ */
+const LINE_AWARDS: Record<string, number> = {
+  ALAS: 0,
+  NLAS: 0,
+  ALMVP: 1,
+  NLMVP: 1,
+  ALCY: 2,
+  NLCY: 2,
+  ALSS: 3,
+  NLSS: 3,
+  ALGG: 4,
+  NLGG: 4,
+};
+
+/** The awards a career line carries, in the order it writes them. */
+export const lineAwards = (awards: PlayerAward[]): PlayerAward[] =>
+  awards
+    .filter((a) => a.id in LINE_AWARDS)
+    .sort((a, b) => LINE_AWARDS[a.id] - LINE_AWARDS[b.id]);
+
+/** Every award the app knows how to show a page for. */
+export const isMajorAward = (id: string) => id in MAJOR_AWARDS;
+
+/** "AL MVP" — the award's own name, for a page title or a bio line. */
+export const awardLabel = (id: string) => MAJOR_AWARDS[id]?.label ?? id;
+
+/** One major award a player won, in one season. */
+export interface PlayerAward {
+  /** MLB's id — "ALMVP". What the award page is keyed by. */
+  id: string;
+  season: string;
+  /** "AL MVP", or "AL Silver Slugger (RF)" where the award is per position. */
+  label: string;
+  /** "MVP-1", "SS" — what the career table's AWARDS column prints. */
+  short: string;
+  rank: number;
+}
+
+/** The major awards a player has won, newest first. */
+export async function getPlayerAwards(id: number): Promise<PlayerAward[]> {
+  const data = await mlb(`/people/${id}/awards`, 86400).catch(() => null);
+  const out: PlayerAward[] = [];
+  for (const a of (data?.awards ?? []) as any[]) {
+    const spec = MAJOR_AWARDS[a.id];
+    if (!spec) continue;
+    const pos = a.player?.primaryPosition?.abbreviation ?? "";
+    out.push({
+      id: a.id,
+      season: String(a.season ?? ""),
+      label: spec.pos && pos ? `${spec.label} (${pos})` : spec.label,
+      short: spec.short,
+      rank: spec.rank,
+    });
+  }
+  return out.sort(
+    (a, b) => Number(b.season) - Number(a.season) || a.rank - b.rank,
+  );
+}
+
+/** One player on an award's page: who he is, and the line he won it on. */
+export interface AwardWinner {
+  id: number;
+  name: string;
+  pos: string;
+  team: string;
+  teamId: number | null;
+  league: string;
+  /** Which of his groups this line is — a Cy Young page is pitching lines. */
+  group: StatGroup;
+  led: Record<string, LedScope>;
+  values: Record<string, TeamStatValue>;
+}
+
+export interface AwardTable {
+  id: string;
+  label: string;
+  season: string;
+  /** The date MLB recorded it, "" where it has none. */
+  date: string;
+  winners: AwardWinner[];
+}
+
+/**
+ * Everyone who took one award in one season, with the line each of them had.
+ *
+ * MLB publishes the winners and nothing else — there is no ballot in this
+ * feed, so a page can say who won and how they played, but never who finished
+ * second or by how many points. What it can say it says well: every winner's
+ * season line, marked where it led the league or the majors, off the same
+ * boards the career table's own marks come from.
+ *
+ * Three requests however many winners there are: the award, then one bulk
+ * `personIds` call for all their season lines, then the leader boards.
+ */
+export async function getAwardTable(
+  awardId: string,
+  season: number,
+): Promise<AwardTable | null> {
+  if (!isMajorAward(awardId)) return null;
+  const data = await mlb(
+    `/awards/${awardId}/recipients?season=${season}`,
+    86400,
+  ).catch(() => null);
+  const given = (data?.awards ?? []) as any[];
+  const base: AwardTable = {
+    id: awardId,
+    label: awardLabel(awardId),
+    season: String(season),
+    date: given[0]?.date ?? "",
+    winners: [],
+  };
+  if (given.length === 0) return base;
+
+  const ids = [...new Set(given.map((a) => a.player?.id).filter(Boolean))];
+  const people = await mlb(
+    `/people?personIds=${ids.join(",")}&hydrate=` +
+      encodeURIComponent(
+        `stats(group=[hitting,pitching],type=[season],season=${season})`,
+      ),
+    86400,
+  ).catch(() => null);
+
+  const hitKeys = statLineKeys("hitting");
+  const pitchKeys = statLineKeys("pitching");
+  const winners: AwardWinner[] = [];
+  for (const p of (people?.people ?? []) as any[]) {
+    /* A pitcher is read by his pitching line and everyone else by his bat —
+       which is also how a two-way player's award page reads, since MLB gives
+       him both and the busier line is the one that won it. */
+    const lines = (p.stats ?? []) as any[];
+    const pick = (name: string) =>
+      lines.find((s) => s.group?.displayName === name)?.splits?.[0];
+    const pitching = pick("pitching");
+    const hitting = pick("hitting");
+    const isPitcher = p.primaryPosition?.abbreviation === "P";
+    const split = (isPitcher ? pitching : hitting) ?? pitching ?? hitting;
+    if (!split) continue;
+    const group: StatGroup = split === pitching ? "pitching" : "hitting";
+    const keys = group === "pitching" ? pitchKeys : hitKeys;
+    winners.push({
+      id: p.id,
+      name: p.fullName ?? "",
+      pos: p.primaryPosition?.abbreviation ?? "",
+      team: split.team?.abbreviation ?? split.team?.name ?? "—",
+      teamId: split.team?.id ?? null,
+      league: leagueAbbr(split.league?.id),
+      group,
+      led: {},
+      values: Object.fromEntries(keys.map((k) => [k, split.stat?.[k] ?? null])),
+    });
+  }
+
+  /* One board per group actually on the page, and per league inside it. */
+  const boards = new Map(
+    await Promise.all(
+      [...new Set(winners.map((w) => w.group))].map(
+        async (g) =>
+          [
+            g,
+            await seasonLeaders(season, g, [
+              ...new Set(
+                winners
+                  .filter((w) => w.group === g)
+                  .map((w) => leagueIdOf(w.league))
+                  .filter((id): id is number => id !== null),
+              ),
+            ]).catch(() => new Map<string, string>()),
+          ] as const,
+      ),
+    ),
+  );
+  for (const w of winners)
+    w.led = ledMarks(
+      w.group,
+      w.values,
+      boards.get(w.group) ?? new Map(),
+      leagueIdOf(w.league),
+    );
+
+  return {
+    ...base,
+    /* A club's whole World Series roster comes back in no order at all; the
+       busiest line first is the one a reader wants at the top. */
+    winners: winners.sort(
+      (a, b) =>
+        (teamStatNum(b.values.plateAppearances ?? b.values.battersFaced) ?? 0) -
+        (teamStatNum(a.values.plateAppearances ?? a.values.battersFaced) ?? 0),
+    ),
+  };
+}
 
 /** The 30 clubs' ids — what separates a major-league award from an A-ball one. */
 async function mlbTeamIds(): Promise<Set<number>> {
@@ -4703,18 +4951,17 @@ async function mlbTeamIds(): Promise<Set<number>> {
  *
  * The career stops are read off the season-by-season lines rather than a
  * transaction history, so a club he was traded to but never appeared for
- * doesn't show up as a season he played there. Awards come back for the whole
- * of organised baseball, so the minor-league ones are dropped and the rest
- * folded by name — "AL Silver Slugger ×4" rather than four lines of it.
+ * doesn't show up as a season he played there. The highlights are the majors
+ * only — see MAJOR_AWARDS — folded by name, so a four-time Silver Slugger is
+ * one line with four years on it rather than four lines.
  */
 export async function getPlayerBio(id: number): Promise<PlayerBio | null> {
-  const [data, awardData, mlbIds, hit, pitch] = await Promise.all([
+  const [data, awards, hit, pitch] = await Promise.all([
     mlb(`/people/${id}?hydrate=draft`, 86400).catch((e: Error) => {
       if (e.message.includes(" 404:")) return null;
       throw e;
     }),
-    mlb(`/people/${id}/awards`, 86400).catch(() => null),
-    mlbTeamIds().catch(() => new Set<number>()),
+    getPlayerAwards(id).catch((): PlayerAward[] => []),
     getPlayerCareer(id, "hitting").catch(() => EMPTY_CAREER),
     getPlayerCareer(id, "pitching").catch(() => EMPTY_CAREER),
   ]);
@@ -4739,15 +4986,17 @@ export async function getPlayerBio(id: number): Promise<PlayerBio | null> {
     seen.years.add(Number(r.season));
   }
 
-  const byName = new Map<string, string[]>();
-  for (const a of (awardData?.awards ?? []) as any[]) {
-    if (a.team?.id && mlbIds.size > 0 && !mlbIds.has(a.team.id)) continue;
-    const name = a.name ?? "";
-    /* A farm award is filed under the parent club, so its id passes the check
-       above — the name is the only thing that gives it away. */
-    if (!name || /^(MiLB|AFL)\b/.test(name)) continue;
-    const years = byName.get(name) ?? byName.set(name, []).get(name)!;
-    if (!years.includes(String(a.season))) years.push(String(a.season));
+  /* Folded by the name as printed, so "AL Silver Slugger (RF)" and the year
+     he won it in left field stay the two separate lines they are. */
+  const byName = new Map<
+    string,
+    { id: string; rank: number; years: string[] }
+  >();
+  for (const a of awards) {
+    const seen =
+      byName.get(a.label) ??
+      byName.set(a.label, { id: a.id, rank: a.rank, years: [] }).get(a.label)!;
+    if (!seen.years.includes(a.season)) seen.years.push(a.season);
   }
 
   return {
@@ -4776,14 +5025,15 @@ export async function getPlayerBio(id: number): Promise<PlayerBio | null> {
       /* Most recent club first — where he is now, then backwards. */
       .sort((a, b) => Number(b.to) - Number(a.to)),
     awards: [...byName.entries()]
-      .map(([name, seasons]) => ({
+      .map(([name, a]) => ({
+        id: a.id,
         name,
-        seasons: seasons.sort((a, b) => Number(b) - Number(a)),
+        rank: a.rank,
+        seasons: a.years.sort((x, y) => Number(y) - Number(x)),
       }))
       .sort(
         (a, b) =>
-          awardRank(a.name) - awardRank(b.name) ||
-          Number(b.seasons[0]) - Number(a.seasons[0]),
+          a.rank - b.rank || Number(b.seasons[0]) - Number(a.seasons[0]),
       ),
   };
 }

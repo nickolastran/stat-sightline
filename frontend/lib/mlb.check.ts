@@ -40,6 +40,7 @@ import {
   ordinal,
   statRank,
   isSplitPart,
+  lineAwards,
   wholeSeasonRow,
   type Game,
   type PlayerBio,
@@ -50,6 +51,7 @@ import {
   type TeamStatRow,
   type CareerRow,
   type CareerTable,
+  type PlayerAward,
 } from "./mlb";
 
 const row = (p: Partial<StandingRow>) =>
@@ -1095,6 +1097,7 @@ const careerRow = (p: Partial<CareerRow>): CareerRow => ({
   age: null,
   league: "",
   teams: 1,
+  awards: [],
   led: {},
   values: {},
   ...p,
@@ -1138,3 +1141,39 @@ assert.equal(
   "a season never played has no line to read",
 );
 console.log("wholeSeasonRow ok");
+
+/* ── lineAwards ─────────────────────────────────────────────────────── */
+
+/* The career line carries five awards and writes them in a fixed order, so a
+   season that won three of them reads the same way every time. Everything
+   else a player won is a highlight, and belongs to the bio instead. */
+const award = (id: string, season = "2024"): PlayerAward => ({
+  id,
+  season,
+  label: id,
+  short: id,
+  rank: 0,
+});
+
+assert.deepEqual(
+  lineAwards([
+    award("ALSS"),
+    award("WSCHAMP"),
+    award("ALAS"),
+    award("MLBAFIRST"),
+    award("ALMVP"),
+  ]).map((a) => a.id),
+  ["ALAS", "ALMVP", "ALSS"],
+  "the five are kept and ordered; a ring and an All-MLB team are not among them",
+);
+assert.deepEqual(
+  lineAwards([award("NLGG"), award("NLCY"), award("NLAS")]).map((a) => a.id),
+  ["NLAS", "NLCY", "NLGG"],
+  "the National League ids order the same way as the American",
+);
+assert.deepEqual(
+  lineAwards([award("WSMVP"), award("ALROY"), award("ALPG")]),
+  [],
+  "a season of nothing but highlights leaves the column empty",
+);
+console.log("lineAwards ok");

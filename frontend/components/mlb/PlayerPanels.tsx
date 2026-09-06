@@ -22,6 +22,7 @@ import {
   type CareerTable,
   type Game,
   type GameLogGroup,
+  type PlayerAward,
   type PlayerBio,
   type SplitSection,
   type StatGroup,
@@ -98,6 +99,32 @@ const careerCells = (
       </td>
     );
   });
+
+/**
+ * What a season won, in the shorthand a printed career line uses — "MVP-1,
+ * SS, AS". Each is a way into that award's own year, which is the only place
+ * the rest of the winners are.
+ *
+ * The row underneath is selectable, so a click here must not also pick a span;
+ * the row's own handler ignores anything inside a link, which these are.
+ */
+function AwardMarks({ awards }: { awards: PlayerAward[] }) {
+  if (awards.length === 0) return <span className="text-ink-3">—</span>;
+  return (
+    <span className="flex flex-wrap gap-x-1.5 gap-y-0.5">
+      {awards.map((a) => (
+        <Link
+          key={`${a.id}-${a.season}`}
+          href={`/award/${a.id}/${a.season}`}
+          title={a.label}
+          className="text-accent hover:underline"
+        >
+          {a.short}
+        </Link>
+      ))}
+    </span>
+  );
+}
 
 const glossaryOf = (columns: TeamStatCol[]) => (
   <div className="mt-3">
@@ -270,7 +297,14 @@ function CareerTableBody({
   group: StatGroup;
   columns: TeamStatCol[];
 }) {
-  const head = ["SEASON", "AGE", "TEAM", "LG", ...columns.map((c) => c.label)];
+  const head = [
+    "SEASON",
+    "AGE",
+    "TEAM",
+    "LG",
+    ...columns.map((c) => c.label),
+    "AWARDS",
+  ];
   /* The label of a summary line runs across the four identity columns. */
   const LEAD = 4;
   const id = `px-1 py-1 text-[12px] whitespace-nowrap ${RULE}`;
@@ -328,6 +362,9 @@ function CareerTableBody({
               </td>
               <td className={`${id} text-ink-3`}>{r.league || "—"}</td>
               {careerCells(columns, r.values, r.led, !part)}
+              <td className={`${id} text-ink-3`}>
+                <AwardMarks awards={r.awards} />
+              </td>
             </Row>
           );
         })}
@@ -351,6 +388,7 @@ function CareerTableBody({
               )}
             </td>
             {careerCells(columns, sum.values, {}, true)}
+            <td className={id} />
           </tr>
         ))}
       </Table>
@@ -558,8 +596,18 @@ export function BioPanel({
                   )}
                   {a.name}
                 </p>
-                <p className="mt-1 text-[10px] tabular-nums tracking-[0.15em] text-ink-3">
-                  {a.seasons.join(", ")}
+                {/* Each year is the way into that year's award — who else
+                    won it, and what they did to. */}
+                <p className="mt-1 flex flex-wrap gap-x-2 text-[10px] tabular-nums tracking-[0.15em]">
+                  {a.seasons.map((s) => (
+                    <Link
+                      key={s}
+                      href={`/award/${a.id}/${s}`}
+                      className="text-ink-3 hover:text-accent"
+                    >
+                      {s}
+                    </Link>
+                  ))}
                 </p>
               </li>
             ))}
