@@ -3919,6 +3919,10 @@ export interface CareerRow {
   teams: number;
   /** Which figures on this line led their league or the majors, by column. */
   led: Record<string, LedScope>;
+  /** The league line this season is measured against, already moved for the
+   *  park — what OPS+ and ERA+ were figured from, kept so a line added up on
+   *  the page (a picked span of seasons) can blend them the same way. */
+  lg?: LeagueLine | null;
   /** The majors he won that season — empty on a split season's halves, which
    *  would otherwise print the same MVP twice under one year. */
   awards: PlayerAward[];
@@ -3926,9 +3930,50 @@ export interface CareerRow {
 }
 
 /**
- * Fills in the figures a summed line cannot get by adding — OPS+, ERA+, FIP —
- * from the seasons it covers. Built inside getPlayerCareer, where the league
- * lines and park factors are, and handed to whatever needs to write one.
+ * The figures a summed line cannot get by adding — OPS+, ERA+, FIP. A plus
+ * stat is a ratio to a league that changes every year and FIP is a rate over
+ * innings, so each is the seasons the line covers blended by what the player
+ * actually did in them: a bat by its trips to the plate, an arm by its outs,
+ * never by the club's or the league's playing time.
+ *
+ * Written in place, on `values`, from rows carrying the `lg` they were figured
+ * against. Postseason and fielding lines have none and are left alone.
+ */
+export function fillPlusLine(
+  group: StatGroup,
+  values: Record<string, TeamStatValue>,
+  from: CareerRow[],
+): void {
+  if (group === "fielding" || !from.some((r) => r.lg)) return;
+  const parts = from.map((r) => ({
+    weight:
+      group === "hitting"
+        ? (teamStatNum(r.values.plateAppearances) ?? 0)
+        : outsOf(r.values.inningsPitched),
+    line: r.lg ?? null,
+    values: r.values,
+  }));
+  const mean = (pick: (p: (typeof parts)[number]) => number | null) =>
+    weightedMean(parts.map((p) => ({ weight: p.weight, value: pick(p) })));
+
+  /* Each season's line is already parked, so the blend carries the parks he
+     played in, in the proportion he played in them. */
+  const blend = {
+    obp: mean((p) => p.line?.obp ?? null) ?? 0,
+    slg: mean((p) => p.line?.slg ?? null) ?? 0,
+    era: mean((p) => p.line?.era ?? null) ?? 0,
+  };
+  if (group === "hitting") values.opsPlus = opsPlus(values, blend);
+  else {
+    values.eraPlus = eraPlus(values, blend);
+    const fip = mean((p) => teamStatNum(p.values.fip));
+    values.fip = fip === null ? null : fip.toFixed(2);
+  }
+}
+
+/**
+ * Fills in those figures on a line built inside getPlayerCareer, where the
+ * league lines and park factors are, and handed to whatever needs to write one.
  */
 type FillPlus = (
   values: Record<string, TeamStatValue>,
@@ -4179,40 +4224,15 @@ export async function getPlayerCareer(
       const line = table?.get(leagueIdOf(r.league)) ?? table?.get(null) ?? null;
       return line && parked(line, parkOf(r));
     };
-    for (const r of rows) r.values[key] = plus(r.values, lineOf(r));
+    for (const r of rows) {
+      r.lg = lineOf(r);
+      r.values[key] = plus(r.values, r.lg);
+    }
 
-    /*
-     * The same figures on a line that is several seasons added together — the
-     * career, a club, a league. None of them can be summed: a plus stat is a
-     * ratio to a league that changes every year, and FIP is a rate over
-     * innings. Each is the seasons the line covers, blended by what he
-     * actually did in them — a bat by its trips to the plate, an arm by its
-     * outs, never by the club's or the league's playing time.
-     */
-    fillPlus = (values, from) => {
-      const parts = from.map((r) => ({
-        weight:
-          group === "hitting"
-            ? (teamStatNum(r.values.plateAppearances) ?? 0)
-            : outsOf(r.values.inningsPitched),
-        line: lineOf(r),
-        values: r.values,
-      }));
-      const mean = (pick: (p: (typeof parts)[number]) => number | null) =>
-        weightedMean(parts.map((p) => ({ weight: p.weight, value: pick(p) })));
-
-      /* Each season's line is already parked, so the blend carries the parks
-         he played in, in the proportion he played in them. */
-      values[key] = plus(values, {
-        obp: mean((p) => p.line?.obp ?? null) ?? 0,
-        slg: mean((p) => p.line?.slg ?? null) ?? 0,
-        era: mean((p) => p.line?.era ?? null) ?? 0,
-      });
-      if (group === "pitching") {
-        const fip = mean((p) => teamStatNum(p.values.fip));
-        values.fip = fip === null ? null : fip.toFixed(2);
-      }
-    };
+    /* The same figures on a line that is several seasons added together — the
+       career, a club, a league, or a span picked on the page, which runs the
+       blend itself off the lines carried on the rows. */
+    fillPlus = (values, from) => fillPlusLine(group, values, from);
   }
   if (total && fillPlus)
     fillPlus(

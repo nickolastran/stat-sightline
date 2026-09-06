@@ -40,6 +40,7 @@ import {
   ordinal,
   statRank,
   isSplitPart,
+  fillPlusLine,
   lineAwards,
   wholeSeasonRow,
   type Game,
@@ -50,6 +51,7 @@ import {
   type Transaction,
   type TeamStatRow,
   type CareerRow,
+  type TeamStatValue,
   type CareerTable,
   type PlayerAward,
 } from "./mlb";
@@ -1177,3 +1179,39 @@ assert.deepEqual(
   "a season of nothing but highlights leaves the column empty",
 );
 console.log("lineAwards ok");
+
+/* ── fillPlusLine ───────────────────────────────────────────────────── */
+/*
+ * A span of picked seasons gets its OPS+ from the league lines they were
+ * measured against, weighted by his own time at the plate — not from a mean
+ * of the seasons' own plus figures, and never left blank.
+ */
+const plusRow = (pa: number, obp: string, slg: string, lgObp: number) =>
+  ({
+    season: "2024",
+    values: { plateAppearances: pa, obp, slg },
+    lg: { obp: lgObp, slg: 0.4, era: 4 },
+  }) as unknown as CareerRow;
+
+const spanned: Record<string, TeamStatValue> = { obp: ".400", slg: ".500" };
+fillPlusLine("hitting", spanned, [
+  plusRow(600, ".400", ".500", 0.3),
+  plusRow(200, ".400", ".500", 0.4),
+]);
+/* League OBP blends to (600·.3 + 200·.4)/800 = .325, so 100·(.4/.325 + .5/.4 − 1). */
+assert.equal(
+  spanned.opsPlus,
+  "148",
+  "blended by plate appearances, not seasons",
+);
+
+const noLine: Record<string, TeamStatValue> = { obp: ".400", slg: ".500" };
+fillPlusLine("hitting", noLine, [
+  { season: "2024", values: {} } as unknown as CareerRow,
+]);
+assert.equal(
+  noLine.opsPlus,
+  undefined,
+  "October has no league line to measure against",
+);
+console.log("fillPlusLine ok");

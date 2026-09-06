@@ -10,6 +10,7 @@ import Glossary from "@/components/mlb/Glossary";
 import { Table, Row, Empty } from "@/components/ui/StatTable";
 import {
   careerCols,
+  fillPlusLine,
   isSplitPart,
   playerCols,
   signingText,
@@ -323,6 +324,10 @@ function CareerTableBody({
           picked.map((r) => r.values),
         )
       : null;
+  /* OPS+, ERA+ and FIP can't be added — they are blended off the league lines
+     the picked seasons were measured against, the same way the career line
+     under the table is. */
+  if (spanTotal) fillPlusLine(group, spanTotal, picked);
   const years = new Set(picked.map((r) => r.season));
 
   return (
@@ -335,34 +340,30 @@ function CareerTableBody({
           /* A season a trade split reads as one line with its halves under it:
            the whole season is the figure, the clubs are the detail. */
           const part = isSplitPart(table.rows, r);
+          /* The whole season reads in ink; the clubs it was split over sit
+             under it a shade back — and on the same left edge as every other
+             row, so the season column reads as one list. */
+          const cell = `${id} ${part ? "text-ink-3" : "text-ink"}`;
           return (
             <Row
               key={`${r.season}-${r.teamId ?? r.teams}-${i}`}
               onClick={part ? undefined : span.pick(i)}
               className={span.holds(i) ? SPAN_ROW : ""}
             >
-              <td
-                className={`${id} tabular-nums ${
-                  part ? "pl-4 text-ink-3" : "text-ink-2"
-                }`}
-              >
-                {r.season}
-              </td>
-              <td className={`${id} tabular-nums text-ink-3`}>
-                {r.age ?? "—"}
-              </td>
-              <td className={`${id} text-ink-2`}>
+              <td className={`${cell} tabular-nums`}>{r.season}</td>
+              <td className={`${cell} tabular-nums`}>{r.age ?? "—"}</td>
+              <td className={cell}>
                 {r.teamId === null ? (
-                  <span className="text-ink-3">{r.team}</span>
+                  <span>{r.team}</span>
                 ) : (
                   /* No mark beside the three letters: a logo per row, eleven
                      rows deep, costs the column the width the line needs. */
                   <TeamLink id={r.teamId} name={r.team} logo={false} />
                 )}
               </td>
-              <td className={`${id} text-ink-3`}>{r.league || "—"}</td>
+              <td className={cell}>{r.league || "—"}</td>
               {careerCells(columns, r.values, r.led, !part)}
-              <td className={`${id} text-ink-3`}>
+              <td className={cell}>
                 <AwardMarks awards={r.awards} />
               </td>
             </Row>
