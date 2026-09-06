@@ -41,6 +41,7 @@ import {
   PLAYER_GAME_TYPES,
   playerHeadshot,
   seasonOf,
+  seriesTotals,
   teamLogo,
   todayET,
   type Game,
@@ -285,9 +286,11 @@ async function TabBody({
         /* October is not a season's log but a career's, so it is not banded
            by month and carries no year in its title. */
         const post = gameType === "P";
+        const bands = await getPlayerGameLog(id, season, group, gameType);
         return (
           <GameLogPanel
-            bands={await getPlayerGameLog(id, season, group, gameType)}
+            bands={bands}
+            totals={post ? seriesTotals(group, bands) : undefined}
             group={group}
             title={post ? "POSTSEASON GAME LOG" : `GAME LOG — ${season}`}
             empty={post ? "NO POSTSEASON GAMES ON RECORD" : "NO GAMES IN THIS SEASON"}

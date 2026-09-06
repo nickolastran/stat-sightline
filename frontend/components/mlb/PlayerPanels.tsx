@@ -7,7 +7,7 @@ import MetricCard from "@/components/ui/MetricCard";
 import GameCard from "@/components/mlb/GameCard";
 import TeamLink from "@/components/mlb/TeamLink";
 import Glossary from "@/components/mlb/Glossary";
-import { Table, Row, Empty } from "@/components/ui/StatTable";
+import { Table, Row, Empty, SectionHead } from "@/components/ui/StatTable";
 import {
   careerCols,
   fillPlusLine,
@@ -667,9 +667,10 @@ export function GameLogPanel({
   empty,
   columns,
   running,
+  totals = [],
   controls,
 }: {
-  /** Months of one season, or the years of a career's Octobers. */
+  /** Months of one season, or the rounds of a career's Octobers. */
   bands: GameLogGroup[];
   /** Which line is being added up when a span of games is picked. */
   group: StatGroup;
@@ -679,15 +680,14 @@ export function GameLogPanel({
   columns: TeamStatCol[];
   /** The line to date printed after it — see lib/mlb's gameLogCols. */
   running: TeamStatCol[];
+  /** A block under the log — October's rounds added up. Empty otherwise. */
+  totals?: { label: string; values: Record<string, TeamStatValue> }[];
   controls?: React.ReactNode;
 }) {
-  const head = [
-    "DATE",
-    "OPP",
-    "RESULT",
-    ...columns.map((c) => c.label),
-    ...running.map((c) => c.label),
-  ];
+  /* No table head of its own: every band prints the columns over its own
+     games, which is the only way a log this wide stays readable once it has
+     been scrolled past the first month. */
+  const cols = 3 + columns.length + running.length;
 
   /* Games are picked across the whole log, not within a month, so the span is
      indexed off one flat list and each band knows where in it it starts. */
@@ -708,29 +708,22 @@ export function GameLogPanel({
   return (
     <div className="space-y-3">
       <Panel title={title} right={controls}>
-        <Table head={head} maxHeight="none" align={"llc"}>
-          {bands.length === 0 && <Empty what={empty} cols={head.length} />}
+        <Table head={[]} maxHeight="none">
+          {bands.length === 0 && <Empty what={empty} cols={cols} />}
           {bands.map((m, i) => (
             <Fragment key={m.label}>
               {/* A band of the page's own ground between one block and the
-                  next: a month closed by a total and opened by nothing reads
-                  as one long list at a glance. */}
+                  next: without it a log reads as one long list at a glance. */}
               {i > 0 && (
                 <tr aria-hidden className="bg-bg">
-                  <td
-                    colSpan={head.length}
-                    className="h-3 border-y border-line"
-                  />
+                  <td colSpan={cols} className="h-3 border-y border-line" />
                 </tr>
               )}
-              <tr className="bg-surface text-ink">
-                <td
-                  className="px-3 py-1.5 text-[10px] tracking-widest whitespace-nowrap"
-                  colSpan={head.length}
-                >
-                  {m.label}
-                </td>
-              </tr>
+              <SectionHead
+                label={m.label}
+                columns={[...columns, ...running]}
+                lead={3}
+              />
               {m.rows.map((r, j) => {
                 const k = starts[i] + j;
                 return (
@@ -767,20 +760,34 @@ export function GameLogPanel({
                   </Row>
                 );
               })}
-              <tr className="border-t border-line bg-surface text-ink">
-                <td
-                  className="px-3 py-1.5 text-[10px] tracking-widest whitespace-nowrap"
-                  colSpan={3}
-                >
-                  {m.label} TOTAL
-                </td>
-                {cells(columns, m.total, true)}
-                {/* The band's own rates, not the running line — a total row is
-                    a slice, and the line to date is on every game above. */}
-                {cells(running, m.total, true)}
-              </tr>
             </Fragment>
           ))}
+          {/* Every October he played, one round at a time — a post-season log
+              is read for what he did in the World Series, not in 2019. */}
+          {totals.length > 0 && (
+            <>
+              <tr aria-hidden className="bg-bg">
+                <td colSpan={cols} className="h-3 border-y border-line" />
+              </tr>
+              <SectionHead
+                label="BY ROUND"
+                columns={[...columns, ...running]}
+                lead={3}
+              />
+              {totals.map((t) => (
+                <Row key={t.label} className="bg-surface">
+                  <td
+                    className="px-3 py-1.5 text-[10px] tracking-widest whitespace-nowrap text-ink"
+                    colSpan={3}
+                  >
+                    {t.label}
+                  </td>
+                  {cells(columns, t.values, true)}
+                  {cells(running, t.values, true)}
+                </Row>
+              ))}
+            </>
+          )}
         </Table>
         {spanTotal && (
           <SpanTotal

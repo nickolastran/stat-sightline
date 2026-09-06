@@ -107,14 +107,19 @@ export function Empty({ what, cols }: { what: string; cols: number }) {
 export function SectionHead({
   label,
   columns,
+  lead = 1,
 }: {
   label: string;
   columns: TeamStatCol[];
+  /** How many identity columns the label runs across — three in a game log,
+   *  whose date, opponent and result sit before the figures. */
+  lead?: number;
 }) {
   return (
     <tr className="border-y border-line bg-surface">
       <th
         scope="colgroup"
+        colSpan={lead}
         className="px-3 py-2 text-left text-[10px] tracking-widest text-ink"
       >
         {label}

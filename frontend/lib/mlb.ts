@@ -4517,9 +4517,42 @@ export interface GameLogRow {
   /** "W 5-4", "L 13-12", "W 5-4 F/10" — blank if the score never arrived. */
   result: string;
   win: boolean | null;
+  /** Which round of October this was — "" in a regular-season log. */
+  series: SeriesCode | "";
   values: Record<string, TeamStatValue>;
   /** The season line through this game — what a log is read down for. */
   running: Record<string, TeamStatValue>;
+}
+
+/** MLB's game types for the four rounds, in the order they are played. */
+export type SeriesCode = "F" | "D" | "L" | "W";
+
+const SERIES: { code: SeriesCode; label: string }[] = [
+  { code: "F", label: "WILD CARD" },
+  { code: "D", label: "DIVISION SERIES" },
+  { code: "L", label: "LEAGUE CHAMPIONSHIP SERIES" },
+  { code: "W", label: "WORLD SERIES" },
+];
+
+const seriesLabel = (code: string): string =>
+  SERIES.find((s) => s.code === code)?.label ?? "POSTSEASON";
+
+/**
+ * A career of Octobers added up one round at a time — what a post-season log
+ * is read for once the games themselves have been read. Rounds he never
+ * reached are left out rather than printed as a line of zeroes.
+ */
+export function seriesTotals(
+  group: StatGroup,
+  bands: GameLogGroup[],
+): { label: string; values: Record<string, TeamStatValue> }[] {
+  const rows = bands.flatMap((b) => b.rows);
+  return SERIES.map(({ code, label }) => ({
+    label,
+    lines: rows.filter((r) => r.series === code).map((r) => r.values),
+  }))
+    .filter((s) => s.lines.length > 0)
+    .map(({ label, lines }) => ({ label, values: sumStatLines(group, lines) }));
 }
 
 /** One band of the log with its own total under it — a month, or, in
@@ -4528,7 +4561,6 @@ export interface GameLogGroup {
   label: string;
   /** Newest first, the way a log is read. */
   rows: GameLogRow[];
-  total: Record<string, TeamStatValue>;
 }
 
 const MONTHS = [
@@ -4639,6 +4671,7 @@ export async function getPlayerGameLog(
       home: !!s.isHome,
       result: gameResult(g, s.team?.id),
       win: typeof s.isWin === "boolean" ? s.isWin : null,
+      series: career ? (s.gameType ?? "") : "",
       values: lines[i],
       running: sumStatLines(group, lines.slice(0, i + 1)),
     };
@@ -4646,20 +4679,15 @@ export async function getPlayerGameLog(
 
   const bands = new Map<string, GameLogRow[]>();
   for (const r of rows) {
+    /* October is banded by the round, not the month — which series a game
+       belongs to is the only thing that orders a post-season log. */
     const key = career
-      ? r.date.slice(0, 4)
+      ? `${r.date.slice(0, 4)} · ${seriesLabel(r.series)}`
       : (MONTHS[Number(r.date.slice(5, 7)) - 1] ?? "SEASON");
     (bands.get(key) ?? bands.set(key, []).get(key)!).push(r);
   }
   return [...bands.entries()]
-    .map(([label, bandRows]) => ({
-      label,
-      rows: [...bandRows].reverse(),
-      total: sumStatLines(
-        group,
-        bandRows.map((r) => r.values),
-      ),
-    }))
+    .map(([label, bandRows]) => ({ label, rows: [...bandRows].reverse() }))
     .reverse();
 }
 
