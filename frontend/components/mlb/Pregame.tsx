@@ -190,7 +190,7 @@ export default async function Pregame({ game }: { game: Game }) {
     /* The gamecast layout, before there is a game to cast: two rails sized to
        what they carry, and the middle taking whatever is left. Below the
        breakpoint the three stack at the full width of the page. */
-    <div className="mt-3 grid grid-cols-1 gap-2 min-[1440px]:grid-cols-[28rem_minmax(0,1fr)_28rem]">
+    <div className="mt-3 bento gap-2">
       <div className="space-y-2">
         <Panel title="MATCHUP PREDICTOR">
           {odds ? (

@@ -410,31 +410,27 @@ export default async function PlayerPage({
      stacks every line of every season rather than showing one at a time. */
   const hasControls = section !== "bio" && section !== "stats";
 
+  /* One group strip either way — splits offer one line fewer and land on
+     batting when fielding was the standing pick. No fragment around the pair:
+     this is a server component, and a fragment's children reach the client as
+     a bare array, which React then wants keys on. */
+  const splits = section === "splits";
   const controls = hasControls ? (
     <div className="flex w-full flex-wrap items-center gap-3">
-      {section === "splits" ? (
-        <>
-          {splitGroups.length > 1 && (
-            <ParamTabs
-              param="group"
-              ariaLabel="Stat group"
-              value={group === "pitching" ? "pitching" : "hitting"}
-              options={groupOptions(splitGroups)}
-            />
-          )}
-          <ParamTabs
-            param="over"
-            ariaLabel="Span"
-            value={career ? "career" : "season"}
-            options={SPLIT_SPANS}
-          />
-        </>
-      ) : (
+      {(!splits || splitGroups.length > 1) && (
         <ParamTabs
           param="group"
           ariaLabel="Stat group"
-          value={group}
-          options={groupOptions(groups)}
+          value={splits && group === "fielding" ? "hitting" : group}
+          options={groupOptions(splits ? splitGroups : groups)}
+        />
+      )}
+      {splits && (
+        <ParamTabs
+          param="over"
+          ariaLabel="Span"
+          value={career ? "career" : "season"}
+          options={SPLIT_SPANS}
         />
       )}
       {/* Pushed right in the control bar, where the group tabs lead; inert

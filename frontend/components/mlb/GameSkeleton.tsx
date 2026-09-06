@@ -89,7 +89,7 @@ export default function GameSkeleton({ tab }: { tab: string }) {
 
   /* The gamecast, in the three columns it lands in. */
   return (
-    <div className="grid grid-cols-1 gap-2 min-[1440px]:grid-cols-[28rem_minmax(0,1fr)_28rem]">
+    <div className="bento gap-2">
       <div className="space-y-2">
         <SkeletonPanel>
           <div className="space-y-2">

@@ -84,6 +84,26 @@ body {
   }
 }
 
+/* The three-column bento the gamecast, its skeleton and the pre-game page all
+   lay out on. The rails scale with the viewport rather than snapping between
+   28rem and nothing at one hard width, so a laptop gets the same three columns
+   a monitor does — narrower, in the same proportion — and the middle keeps
+   whatever is left. Below the fold-in width the three stack, full width each.
+   No mobile sizing yet; this starts at the narrowest laptop. */
+.bento {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+@media (min-width: 68rem) {
+  .bento {
+    grid-template-columns:
+      clamp(19rem, 24vw, 28rem)
+      minmax(0, 1fr)
+      clamp(19rem, 24vw, 28rem);
+  }
+}
+
 ::selection {
   background: var(--color-accent);
   color: #ffffff;
