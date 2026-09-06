@@ -159,7 +159,8 @@ const toGame = (g: any): Game => ({
 });
 
 /** The pitcher of a decision or a probable, or null when there isn't one. */
-const person = (p: any) => (p?.id ? { id: p.id, name: p.fullName ?? "—" } : null);
+const person = (p: any) =>
+  p?.id ? { id: p.id, name: p.fullName ?? "—" } : null;
 
 /* Decisions and the gate count ride along with every schedule read: they are
  * a few hundred bytes a game, and it keeps one hydrate string to keep right. */
@@ -168,7 +169,7 @@ const SCHEDULE_HYDRATE = "probablePitcher,linescore,team,decisions,gameInfo";
 export async function getSchedule(date: string): Promise<Game[]> {
   const data = await mlb(
     `/schedule?sportId=1&date=${date}&hydrate=${SCHEDULE_HYDRATE}`,
-    60
+    60,
   );
   return (data.dates?.[0]?.games ?? []).map(toGame);
 }
@@ -181,7 +182,7 @@ export async function getSchedule(date: string): Promise<Game[]> {
 export async function getGame(pk: number): Promise<Game | null> {
   const data = await mlb(
     `/schedule?sportId=1&gamePk=${pk}&hydrate=${SCHEDULE_HYDRATE}`,
-    60
+    60,
   );
   const g = data.dates?.[0]?.games?.[0];
   return g ? toGame(g) : null;
@@ -196,7 +197,7 @@ export const sortGames = (games: Game[]): Game[] =>
     .sort(
       (a, b) =>
         (STATE_ORDER[a.state] ?? 3) - (STATE_ORDER[b.state] ?? 3) ||
-        a.startTime.localeCompare(b.startTime)
+        a.startTime.localeCompare(b.startTime),
     );
 
 /**
@@ -218,7 +219,7 @@ export const FALLBACK_TZ = "America/New_York";
  */
 export function gameStatus(
   g: Game,
-  timeZone: string = FALLBACK_TZ
+  timeZone: string = FALLBACK_TZ,
 ): {
   text: string;
   tone: "live" | "final" | "pre";
@@ -349,7 +350,7 @@ export interface BoxScore {
 
 const total = (stat: any, group: "hitting" | "pitching") =>
   Object.fromEntries(
-    TOTAL_ROWS[group].map((c) => [c.key, stat?.[c.key] ?? null])
+    TOTAL_ROWS[group].map((c) => [c.key, stat?.[c.key] ?? null]),
   );
 
 /** A starter's battingOrder is a round hundred ("100"); subs are "101", "102". */
@@ -430,11 +431,13 @@ export async function getBoxScore(pk: number): Promise<BoxScore> {
   return {
     pk,
     scheduledInnings: line.scheduledInnings ?? 9,
-    innings: (line.innings ?? []).map((i: any): BoxInning => ({
-      num: i.num,
-      away: i.away?.runs ?? null,
-      home: i.home?.runs ?? null,
-    })),
+    innings: (line.innings ?? []).map(
+      (i: any): BoxInning => ({
+        num: i.num,
+        away: i.away?.runs ?? null,
+        home: i.home?.runs ?? null,
+      }),
+    ),
     away: boxTeam(box.teams?.away ?? {}, line.teams?.away),
     home: boxTeam(box.teams?.home ?? {}, line.teams?.home),
   };
@@ -576,11 +579,11 @@ const standingsUrl = (season: number, type: string) =>
 
 export async function getStandings(
   season: number,
-  gameType: GameType = "R"
+  gameType: GameType = "R",
 ): Promise<Division[]> {
   const data = await mlb(
     standingsUrl(season, gameType === "S" ? "springTraining" : "regularSeason"),
-    1800
+    1800,
   );
   const records = (data.records ?? []) as any[];
   return records
@@ -595,7 +598,9 @@ export async function getStandings(
         teams: (r.teamRecords ?? []).map(standingRow),
       };
     })
-    .sort((a, b) => DIVISION_ORDER.indexOf(a.id) - DIVISION_ORDER.indexOf(b.id));
+    .sort(
+      (a, b) => DIVISION_ORDER.indexOf(a.id) - DIVISION_ORDER.indexOf(b.id),
+    );
 }
 
 /*
@@ -649,7 +654,7 @@ export async function getWildCard(season: number): Promise<WildCardGroup[]> {
           .map(standingRow)
           .sort(
             (a: StandingRow, b: StandingRow) =>
-              (Number(a.wcRank) || 99) - (Number(b.wcRank) || 99)
+              (Number(a.wcRank) || 99) - (Number(b.wcRank) || 99),
           ),
       };
     })
@@ -768,11 +773,11 @@ const cols = (group: "hitting" | "pitching") =>
 async function teamStatTable(
   group: "hitting" | "pitching",
   season: number,
-  gameType: GameType
+  gameType: GameType,
 ): Promise<TeamStatTable> {
   const data = await mlb(
     `/teams/stats?season=${season}&sportIds=1&group=${group}&stats=season&gameType=${gameType}`,
-    1800
+    1800,
   );
   const splits = (data.stats?.[0]?.splits ?? []) as any[];
   const columns = cols(group);
@@ -785,7 +790,7 @@ async function teamStatTable(
         id: s.team?.id,
         name: s.team?.name ?? "—",
         values: Object.fromEntries(
-          columns.map((c) => [c.key, stat[c.key] ?? null])
+          columns.map((c) => [c.key, stat[c.key] ?? null]),
         ),
       };
     }),
@@ -799,7 +804,7 @@ async function teamStatTable(
  */
 export async function getTeamStats(
   season: number,
-  gameType: GameType = "R"
+  gameType: GameType = "R",
 ): Promise<TeamStatTable[]> {
   return Promise.all([
     teamStatTable("hitting", season, gameType),
@@ -840,7 +845,7 @@ export async function searchAll(q: string, limit = 8): Promise<SearchHit[]> {
     mlbTeams().catch(() => [] as any[]),
     mlb(
       `/people/search?names=${encodeURIComponent(needle)}&hydrate=currentTeam`,
-      3600
+      3600,
     )
       .then((d) => (d.people ?? []) as any[])
       .catch(() => [] as any[]),
@@ -850,7 +855,7 @@ export async function searchAll(q: string, limit = 8): Promise<SearchHit[]> {
     .filter((t) =>
       [t.name, t.teamName, t.locationName, t.abbreviation]
         .filter(Boolean)
-        .some((f: string) => f.toLowerCase().includes(needle))
+        .some((f: string) => f.toLowerCase().includes(needle)),
     )
     .map((t) => ({
       kind: "team" as const,
@@ -921,13 +926,13 @@ export interface TeamIdentity {
 /** Identity and ballpark. Null for an unknown id so the route can 404. */
 export async function getTeamIdentity(
   id: number,
-  season: number
+  season: number,
 ): Promise<TeamIdentity | null> {
   const data = await mlb(`/teams/${id}?season=${season}`, 1800).catch(
     (e: Error) => {
       if (e.message.includes(" 404:")) return null;
       throw e;
-    }
+    },
   );
   const t = data?.teams?.[0];
   if (!t) return null;
@@ -948,7 +953,7 @@ export async function getTeamIdentity(
  */
 export async function getTeamRecord(
   id: number,
-  season: number
+  season: number,
 ): Promise<StandingRow | null> {
   const divisions = await getStandings(season);
   return divisions.flatMap((d) => d.teams).find((r) => r.id === id) ?? null;
@@ -957,7 +962,7 @@ export async function getTeamRecord(
 /** One club's season lines, off the same payload the team-stats section uses. */
 export async function getTeamLines(
   id: number,
-  season: number
+  season: number,
 ): Promise<{ hitting: TeamStatRow | null; pitching: TeamStatRow | null }> {
   const stats = await getTeamStats(season);
   const lineFor = (group: "hitting" | "pitching") =>
@@ -969,11 +974,11 @@ export async function getTeamLines(
 export async function getTeamRoster(
   id: number,
   season: number,
-  rosterType = "fullSeason"
+  rosterType = "fullSeason",
 ): Promise<RosterEntry[]> {
   const data = await mlb(
     `/teams/${id}/roster?season=${season}&rosterType=${rosterType}&hydrate=person`,
-    1800
+    1800,
   ).catch(() => null);
   return ((data?.roster ?? []) as any[]).map((r): RosterEntry => {
     const p = r.person ?? {};
@@ -1035,16 +1040,41 @@ const LEADER_SPECS: {
   { cat: "triples", group: "hitting", label: "TRIPLES", stat: "triples" },
   { cat: "homeRuns", group: "hitting", label: "HOME RUNS", stat: "homeRuns" },
   { cat: "runsBattedIn", group: "hitting", label: "RBI", stat: "rbi" },
-  { cat: "strikeouts", group: "hitting", label: "STRIKEOUTS", stat: "strikeOuts" },
+  {
+    cat: "strikeouts",
+    group: "hitting",
+    label: "STRIKEOUTS",
+    stat: "strikeOuts",
+  },
   { cat: "walks", group: "hitting", label: "WALKS", stat: "baseOnBalls" },
-  { cat: "stolenBases", group: "hitting", label: "STOLEN BASES", stat: "stolenBases" },
+  {
+    cat: "stolenBases",
+    group: "hitting",
+    label: "STOLEN BASES",
+    stat: "stolenBases",
+  },
   { cat: "earnedRunAverage", group: "pitching", label: "ERA", stat: "era" },
   { cat: "wins", group: "pitching", label: "WINS", stat: "wins" },
   { cat: "losses", group: "pitching", label: "LOSSES", stat: "losses" },
-  { cat: "inningsPitched", group: "pitching", label: "INNINGS PITCHED", stat: "inningsPitched" },
-  { cat: "strikeouts", group: "pitching", label: "STRIKEOUTS", stat: "strikeOuts" },
+  {
+    cat: "inningsPitched",
+    group: "pitching",
+    label: "INNINGS PITCHED",
+    stat: "inningsPitched",
+  },
+  {
+    cat: "strikeouts",
+    group: "pitching",
+    label: "STRIKEOUTS",
+    stat: "strikeOuts",
+  },
   { cat: "walks", group: "pitching", label: "WALKS", stat: "baseOnBalls" },
-  { cat: "earnedRun", group: "pitching", label: "EARNED RUNS", stat: "earnedRuns" },
+  {
+    cat: "earnedRun",
+    group: "pitching",
+    label: "EARNED RUNS",
+    stat: "earnedRuns",
+  },
   { cat: "whip", group: "pitching", label: "WHIP", stat: "whip" },
   { cat: "saves", group: "pitching", label: "SAVES", stat: "saves" },
 ];
@@ -1052,11 +1082,11 @@ const LEADER_SPECS: {
 async function oneBoard(
   spec: (typeof LEADER_SPECS)[number],
   season: number,
-  limit: number
+  limit: number,
 ): Promise<Leaderboard> {
   const data = await mlb(
     `/stats/leaders?leaderCategories=${spec.cat}&statGroup=${spec.group}&season=${season}&sportId=1&limit=${limit}`,
-    1800
+    1800,
   );
   const leaders = (data.leagueLeaders?.[0]?.leaders ?? []) as any[];
   return {
@@ -1064,19 +1094,21 @@ async function oneBoard(
     label: spec.label,
     group: spec.group,
     stat: spec.stat,
-    leaders: leaders.map((l): LeaderRow => ({
-      rank: l.rank,
-      personId: l.person?.id,
-      name: l.person?.fullName ?? "—",
-      team: l.team?.name ?? "",
-      value: l.value,
-    })),
+    leaders: leaders.map(
+      (l): LeaderRow => ({
+        rank: l.rank,
+        personId: l.person?.id,
+        name: l.person?.fullName ?? "—",
+        team: l.team?.name ?? "",
+        value: l.value,
+      }),
+    ),
   };
 }
 
 export async function getLeaderboards(
   season: number,
-  limit = 20
+  limit = 20,
 ): Promise<Leaderboard[]> {
   return Promise.all(LEADER_SPECS.map((s) => oneBoard(s, season, limit)));
 }
@@ -1154,11 +1186,11 @@ const PITCHING_KEYS: [string, string][] = [
  */
 export async function getPlayer(
   id: number,
-  season: number
+  season: number,
 ): Promise<PlayerSummary | null> {
   const data = await mlb(
     `/people/${id}?hydrate=currentTeam,stats(group=[hitting,pitching],type=[season],season=${season})`,
-    1800
+    1800,
   ).catch((e: Error) => {
     // Unknown id → null so the route 404s; anything else is an outage and
     // must surface as one, not as "no such player".
@@ -1218,7 +1250,7 @@ export async function getPlayer(
 export async function getPlayerSeasons(id: number): Promise<number[]> {
   const data = await mlb(
     `/people/${id}/stats?stats=yearByYear&group=hitting,pitching&sportId=1`,
-    86400
+    86400,
   ).catch((e: Error) => {
     if (e.message.includes(" 404:")) return null;
     throw e;
@@ -1255,7 +1287,7 @@ export type ClinchPhase = "live" | "settled" | "none";
 
 export const clinchPhase = (
   rows: StandingRow[],
-  seasonOver: boolean
+  seasonOver: boolean,
 ): ClinchPhase =>
   !seasonOver ? "live" : rows.some((r) => r.clinch !== "") ? "settled" : "none";
 
@@ -1318,7 +1350,7 @@ export function latestByGame(games: Game[]): Game[] {
     if (!prev || g.startTime > prev.startTime) latest.set(g.pk, g);
   }
   return [...latest.values()].sort((a, b) =>
-    a.startTime.localeCompare(b.startTime)
+    a.startTime.localeCompare(b.startTime),
   );
 }
 
@@ -1329,14 +1361,14 @@ export function latestByGame(games: Game[]): Game[] {
  */
 export async function getTeamSchedule(
   id: number,
-  season: number
+  season: number,
 ): Promise<Game[]> {
   const data = await mlb(
     `/schedule?sportId=1&teamId=${id}&season=${season}&gameType=R,F,D,L,W&hydrate=${SCHEDULE_HYDRATE}`,
-    300
+    300,
   );
   return latestByGame(
-    ((data.dates ?? []) as any[]).flatMap((d) => d.games ?? []).map(toGame)
+    ((data.dates ?? []) as any[]).flatMap((d) => d.games ?? []).map(toGame),
   );
 }
 
@@ -1407,7 +1439,11 @@ export const PLAYER_PITCHING_COLS: TeamStatCol[] = [
   { key: "baseOnBalls", label: "BB", title: "Walks issued" },
   { key: "strikeOuts", label: "K", title: "Strikeouts recorded" },
   { key: "avg", label: "OAVG", title: "Opponent batting average" },
-  { key: "strikeoutsPer9Inn", label: "K/9", title: "Strikeouts per nine innings" },
+  {
+    key: "strikeoutsPer9Inn",
+    label: "K/9",
+    title: "Strikeouts per nine innings",
+  },
 ];
 
 export const PLAYER_FIELDING_COLS: TeamStatCol[] = [
@@ -1420,7 +1456,11 @@ export const PLAYER_FIELDING_COLS: TeamStatCol[] = [
   { key: "fielding", label: "FPCT", title: "Fielding percentage" },
   { key: "errors", label: "E", title: "Errors" },
   { key: "doublePlays", label: "DP", title: "Double plays turned" },
-  { key: "rangeFactorPer9Inn", label: "RF/9", title: "Range factor per nine innings" },
+  {
+    key: "rangeFactorPer9Inn",
+    label: "RF/9",
+    title: "Range factor per nine innings",
+  },
 ];
 
 /* Innings are thirds: "121.2" is 121 innings and two outs, so they are added
@@ -1443,8 +1483,19 @@ const inningsOf = (outs: number): string =>
  * is where he played the most innings, starred if there were others.
  */
 export function mergeFielding(rows: PlayerStatRow[]): PlayerStatRow[] {
-  const SUM = ["games", "gamesStarted", "chances", "putOuts", "assists", "errors", "doublePlays"];
-  const byPlayer = new Map<number, { row: PlayerStatRow; outs: number; spots: { pos: string; outs: number }[] }>();
+  const SUM = [
+    "games",
+    "gamesStarted",
+    "chances",
+    "putOuts",
+    "assists",
+    "errors",
+    "doublePlays",
+  ];
+  const byPlayer = new Map<
+    number,
+    { row: PlayerStatRow; outs: number; spots: { pos: string; outs: number }[] }
+  >();
 
   for (const r of rows) {
     const outs = outsOf(r.values.innings);
@@ -1458,7 +1509,9 @@ export function mergeFielding(rows: PlayerStatRow[]): PlayerStatRow[] {
       continue;
     }
     for (const k of SUM)
-      seen.row.values[k] = (teamStatNum(seen.row.values[k]) ?? 0) + (teamStatNum(r.values[k]) ?? 0);
+      seen.row.values[k] =
+        (teamStatNum(seen.row.values[k]) ?? 0) +
+        (teamStatNum(r.values[k]) ?? 0);
     seen.outs += outs;
     seen.spots.push({ pos: r.position, outs });
   }
@@ -1469,11 +1522,16 @@ export function mergeFielding(rows: PlayerStatRow[]): PlayerStatRow[] {
     const errors = teamStatNum(row.values.errors) ?? 0;
     /* Chances go unreported often enough that the sum of the three is the
        safer denominator; it is what a total chance is. */
-    const tc = Math.max(teamStatNum(row.values.chances) ?? 0, po + assists + errors);
+    const tc = Math.max(
+      teamStatNum(row.values.chances) ?? 0,
+      po + assists + errors,
+    );
     row.position = spots.reduce((a, b) => (b.outs > a.outs ? b : a)).pos;
     row.values.innings = inningsOf(outs);
     row.values.chances = tc;
-    row.values.fielding = tc ? ((po + assists) / tc).toFixed(3).replace(/^0/, "") : null;
+    row.values.fielding = tc
+      ? ((po + assists) / tc).toFixed(3).replace(/^0/, "")
+      : null;
     row.values.rangeFactorPer9Inn = outs
       ? (((po + assists) * 27) / outs).toFixed(2)
       : null;
@@ -1501,12 +1559,12 @@ export async function getTeamPlayerStats(
   id: number,
   season: number,
   group: StatGroup,
-  gameType: PlayerGameType = "R"
+  gameType: PlayerGameType = "R",
 ): Promise<PlayerStatRow[]> {
   const data = await mlb(
     `/stats?stats=season&group=${group}&season=${season}&teamId=${id}` +
       `&gameType=${gameType}&sportId=1&playerPool=ALL&limit=200`,
-    1800
+    1800,
   );
   const columns = playerCols(group);
   const rows = ((data.stats?.[0]?.splits ?? []) as any[]).map(
@@ -1517,10 +1575,10 @@ export async function getTeamPlayerStats(
         name: s.player?.fullName ?? "—",
         position: s.position?.abbreviation ?? "",
         values: Object.fromEntries(
-          columns.map((c) => [c.key, stat[c.key] ?? null])
+          columns.map((c) => [c.key, stat[c.key] ?? null]),
         ),
       };
-    }
+    },
   );
   if (group === "fielding") return mergeFielding(rows);
   /* `playerPool=ALL` answers with every pitcher who ever appeared, each with an
@@ -1531,7 +1589,7 @@ export async function getTeamPlayerStats(
     ? rows.filter(
         (r) =>
           r.position !== "P" ||
-          (teamStatNum(r.values.plateAppearances) ?? 0) > 0
+          (teamStatNum(r.values.plateAppearances) ?? 0) > 0,
       )
     : rows;
 }
@@ -1587,20 +1645,19 @@ export const defaultLeaderStat = (group: StatGroup): string =>
  * descending, which is the common case and what MLB's default usually is.
  */
 export const boardDir = (values: TeamStatValue[]): "asc" | "desc" => {
-  const nums = values
-    .map(teamStatNum)
-    .filter((n): n is number => n !== null);
+  const nums = values.map(teamStatNum).filter((n): n is number => n !== null);
   return nums.length > 1 && nums[nums.length - 1] > nums[0] ? "asc" : "desc";
 };
 
 /** The sort direction off the query string — anything else means MLB's own. */
 export const pickLeaderOrder = (
-  raw: string | undefined
-): "asc" | "desc" | undefined => (raw === "asc" || raw === "desc" ? raw : undefined);
+  raw: string | undefined,
+): "asc" | "desc" | undefined =>
+  raw === "asc" || raw === "desc" ? raw : undefined;
 
 export const pickLeaderStat = (
   raw: string | undefined,
-  group: StatGroup
+  group: StatGroup,
 ): string =>
   playerCols(group).some((c) => c.key === raw)
     ? raw!
@@ -1631,12 +1688,12 @@ async function tradedTeams(
   season: number,
   group: StatGroup,
   gameType: PlayerGameType,
-  current: string
+  current: string,
 ): Promise<string | null> {
   const data = await mlb(
     `/people/${id}/stats?stats=season&group=${group}&season=${season}` +
       `&sportId=1&gameType=${gameType}&hydrate=team`,
-    1800
+    1800,
   );
   /* The payload leads with the combined line, which has no club of its own —
      the per-club rows are the ones that name a team. */
@@ -1693,22 +1750,24 @@ export async function getStatLeaders({
       (order ? `&order=${order}` : "") +
       (league === "all" ? "" : `&leagueId=${league}`) +
       (position === "all" ? "" : `&position=${position}`),
-    1800
+    1800,
   );
   const columns = playerCols(group);
   const board = data.stats?.[0];
   const splits = (board?.splits ?? []) as any[];
-  const rows = splits.map((s): StatLeaderRow => ({
-    rank: s.rank ?? null,
-    id: s.player?.id,
-    name: s.player?.fullName ?? "—",
-    position: s.position?.abbreviation ?? "",
-    team: s.team?.abbreviation ?? "",
-    teamId: s.team?.id ?? null,
-    values: Object.fromEntries(
-      columns.map((c) => [c.key, s.stat?.[c.key] ?? null])
-    ),
-  }));
+  const rows = splits.map(
+    (s): StatLeaderRow => ({
+      rank: s.rank ?? null,
+      id: s.player?.id,
+      name: s.player?.fullName ?? "—",
+      position: s.position?.abbreviation ?? "",
+      team: s.team?.abbreviation ?? "",
+      teamId: s.team?.id ?? null,
+      values: Object.fromEntries(
+        columns.map((c) => [c.key, s.stat?.[c.key] ?? null]),
+      ),
+    }),
+  );
 
   /* Only the handful a trade moved cost a request of their own, and a failed
      one leaves the club they finished the season on rather than no club. */
@@ -1720,10 +1779,10 @@ export async function getStatLeaders({
         season,
         group,
         gameType,
-        r.team
+        r.team,
       ).catch(() => null);
       if (stops) r.team = stops;
-    })
+    }),
   );
 
   return { total: board?.totalSplits ?? 0, rows };
@@ -1767,17 +1826,17 @@ export function runningRecords(games: Game[]): Map<string, PitcherRecord> {
 }
 
 export async function getPitcherRecords(
-  season: number
+  season: number,
 ): Promise<Map<string, PitcherRecord>> {
   const data = await mlb(
     `/schedule?sportId=1&season=${season}&gameType=R,F,D,L,W&hydrate=decisions` +
       `&fields=dates,games,gamePk,gameDate,decisions,winner,loser,save,id,fullName`,
-    1800
+    1800,
   );
   return runningRecords(
     latestByGame(
-      ((data.dates ?? []) as any[]).flatMap((d) => d.games ?? []).map(toGame)
-    )
+      ((data.dates ?? []) as any[]).flatMap((d) => d.games ?? []).map(toGame),
+    ),
   );
 }
 
@@ -1788,7 +1847,7 @@ export async function getPitcherRecords(
 export async function getBreakDate(season: number): Promise<string | null> {
   const data = await mlb(
     `/schedule?sportId=1&season=${season}&gameType=A&fields=dates,games,gameDate`,
-    86400
+    86400,
   );
   const g = ((data.dates ?? []) as any[]).flatMap((d) => d.games ?? [])[0];
   return g?.gameDate ?? null;
@@ -1855,21 +1914,48 @@ const TEAM_LEADER_SPECS: TeamLeaderSpec[] = [
  */
 export const PLAYER_LEADER_SPECS: Record<StatGroup, TeamLeaderSpec[]> = {
   hitting: [
-    { key: "avg", label: "BATTING AVG", group: "hitting", min: { key: "plateAppearances", perGame: 3.1 } },
+    {
+      key: "avg",
+      label: "BATTING AVG",
+      group: "hitting",
+      min: { key: "plateAppearances", perGame: 3.1 },
+    },
     { key: "homeRuns", label: "HOME RUNS", group: "hitting" },
     { key: "rbi", label: "RBI", group: "hitting" },
-    { key: "obp", label: "OBP", group: "hitting", min: { key: "plateAppearances", perGame: 3.1 } },
+    {
+      key: "obp",
+      label: "OBP",
+      group: "hitting",
+      min: { key: "plateAppearances", perGame: 3.1 },
+    },
     { key: "hits", label: "HITS", group: "hitting" },
   ],
   pitching: [
-    { key: "era", label: "ERA", group: "pitching", low: true, min: { key: "inningsPitched", perGame: 1 } },
+    {
+      key: "era",
+      label: "ERA",
+      group: "pitching",
+      low: true,
+      min: { key: "inningsPitched", perGame: 1 },
+    },
     { key: "wins", label: "WINS", group: "pitching" },
     { key: "strikeOuts", label: "STRIKEOUTS", group: "pitching" },
     { key: "saves", label: "SAVES", group: "pitching" },
-    { key: "whip", label: "WHIP", group: "pitching", low: true, min: { key: "inningsPitched", perGame: 1 } },
+    {
+      key: "whip",
+      label: "WHIP",
+      group: "pitching",
+      low: true,
+      min: { key: "inningsPitched", perGame: 1 },
+    },
   ],
   fielding: [
-    { key: "fielding", label: "FIELDING PCT", group: "fielding", min: { key: "chances", perGame: 1 } },
+    {
+      key: "fielding",
+      label: "FIELDING PCT",
+      group: "fielding",
+      min: { key: "chances", perGame: 1 },
+    },
     { key: "putOuts", label: "PUTOUTS", group: "fielding" },
     { key: "assists", label: "ASSISTS", group: "fielding" },
     { key: "doublePlays", label: "DOUBLE PLAYS", group: "fielding" },
@@ -1904,7 +1990,7 @@ function rankBy(rows: PlayerStatRow[], spec: TeamLeaderSpec): PlayerStatRow[] {
 export function leaderBoard(
   spec: TeamLeaderSpec,
   rows: PlayerStatRow[],
-  teamGames: number
+  teamGames: number,
 ): TeamLeaderBoard {
   const ranked = rankBy(rows, spec);
   const bar = spec.min
@@ -1912,7 +1998,7 @@ export function leaderBoard(
         ranked.filter(
           (r) =>
             (teamStatNum(r.values[spec.min!.key]) ?? 0) >=
-            teamGames * spec.min!.perGame * fraction
+            teamGames * spec.min!.perGame * fraction,
         )
     : () => ranked;
   const filled =
@@ -1942,7 +2028,7 @@ export async function getTeamLeaders(
   gameType: PlayerGameType = "R",
   /** Leave off anyone the club has since moved on from — a pre-game page is
    *  asking who is available tonight, not who led the season's ledger. */
-  activeOnly = false
+  activeOnly = false,
 ): Promise<TeamLeaderBoard[]> {
   const [hitting, pitching, active] = await Promise.all([
     getTeamPlayerStats(id, season, "hitting", gameType),
@@ -1956,15 +2042,15 @@ export async function getTeamLeaders(
      the denominator every qualifying bar is a multiple of. */
   const teamGames = Math.max(
     0,
-    ...hitting.map((r) => teamStatNum(r.values.gamesPlayed) ?? 0)
+    ...hitting.map((r) => teamStatNum(r.values.gamesPlayed) ?? 0),
   );
 
   return TEAM_LEADER_SPECS.map((spec) =>
     leaderBoard(
       spec,
       rostered(spec.group === "hitting" ? hitting : pitching),
-      teamGames
-    )
+      teamGames,
+    ),
   );
 }
 
@@ -2006,7 +2092,7 @@ export function statRank(
   rows: TeamStatRow[],
   key: string,
   id: number,
-  low = false
+  low = false,
 ): number | null {
   const mine = teamStatNum(rows.find((r) => r.id === id)?.values[key] ?? null);
   if (mine === null) return null;
@@ -2030,7 +2116,7 @@ export function ordinal(n: number): string {
  */
 export async function getTeamCardStats(
   id: number,
-  season: number
+  season: number,
 ): Promise<Record<"hitting" | "pitching", RankedStat[]>> {
   const tables = await getTeamStats(season);
   const build = (group: "hitting" | "pitching"): RankedStat[] => {
@@ -2105,7 +2191,7 @@ const SPLIT_SECTIONS: {
 async function buildSplits(
   url: (codes: string) => string,
   columns: TeamStatCol[],
-  sections: { label: string; codes: string[] }[]
+  sections: { label: string; codes: string[] }[],
 ): Promise<SplitSection[]> {
   const data = await mlb(url(sections.flatMap((s) => s.codes).join(",")), 1800);
   const values = (stat: any) =>
@@ -2150,13 +2236,13 @@ async function buildSplits(
 export async function getTeamSplits(
   id: number,
   season: number,
-  group: "hitting" | "pitching"
+  group: "hitting" | "pitching",
 ): Promise<SplitSection[]> {
   return buildSplits(
     (codes) =>
       `/teams/${id}/stats?season=${season}&group=${group}&stats=season,statSplits&sitCodes=${codes}`,
     cols(group),
-    SPLIT_SECTIONS.filter((s) => !s.hittingOnly || group === "hitting")
+    SPLIT_SECTIONS.filter((s) => !s.hittingOnly || group === "hitting"),
   );
 }
 
@@ -2172,21 +2258,23 @@ export interface Transaction {
 
 export async function getTeamTransactions(
   id: number,
-  season: number
+  season: number,
 ): Promise<Transaction[]> {
   const data = await mlb(
     `/transactions?teamId=${id}&startDate=${season}-01-01&endDate=${season}-12-31`,
-    3600
+    3600,
   );
   return ((data.transactions ?? []) as any[])
-    .map((t): Transaction => ({
-      id: t.id,
-      date: t.date ?? "",
-      type: t.typeDesc ?? "",
-      description: t.description ?? "",
-      personId: t.person?.id ?? null,
-      person: t.person?.fullName ?? "",
-    }))
+    .map(
+      (t): Transaction => ({
+        id: t.id,
+        date: t.date ?? "",
+        type: t.typeDesc ?? "",
+        description: t.description ?? "",
+        personId: t.person?.id ?? null,
+        person: t.person?.fullName ?? "",
+      }),
+    )
     .sort((a, b) => b.date.localeCompare(a.date));
 }
 
@@ -2283,13 +2371,11 @@ const GROUP_LABEL: Record<string, string> = {
  */
 export async function getTeamRosterGroups(
   id: number,
-  season: number
+  season: number,
 ): Promise<RosterGroup[]> {
   const [roster, pitching] = await Promise.all([
     getTeamRoster(id, season, "active"),
-    getTeamPlayerStats(id, season, "pitching").catch(
-      (): PlayerStatRow[] => []
-    ),
+    getTeamPlayerStats(id, season, "pitching").catch((): PlayerStatRow[] => []),
   ]);
   const starts = new Map(
     pitching.map((r) => [
@@ -2298,7 +2384,7 @@ export async function getTeamRosterGroups(
         gs: teamStatNum(r.values.gamesStarted) ?? 0,
         g: teamStatNum(r.values.gamesPlayed) ?? 0,
       },
-    ])
+    ]),
   );
   const rotation = (p: RosterEntry) => {
     const line = starts.get(p.id);
@@ -2345,7 +2431,7 @@ export interface InjuryEntry extends RosterEntry {
  */
 export async function getTeamInjuries(
   id: number,
-  season: number
+  season: number,
 ): Promise<InjuryEntry[]> {
   const [roster, moves] = await Promise.all([
     getTeamRoster(id, season, "40Man"),
@@ -2356,7 +2442,7 @@ export async function getTeamInjuries(
   const onto = moves.filter(
     (t) =>
       /injured list/i.test(t.description) &&
-      !/(activated|reinstated)/i.test(t.description)
+      !/(activated|reinstated)/i.test(t.description),
   );
   return roster
     .filter((p) => injured(p.statusCode))
@@ -2401,7 +2487,8 @@ export interface Pregame {
   series: { game: number; total: number; result: string } | null;
 }
 
-const PREGAME_HYDRATE = "weather,officials,broadcasts(all),lineups,seriesStatus";
+const PREGAME_HYDRATE =
+  "weather,officials,broadcasts(all),lineups,seriesStatus";
 
 const spot = (p: any): LineupSpot => ({
   id: p.id,
@@ -2412,7 +2499,7 @@ const spot = (p: any): LineupSpot => ({
 export async function getPregame(pk: number): Promise<Pregame | null> {
   const data = await mlb(
     `/schedule?sportId=1&gamePk=${pk}&hydrate=${PREGAME_HYDRATE}`,
-    300
+    300,
   );
   const g = data.dates?.[0]?.games?.[0];
   if (!g) return null;
@@ -2469,7 +2556,7 @@ const lineupLine = (stat: any): LineupLine =>
   stat
     ? {
         ...Object.fromEntries(
-          LINEUP_COLS.map((c) => [c.key, stat[c.key] ?? null])
+          LINEUP_COLS.map((c) => [c.key, stat[c.key] ?? null]),
         ),
         hAb: `${stat.hits ?? 0}-${stat.atBats ?? 0}`,
       }
@@ -2486,28 +2573,28 @@ const lineupLine = (stat: any): LineupLine =>
  */
 export async function getVsPitcher(
   batters: number[],
-  pitcherId: number
+  pitcherId: number,
 ): Promise<Record<number, LineupLine>> {
   const lines = await Promise.all(
     batters.map((id) =>
       mlb(
         `/people/${id}/stats?stats=vsPlayerTotal&group=hitting&opposingPlayerId=${pitcherId}`,
-        86400
+        86400,
       )
         .then((d) => {
           const splits = (d.stats?.[0]?.splits ?? []) as any[];
           const s = splits.find((x) => x.gameType === "R") ?? splits[0];
           return lineupLine(s?.stat);
         })
-        .catch(() => null)
-    )
+        .catch(() => null),
+    ),
   );
   return Object.fromEntries(batters.map((id, i) => [id, lines[i]]));
 }
 
 /** A club's season line for each of its hitters, keyed by player id. */
 export const lineupSeason = (
-  rows: PlayerStatRow[]
+  rows: PlayerStatRow[],
 ): Record<number, LineupLine> =>
   Object.fromEntries(rows.map((r) => [r.id, lineupLine(r.values)]));
 
@@ -2526,9 +2613,7 @@ const HOME_FIELD_ODDS = 0.535 / 0.465;
  * A starter-aware number would need projections this API doesn't publish;
  * blend one in here if it ever does.
  */
-export function winProbability(
-  g: Game
-): { home: number; away: number } | null {
+export function winProbability(g: Game): { home: number; away: number } | null {
   const pct = (s: GameSide) => {
     const played = (s.wins ?? 0) + (s.losses ?? 0);
     return s.wins === null || played === 0 ? null : s.wins / played;
@@ -2539,7 +2624,8 @@ export function winProbability(
 
   const denom = h + a - 2 * h * a;
   /* Two unbeaten clubs, or two winless ones, log5 cannot separate. */
-  const base = denom === 0 ? 0.5 : Math.min(0.99, Math.max(0.01, (h - h * a) / denom));
+  const base =
+    denom === 0 ? 0.5 : Math.min(0.99, Math.max(0.01, (h - h * a) / denom));
   const odds = (base / (1 - base)) * HOME_FIELD_ODDS;
   const home = odds / (1 + odds);
   return { home, away: 1 - home };
@@ -2663,7 +2749,10 @@ function livePitch(e: any): LivePitch {
     code: d.type?.code ?? "",
     name: d.type?.description ?? "—",
     call: d.description ?? d.call?.description ?? "—",
-    speed: typeof e.pitchData?.startSpeed === "number" ? e.pitchData.startSpeed : null,
+    speed:
+      typeof e.pitchData?.startSpeed === "number"
+        ? e.pitchData.startSpeed
+        : null,
     x: typeof c.pX === "number" ? c.pX : null,
     z: typeof c.pZ === "number" ? c.pZ : null,
     outcome: d.isInPlay ? "in-play" : d.isStrike ? "strike" : "ball",
@@ -2737,7 +2826,7 @@ export async function getLive(pk: number): Promise<LiveGame> {
                 .map((e) => e.hitData?.totalDistance)
                 .find((d) => typeof d === "number") ?? null)
             : null,
-      })
+      }),
     ),
   };
 }
@@ -2768,12 +2857,12 @@ export interface HeatZone {
 export async function getHotZones(id: number): Promise<HeatZone[]> {
   const data = await mlb(
     `/people/${id}/stats?stats=hotColdZones&group=hitting&fields=stats,splits,stat,name,zones,zone,value,temp`,
-    3600
+    3600,
   ).catch(() => null);
   const splits = data?.stats?.[0]?.splits ?? [];
   const avg = (splits as any[]).find((s) => s.stat?.name === "battingAverage");
   return ((avg?.stat?.zones ?? []) as any[]).map(
-    (z): HeatZone => ({ zone: z.zone, value: z.value, temp: z.temp })
+    (z): HeatZone => ({ zone: z.zone, value: z.value, temp: z.temp }),
   );
 }
 
@@ -2815,7 +2904,9 @@ export function halfInnings(plays: PlayProb[]): HalfInning[] {
     }
     const before = plays[i - 1];
     half.runs +=
-      p.awayScore - (before?.awayScore ?? 0) + (p.homeScore - (before?.homeScore ?? 0));
+      p.awayScore -
+      (before?.awayScore ?? 0) +
+      (p.homeScore - (before?.homeScore ?? 0));
     half.plays.push(p);
   });
   return out;
@@ -2833,11 +2924,11 @@ export function halfInnings(plays: PlayProb[]): HalfInning[] {
  */
 export async function getPlayerGroups(
   id: number,
-  pos: string
+  pos: string,
 ): Promise<StatGroup[]> {
   const data = await mlb(
     `/people/${id}/stats?stats=career&group=hitting,pitching,fielding&sportId=1`,
-    86400
+    86400,
   ).catch(() => null);
 
   const vol = new Map<StatGroup, number>();
@@ -2851,7 +2942,7 @@ export async function getPlayerGroups(
         ? (teamStatNum(stat.plateAppearances) ?? 0)
         : g === "pitching"
           ? outsOf(stat.inningsPitched)
-          : (teamStatNum(stat.games) ?? 0)
+          : (teamStatNum(stat.games) ?? 0),
     );
   }
   const pa = vol.get("hitting") ?? 0;
@@ -2888,8 +2979,9 @@ export const groupOptions = (groups: StatGroup[]) =>
 /** Anything but one of the player's own groups reads as their first. */
 export const pickPlayerGroup = (
   raw: string | undefined,
-  groups: StatGroup[]
-): StatGroup => (groups.includes(raw as StatGroup) ? (raw as StatGroup) : groups[0]);
+  groups: StatGroup[],
+): StatGroup =>
+  groups.includes(raw as StatGroup) ? (raw as StatGroup) : groups[0];
 
 /* ── Career column sets ─────────────────────────────────────────────── */
 
@@ -2907,7 +2999,11 @@ export const pickPlayerGroup = (
  * league's own line; see leagueRates.
  */
 export const CAREER_HITTING_COLS: TeamStatCol[] = [
-  { key: "war", label: "WAR", title: "Wins above replacement (FanGraphs, via MLB)" },
+  {
+    key: "war",
+    label: "WAR",
+    title: "Wins above replacement (FanGraphs, via MLB)",
+  },
   { key: "gamesPlayed", label: "G", title: "Games played" },
   { key: "plateAppearances", label: "PA", title: "Plate appearances" },
   { key: "atBats", label: "AB", title: "At-bats" },
@@ -2925,9 +3021,18 @@ export const CAREER_HITTING_COLS: TeamStatCol[] = [
   { key: "obp", label: "OBP", title: "On-base percentage" },
   { key: "slg", label: "SLG", title: "Slugging percentage" },
   { key: "ops", label: "OPS", title: "On-base plus slugging" },
-  { key: "opsPlus", label: "OPS+", title: "OPS against his league, adjusted for the parks he played in — 100 is average" },
+  {
+    key: "opsPlus",
+    label: "OPS+",
+    title:
+      "OPS against his league, adjusted for the parks he played in — 100 is average",
+  },
   { key: "totalBases", label: "TB", title: "Total bases" },
-  { key: "groundIntoDoublePlay", label: "GIDP", title: "Grounded into double plays" },
+  {
+    key: "groundIntoDoublePlay",
+    label: "GIDP",
+    title: "Grounded into double plays",
+  },
   { key: "hitByPitch", label: "HBP", title: "Hit by pitch" },
   { key: "sacBunts", label: "SH", title: "Sacrifice hits (bunts)" },
   { key: "sacFlies", label: "SF", title: "Sacrifice flies" },
@@ -2935,7 +3040,11 @@ export const CAREER_HITTING_COLS: TeamStatCol[] = [
 ];
 
 export const CAREER_PITCHING_COLS: TeamStatCol[] = [
-  { key: "war", label: "WAR", title: "Wins above replacement (FanGraphs, via MLB)" },
+  {
+    key: "war",
+    label: "WAR",
+    title: "Wins above replacement (FanGraphs, via MLB)",
+  },
   { key: "wins", label: "W", title: "Wins" },
   { key: "losses", label: "L", title: "Losses" },
   { key: "winPercentage", label: "W-L%", title: "Winning percentage" },
@@ -2959,12 +3068,29 @@ export const CAREER_PITCHING_COLS: TeamStatCol[] = [
   { key: "wildPitches", label: "WP", title: "Wild pitches" },
   { key: "battersFaced", label: "BF", title: "Batters faced" },
   { key: "whip", label: "WHIP", title: "Walks and hits per inning pitched" },
-  { key: "fip", label: "FIP", title: "Fielding independent pitching (FanGraphs, via MLB)" },
-  { key: "eraPlus", label: "ERA+", title: "ERA against his league, adjusted for the parks he pitched in — 100 is average" },
+  {
+    key: "fip",
+    label: "FIP",
+    title: "Fielding independent pitching (FanGraphs, via MLB)",
+  },
+  {
+    key: "eraPlus",
+    label: "ERA+",
+    title:
+      "ERA against his league, adjusted for the parks he pitched in — 100 is average",
+  },
   { key: "hitsPer9Inn", label: "H9", title: "Hits allowed per nine innings" },
-  { key: "homeRunsPer9", label: "HR9", title: "Home runs allowed per nine innings" },
+  {
+    key: "homeRunsPer9",
+    label: "HR9",
+    title: "Home runs allowed per nine innings",
+  },
   { key: "walksPer9Inn", label: "BB9", title: "Walks per nine innings" },
-  { key: "strikeoutsPer9Inn", label: "SO9", title: "Strikeouts per nine innings" },
+  {
+    key: "strikeoutsPer9Inn",
+    label: "SO9",
+    title: "Strikeouts per nine innings",
+  },
   { key: "strikeoutWalkRatio", label: "SO/W", title: "Strikeouts per walk" },
 ];
 
@@ -2990,36 +3116,107 @@ export const careerCols = (group: StatGroup): TeamStatCol[] =>
  * percentage on the fielding table.
  */
 export const ADVANCED_HITTING_COLS: TeamStatCol[] = [
-  { key: "war", label: "WAR", title: "Wins above replacement (FanGraphs, via MLB)" },
+  {
+    key: "war",
+    label: "WAR",
+    title: "Wins above replacement (FanGraphs, via MLB)",
+  },
   { key: "rar", label: "RAR", title: "Runs above replacement" },
-  { key: "woba", label: "wOBA", title: "Weighted on-base average — every way of reaching base at its run value" },
+  {
+    key: "woba",
+    label: "wOBA",
+    title:
+      "Weighted on-base average — every way of reaching base at its run value",
+  },
   { key: "wRc", label: "wRC", title: "Weighted runs created" },
-  { key: "wRcPlus", label: "wRC+", title: "Weighted runs created against the league, park-adjusted — 100 is average" },
+  {
+    key: "wRcPlus",
+    label: "wRC+",
+    title:
+      "Weighted runs created against the league, park-adjusted — 100 is average",
+  },
   { key: "wRaa", label: "wRAA", title: "Weighted runs above average" },
   { key: "batting", label: "Rbat", title: "Batting runs above average" },
-  { key: "baseRunning", label: "Rbaser", title: "Base-running runs above average" },
+  {
+    key: "baseRunning",
+    label: "Rbaser",
+    title: "Base-running runs above average",
+  },
   { key: "positional", label: "Rpos", title: "Positional adjustment runs" },
-  { key: "replacement", label: "Rrep", title: "Runs above a replacement-level player" },
+  {
+    key: "replacement",
+    label: "Rrep",
+    title: "Runs above a replacement-level player",
+  },
   { key: "spd", label: "SPD", title: "Speed score" },
-  { key: "ubr", label: "UBR", title: "Ultimate base running — base-running run value outside stolen bases" },
+  {
+    key: "ubr",
+    label: "UBR",
+    title:
+      "Ultimate base running — base-running run value outside stolen bases",
+  },
   { key: "wSb", label: "wSB", title: "Weighted stolen-base runs" },
   { key: "wGdp", label: "wGDP", title: "Weighted double-play runs" },
 ];
 
 export const ADVANCED_PITCHING_COLS: TeamStatCol[] = [
-  { key: "war", label: "WAR", title: "Wins above replacement (FanGraphs, via MLB)" },
-  { key: "ra9War", label: "RA9-WAR", title: "Wins above replacement figured from runs allowed rather than FIP" },
+  {
+    key: "war",
+    label: "WAR",
+    title: "Wins above replacement (FanGraphs, via MLB)",
+  },
+  {
+    key: "ra9War",
+    label: "RA9-WAR",
+    title: "Wins above replacement figured from runs allowed rather than FIP",
+  },
   { key: "rar", label: "RAR", title: "Runs above replacement" },
   { key: "fip", label: "FIP", title: "Fielding independent pitching" },
-  { key: "xfip", label: "xFIP", title: "FIP with a league-average home-run rate on fly balls" },
-  { key: "fipMinus", label: "FIP-", title: "FIP against the league — 100 is average, lower is better" },
-  { key: "eraMinus", label: "ERA-", title: "ERA against the league — 100 is average, lower is better" },
-  { key: "pli", label: "pLI", title: "Average leverage index on entering a game" },
-  { key: "inli", label: "inLI", title: "Average leverage index over innings pitched" },
-  { key: "gmli", label: "gmLI", title: "Average leverage index at the moment of entry" },
-  { key: "exli", label: "exLI", title: "Average leverage index on leaving a game" },
-  { key: "sd", label: "SD", title: "Shutdowns — relief outings that meaningfully helped the club win" },
-  { key: "md", label: "MD", title: "Meltdowns — relief outings that meaningfully hurt it" },
+  {
+    key: "xfip",
+    label: "xFIP",
+    title: "FIP with a league-average home-run rate on fly balls",
+  },
+  {
+    key: "fipMinus",
+    label: "FIP-",
+    title: "FIP against the league — 100 is average, lower is better",
+  },
+  {
+    key: "eraMinus",
+    label: "ERA-",
+    title: "ERA against the league — 100 is average, lower is better",
+  },
+  {
+    key: "pli",
+    label: "pLI",
+    title: "Average leverage index on entering a game",
+  },
+  {
+    key: "inli",
+    label: "inLI",
+    title: "Average leverage index over innings pitched",
+  },
+  {
+    key: "gmli",
+    label: "gmLI",
+    title: "Average leverage index at the moment of entry",
+  },
+  {
+    key: "exli",
+    label: "exLI",
+    title: "Average leverage index on leaving a game",
+  },
+  {
+    key: "sd",
+    label: "SD",
+    title: "Shutdowns — relief outings that meaningfully helped the club win",
+  },
+  {
+    key: "md",
+    label: "MD",
+    title: "Meltdowns — relief outings that meaningfully hurt it",
+  },
 ];
 
 /** The feed has no fielding line at all, so that group has no advanced view. */
@@ -3037,8 +3234,20 @@ export const advancedCols = (group: StatGroup): TeamStatCol[] =>
  * a number that would mean nothing — a summed wRC+ of 344 is not a career.
  */
 const ADVANCED_ADDITIVE = new Set([
-  "war", "rar", "wRaa", "wRc", "batting", "baseRunning", "positional",
-  "replacement", "ubr", "wSb", "wGdp", "ra9War", "sd", "md",
+  "war",
+  "rar",
+  "wRaa",
+  "wRc",
+  "batting",
+  "baseRunning",
+  "positional",
+  "replacement",
+  "ubr",
+  "wSb",
+  "wGdp",
+  "ra9War",
+  "sd",
+  "md",
 ]);
 
 /* ── Summing stat lines ─────────────────────────────────────────────── */
@@ -3048,9 +3257,17 @@ const ADVANCED_ADDITIVE = new Set([
 const RATE_KEYS: Record<StatGroup, string[]> = {
   hitting: ["avg", "obp", "slg", "ops", "opsPlus"],
   pitching: [
-    "era", "whip", "avg", "strikeoutsPer9Inn", "winPercentage",
-    "hitsPer9Inn", "homeRunsPer9", "walksPer9Inn", "strikeoutWalkRatio",
-    "fip", "eraPlus",
+    "era",
+    "whip",
+    "avg",
+    "strikeoutsPer9Inn",
+    "winPercentage",
+    "hitsPer9Inn",
+    "homeRunsPer9",
+    "walksPer9Inn",
+    "strikeoutWalkRatio",
+    "fip",
+    "eraPlus",
   ],
   fielding: ["fielding", "rangeFactorPer9Inn"],
 };
@@ -3061,7 +3278,7 @@ const RATE_KEYS: Record<StatGroup, string[]> = {
  * average is noise, and the same label twice in a header is worse.
  */
 export const gameLogCols = (
-  group: StatGroup
+  group: StatGroup,
 ): { game: TeamStatCol[]; running: TeamStatCol[] } => {
   const rates = new Set(RATE_KEYS[group]);
   const cols = playerCols(group);
@@ -3102,16 +3319,18 @@ const num = (v: TeamStatValue) => teamStatNum(v) ?? 0;
  */
 export function sumStatLines(
   group: StatGroup,
-  lines: Record<string, TeamStatValue>[]
+  lines: Record<string, TeamStatValue>[],
 ): Record<string, TeamStatValue> {
   const rates = new Set(RATE_KEYS[group]);
   const innKey =
-    group === "pitching" ? "inningsPitched" : group === "fielding" ? "innings" : "";
+    group === "pitching"
+      ? "inningsPitched"
+      : group === "fielding"
+        ? "innings"
+        : "";
   /* Everything a line carries, not just what the narrow tables print: a club
      total is shown on the career table, whose columns are the wider set. */
-  const keys = statLineKeys(group).filter(
-    (k) => !rates.has(k) && k !== innKey
-  );
+  const keys = statLineKeys(group).filter((k) => !rates.has(k) && k !== innKey);
 
   const out: Record<string, TeamStatValue> = {};
   let outs = 0;
@@ -3245,13 +3464,13 @@ export type LedScope = "league" | "mlb";
 async function seasonLeaders(
   season: number,
   group: StatGroup,
-  leagues: number[]
+  leagues: number[],
 ): Promise<Map<string, string>> {
   const cats = [
     ...new Set(
       careerCols(group)
         .map((c) => LEADER_CATEGORY[c.key])
-        .filter(Boolean)
+        .filter(Boolean),
     ),
   ].join(",");
   const scopes: [string, string][] = [
@@ -3265,14 +3484,14 @@ async function seasonLeaders(
       const data = await mlb(
         `/stats/leaders?leaderCategories=${cats}&season=${season}` +
           `&statGroup=${group}&limit=1&sportId=1${param}`,
-        86400
+        86400,
       ).catch(() => null);
-      for (const board of ((data?.leagueLeaders ?? []) as any[])) {
+      for (const board of (data?.leagueLeaders ?? []) as any[]) {
         const value = board.leaders?.[0]?.value;
         if (value === undefined || value === null) continue;
         out.set(`${scope}:${board.leaderCategory}`, String(value));
       }
-    })
+    }),
   );
   return out;
 }
@@ -3286,7 +3505,7 @@ function ledMarks(
   group: StatGroup,
   values: Record<string, TeamStatValue>,
   leaders: Map<string, string>,
-  leagueId: number | null
+  leagueId: number | null,
 ): Record<string, LedScope> {
   const marks: Record<string, LedScope> = {};
   for (const col of careerCols(group)) {
@@ -3384,12 +3603,12 @@ export const parkFactorOf = (raws: number[]): number =>
  */
 async function parkRunRatio(
   teamId: number,
-  season: number
+  season: number,
 ): Promise<number | null> {
   const data = await mlb(
     `/teams/${teamId}/stats?stats=statSplits&sitCodes=h,a` +
       `&group=hitting,pitching&season=${season}`,
-    86400
+    86400,
   ).catch(() => null);
 
   const at = (group: string, code: string) => {
@@ -3402,12 +3621,18 @@ async function parkRunRatio(
     };
   };
   const [hs, ha, ps, pa] = [
-    at("hitting", "h"), at("hitting", "a"),
-    at("pitching", "h"), at("pitching", "a"),
+    at("hitting", "h"),
+    at("hitting", "a"),
+    at("pitching", "h"),
+    at("pitching", "a"),
   ];
   if (
-    hs.runs === null || ha.runs === null || ps.runs === null || pa.runs === null ||
-    !hs.games || !ha.games
+    hs.runs === null ||
+    ha.runs === null ||
+    ps.runs === null ||
+    pa.runs === null ||
+    !hs.games ||
+    !ha.games
   )
     return null;
 
@@ -3419,7 +3644,7 @@ async function parkRunRatio(
 async function parkFactor(teamId: number, season: number): Promise<number> {
   const years = Array.from(
     { length: PARK_WINDOW * 2 + 1 },
-    (_, i) => season - PARK_WINDOW + i
+    (_, i) => season - PARK_WINDOW + i,
   );
   const raws = await Promise.all(years.map((y) => parkRunRatio(teamId, y)));
   return parkFactorOf(raws.filter((r): r is number => r !== null));
@@ -3427,19 +3652,24 @@ async function parkFactor(teamId: number, season: number): Promise<number> {
 
 /** Everything a league's batting line has to carry to give up its rates. */
 const LEAGUE_BAT_KEYS = [
-  "hits", "atBats", "baseOnBalls", "hitByPitch", "sacFlies", "totalBases",
+  "hits",
+  "atBats",
+  "baseOnBalls",
+  "hitByPitch",
+  "sacFlies",
+  "totalBases",
 ];
 
 /** Which clubs were in which league that season — what splits the thirty
  *  clubs' totals into the two lines a plus stat is measured against. */
 async function leaguesOf(season: number): Promise<Map<number, number>> {
   const data = await mlb(`/teams?sportId=1&season=${season}`, 86400).catch(
-    () => null
+    () => null,
   );
   return new Map(
     ((data?.teams ?? []) as any[])
       .filter((t) => t.id && t.league?.id)
-      .map((t) => [t.id as number, t.league.id as number])
+      .map((t) => [t.id as number, t.league.id as number]),
   );
 }
 
@@ -3454,7 +3684,7 @@ async function leaguesOf(season: number): Promise<Map<number, number>> {
  * stays in the league where it belongs.
  */
 async function leaguePitcherBats(
-  season: number
+  season: number,
 ): Promise<Map<number | null, Record<string, number>>> {
   const out = new Map<number | null, Record<string, number>>();
   /* One page is enough for a live season; two covers the deepest staffs the
@@ -3463,7 +3693,7 @@ async function leaguePitcherBats(
     const data = await mlb(
       `/stats?stats=season&group=hitting&season=${season}&sportId=1` +
         `&playerPool=ALL&position=P&limit=1000&offset=${offset}`,
-      86400
+      86400,
     ).catch(() => null);
     const splits = (data?.stats?.[0]?.splits ?? []) as any[];
     if (splits.length === 0) break;
@@ -3495,20 +3725,20 @@ async function leaguePitcherBats(
  */
 async function leagueRates(
   season: number,
-  group: StatGroup
+  group: StatGroup,
 ): Promise<Map<number | null, LeagueLine>> {
   const out = new Map<number | null, LeagueLine>();
   if (group === "fielding") return out;
   const [data, leagues, arms] = await Promise.all([
     mlb(
       `/teams/stats?season=${season}&group=${group}&stats=season&sportIds=1`,
-      86400
+      86400,
     ).catch(() => null),
     leaguesOf(season),
     /* Only a batting line has pitchers to take out of it. */
     group === "hitting"
       ? leaguePitcherBats(season).catch(
-          () => new Map<number | null, Record<string, number>>()
+          () => new Map<number | null, Record<string, number>>(),
         )
       : new Map<number | null, Record<string, number>>(),
   ]);
@@ -3538,7 +3768,8 @@ async function leagueRates(
 
   for (const [key, d] of tot) {
     if (group === "pitching") {
-      if (d.outs > 0) out.set(key, { obp: 0, slg: 0, era: (d.earnedRuns * 27) / d.outs });
+      if (d.outs > 0)
+        out.set(key, { obp: 0, slg: 0, era: (d.earnedRuns * 27) / d.outs });
       continue;
     }
     const onBase = d.atBats + d.baseOnBalls + d.hitByPitch + d.sacFlies;
@@ -3560,7 +3791,7 @@ async function leagueRates(
  */
 export const opsPlus = (
   values: Record<string, TeamStatValue>,
-  lg: LeagueLine | null | undefined
+  lg: LeagueLine | null | undefined,
 ): string | null => {
   const obp = teamStatNum(values.obp);
   const slg = teamStatNum(values.slg);
@@ -3575,7 +3806,7 @@ export const opsPlus = (
  */
 export const eraPlus = (
   values: Record<string, TeamStatValue>,
-  lg: LeagueLine | null | undefined
+  lg: LeagueLine | null | undefined,
 ): string | null => {
   const era = teamStatNum(values.era);
   if (!lg?.era || era === null || era <= 0) return null;
@@ -3608,7 +3839,7 @@ const parked = (lg: LeagueLine, park: number): LeagueLine => {
  * count as much as one he threw two hundred.
  */
 const weightedMean = (
-  parts: { weight: number; value: number | null }[]
+  parts: { weight: number; value: number | null }[],
 ): number | null => {
   let sum = 0;
   let weight = 0;
@@ -3622,8 +3853,11 @@ const weightedMean = (
 
 /** The sabermetric keys a group's career table prints. */
 const saberKeys = (group: StatGroup): string[] =>
-  [...new Set([...careerCols(group), ...advancedCols(group)].map((c) => c.key))]
-    .filter((k) => k in SABER_FORMAT);
+  [
+    ...new Set(
+      [...careerCols(group), ...advancedCols(group)].map((c) => c.key),
+    ),
+  ].filter((k) => k in SABER_FORMAT);
 
 /**
  * WAR and its neighbours for a set of seasons, keyed `"<season>:<team id>"`
@@ -3637,7 +3871,7 @@ const saberKeys = (group: StatGroup): string[] =>
 async function getPlayerSabermetrics(
   id: number,
   group: StatGroup,
-  seasons: string[]
+  seasons: string[],
 ): Promise<Map<string, Record<string, TeamStatValue>>> {
   const keys = saberKeys(group);
   const out = new Map<string, Record<string, TeamStatValue>>();
@@ -3647,9 +3881,9 @@ async function getPlayerSabermetrics(
     seasons.map(async (season) => {
       const data = await mlb(
         `/people/${id}/stats?stats=sabermetrics&group=${group}&season=${season}`,
-        86400
+        86400,
       ).catch(() => null);
-      for (const split of ((data?.stats?.[0]?.splits ?? []) as any[])) {
+      for (const split of (data?.stats?.[0]?.splits ?? []) as any[]) {
         const line: Record<string, TeamStatValue> = {};
         for (const k of keys) {
           const n = teamStatNum(split.stat?.[k]);
@@ -3657,7 +3891,7 @@ async function getPlayerSabermetrics(
         }
         out.set(`${season}:${split.team?.id ?? ""}`, line);
       }
-    })
+    }),
   );
   return out;
 }
@@ -3677,8 +3911,6 @@ export interface CareerRow {
   age: number | null;
   /** "AL" / "NL", or "2LG" on a season split across both. */
   league: string;
-  /** Where he played it, busiest first — "*3B/DH". Hitting tables only. */
-  pos: string;
   /**
    * How many clubs the line covers. 1 for an ordinary season; 2 or more on
    * the combined line of a season a trade split, whose per-club lines follow
@@ -3697,7 +3929,7 @@ export interface CareerRow {
  */
 type FillPlus = (
   values: Record<string, TeamStatValue>,
-  from: CareerRow[]
+  from: CareerRow[],
 ) => void;
 
 /** A line under the table that is not a season — the career, a club, a league. */
@@ -3739,24 +3971,16 @@ export interface CareerTable {
 export async function getPlayerCareer(
   id: number,
   group: StatGroup,
-  postseason = false
+  postseason = false,
 ): Promise<CareerTable> {
-  const [data, positions] = await Promise.all([
-    mlb(
-      `/people/${id}/stats?stats=yearByYear,career&group=${group}&sportId=1` +
-        `&hydrate=team${postseason ? "&gameType=P" : ""}`,
-      86400
-    ).catch((e: Error) => {
-      if (e.message.includes(" 404:")) return null;
-      throw e;
-    }),
-    /* Where he played each year rides on the batting table the way it does
-       on a printed career line. It is a second request, so nothing else pays
-       for it, and a failure costs one column rather than the table. */
-    group === "hitting"
-      ? getPlayerPositions(id, postseason).catch(() => new Map<string, string>())
-      : Promise.resolve(new Map<string, string>()),
-  ]);
+  const data = await mlb(
+    `/people/${id}/stats?stats=yearByYear,career&group=${group}&sportId=1` +
+      `&hydrate=team${postseason ? "&gameType=P" : ""}`,
+    86400,
+  ).catch((e: Error) => {
+    if (e.message.includes(" 404:")) return null;
+    throw e;
+  });
 
   const keys = statLineKeys(group);
   const values = (stat: any) =>
@@ -3776,29 +4000,30 @@ export async function getPlayerCareer(
         season,
         /* MLB leaves the combined line of a split season with no club at all;
            it is the season's own line, so it says how many. */
-        team: teams > 1 ? `${teams}TM` : (s.team?.abbreviation ?? s.team?.name ?? "—"),
+        team:
+          teams > 1
+            ? `${teams}TM`
+            : (s.team?.abbreviation ?? s.team?.name ?? "—"),
         teamName: teams > 1 ? `${teams} TEAMS` : (s.team?.name ?? "—"),
         teamId: teams > 1 ? null : (s.team?.id ?? null),
         age: teamStatNum(s.stat?.age),
         league: teams > 1 ? "" : leagueAbbr(s.league?.id),
-        pos: positions.get(`${season}:${s.team?.id ?? ""}`) ?? "",
         teams,
         led: {},
         values: values(s.stat),
       };
     });
 
-  const rows = group === "fielding" ? mergeSeasons(group, raw) : orderSeasons(raw);
+  const rows =
+    group === "fielding" ? mergeSeasons(group, raw) : orderSeasons(raw);
 
   /* WAR and its neighbours ride alongside the standard line rather than in a
      table of their own — a career is read for them as much as for the hits.
      October has no such feed, so a post-season table simply goes without. */
   if (!postseason && saberKeys(group).length > 0 && rows.length > 0) {
-    const saber = await getPlayerSabermetrics(
-      id,
-      group,
-      [...new Set(rows.map((r) => r.season))]
-    );
+    const saber = await getPlayerSabermetrics(id, group, [
+      ...new Set(rows.map((r) => r.season)),
+    ]);
     for (const r of rows)
       Object.assign(r.values, saber.get(`${r.season}:${r.teamId ?? ""}`) ?? {});
   }
@@ -3807,7 +4032,7 @@ export async function getPlayerCareer(
   for (const r of rows)
     if (r.teams > 1)
       r.league = leagueSpan(
-        rows.filter((o: CareerRow) => o.season === r.season && o.teams === 1)
+        rows.filter((o: CareerRow) => o.season === r.season && o.teams === 1),
       );
 
   /* The marks on the line. Only a regular season has leader boards, and a
@@ -3820,35 +4045,34 @@ export async function getPlayerCareer(
           async (season) =>
             [
               season,
-              await seasonLeaders(
-                Number(season),
-                group,
-                [
-                  ...new Set(
-                    rows
-                      .filter((r) => r.season === season && r.teams === 1)
-                      .map((r) => leagueIdOf(r.league))
-                      .filter((id): id is number => id !== null)
-                  ),
-                ]
-              ),
-            ] as const
-        )
-      )
+              await seasonLeaders(Number(season), group, [
+                ...new Set(
+                  rows
+                    .filter((r) => r.season === season && r.teams === 1)
+                    .map((r) => leagueIdOf(r.league))
+                    .filter((id): id is number => id !== null),
+                ),
+              ]),
+            ] as const,
+        ),
+      ),
     );
     for (const r of rows)
       r.led = ledMarks(
         group,
         r.values,
         boards.get(r.season) ?? new Map(),
-        r.teams > 1 ? null : leagueIdOf(r.league)
+        r.teams > 1 ? null : leagueIdOf(r.league),
       );
   }
 
   const total =
     group === "fielding"
       ? career.length > 0
-        ? sumStatLines(group, (career as any[]).map((c) => values(c.stat)))
+        ? sumStatLines(
+            group,
+            (career as any[]).map((c) => values(c.stat)),
+          )
         : null
       : career[0]?.stat
         ? values(career[0].stat)
@@ -3862,7 +4086,9 @@ export async function getPlayerCareer(
      than becoming a figure that would mean nothing. */
   if (total && !postseason) {
     const parts = rows.filter((r) => r.teams === 1).map((r) => r.values);
-    for (const key of saberKeys(group).filter((k) => ADVANCED_ADDITIVE.has(k))) {
+    for (const key of saberKeys(group).filter((k) =>
+      ADVANCED_ADDITIVE.has(k),
+    )) {
       const nums = parts
         .map((p) => teamStatNum(p[key]))
         .filter((n): n is number => n !== null);
@@ -3888,16 +4114,18 @@ export async function getPlayerCareer(
       await Promise.all(
         [...new Set(rows.map((r) => r.season))].map(
           async (season) =>
-            [season, await leagueRates(Number(season), group)] as const
-        )
-      )
+            [season, await leagueRates(Number(season), group)] as const,
+        ),
+      ),
     );
     /* One factor per club-season on the table. A season a trade split has no
        park of its own — its halves are below it, and the combined line takes
        the two weighted by the games played in each. */
     const clubs = [
       ...new Set(
-        rows.filter((r) => r.teamId !== null).map((r) => `${r.season}:${r.teamId}`)
+        rows
+          .filter((r) => r.teamId !== null)
+          .map((r) => `${r.season}:${r.teamId}`),
       ),
     ];
     const parks = new Map(
@@ -3905,8 +4133,8 @@ export async function getPlayerCareer(
         clubs.map(async (k) => {
           const [season, team] = k.split(":");
           return [k, await parkFactor(Number(team), Number(season))] as const;
-        })
-      )
+        }),
+      ),
     );
     const parkOf = (r: CareerRow): number => {
       if (r.teamId !== null) return parks.get(`${r.season}:${r.teamId}`) ?? 1;
@@ -3916,7 +4144,7 @@ export async function getPlayerCareer(
           halves.map((h) => ({
             weight: teamStatNum(h.values.gamesPlayed) ?? 0,
             value: parkOf(h),
-          }))
+          })),
         ) ?? 1
       );
     };
@@ -3967,7 +4195,11 @@ export async function getPlayerCareer(
       }
     };
   }
-  if (total && fillPlus) fillPlus(total, rows.filter((r) => r.teams === 1));
+  if (total && fillPlus)
+    fillPlus(
+      total,
+      rows.filter((r) => r.teams === 1),
+    );
 
   return {
     rows,
@@ -3994,7 +4226,10 @@ function mergeSeasons(group: StatGroup, rows: CareerRow[]): CareerRow[] {
   }
   const clubs = [...by.values()].map((lines) => ({
     ...lines[0],
-    values: sumStatLines(group, lines.map((l) => l.values)),
+    values: sumStatLines(
+      group,
+      lines.map((l) => l.values),
+    ),
   }));
 
   const split = new Map<string, CareerRow[]>();
@@ -4011,22 +4246,30 @@ function mergeSeasons(group: StatGroup, rows: CareerRow[]): CareerRow[] {
         team: `${of.length}TM`,
         teamName: `${of.length} TEAMS`,
         teamId: null,
-        pos: "",
         teams: of.length,
-        values: sumStatLines(group, of.map((r) => r.values)),
+        values: sumStatLines(
+          group,
+          of.map((r) => r.values),
+        ),
       })),
   ]);
 }
 
 /** An empty table — what a caller falls back to when the career won't load. */
-export const EMPTY_CAREER: CareerTable = { rows: [], total: null, summaries: [] };
+export const EMPTY_CAREER: CareerTable = {
+  rows: [],
+  total: null,
+  summaries: [],
+};
 
 /** True for a per-club line of a season a trade split, which sits under the
  *  season's combined line on the career table rather than standing on its
  *  own. Shared by the career table's own indenting and by whichever line
  *  reads a season as a single row. */
 export function isSplitPart(rows: CareerRow[], r: CareerRow): boolean {
-  return r.teams === 1 && rows.some((o) => o.season === r.season && o.teams > 1);
+  return (
+    r.teams === 1 && rows.some((o) => o.season === r.season && o.teams > 1)
+  );
 }
 
 /** The one row that is a season's whole line — the lone team's row in an
@@ -4034,11 +4277,12 @@ export function isSplitPart(rows: CareerRow[], r: CareerRow): boolean {
  *  compare page's season scope, where a per-club split has no meaning. */
 export function wholeSeasonRow(
   table: CareerTable,
-  season: number
+  season: number,
 ): CareerRow | null {
   const s = String(season);
   return (
-    table.rows.find((r) => r.season === s && !isSplitPart(table.rows, r)) ?? null
+    table.rows.find((r) => r.season === s && !isSplitPart(table.rows, r)) ??
+    null
   );
 }
 
@@ -4064,7 +4308,10 @@ function orderSeasons(rows: CareerRow[]): CareerRow[] {
   const seasons = [...new Set(rows.map((r) => r.season))].sort();
   return seasons.flatMap((season) => {
     const of = rows.filter((r) => r.season === season);
-    return [...of.filter((r) => r.teams > 1), ...of.filter((r) => r.teams === 1)];
+    return [
+      ...of.filter((r) => r.teams > 1),
+      ...of.filter((r) => r.teams === 1),
+    ];
   });
 }
 
@@ -4083,11 +4330,17 @@ function orderSeasons(rows: CareerRow[]): CareerRow[] {
 function seasonAverage(
   group: StatGroup,
   total: Record<string, TeamStatValue>,
-  seasons: number
+  seasons: number,
 ): { label: string; values: Record<string, TeamStatValue> } | null {
   const games = teamStatNum(total.gamesPlayed) ?? 0;
   const scale =
-    group === "hitting" ? (games > 0 ? 162 / games : 0) : seasons > 0 ? 1 / seasons : 0;
+    group === "hitting"
+      ? games > 0
+        ? 162 / games
+        : 0
+      : seasons > 0
+        ? 1 / seasons
+        : 0;
   if (scale <= 0) return null;
 
   const rates = new Set(RATE_KEYS[group]);
@@ -4130,7 +4383,7 @@ function summarise(
       average it over, so the per-162 line is left off. */
   postseason: boolean,
   /** What writes the rates a club's or a league's line can't be summed into. */
-  fillPlus?: FillPlus
+  fillPlus?: FillPlus,
 ): CareerSummary[] {
   const parts = rows.filter((r) => r.teams === 1);
   if (parts.length === 0 || !total) return [];
@@ -4139,8 +4392,13 @@ function summarise(
     { label: "CAREER", span: yearSpan(rows), band: 0, values: total },
   ];
   if (group !== "fielding" && !postseason) {
-    const avg = seasonAverage(group, total, new Set(rows.map((r) => r.season)).size);
-    if (avg) out.push({ label: avg.label, span: "", band: 0, values: avg.values });
+    const avg = seasonAverage(
+      group,
+      total,
+      new Set(rows.map((r) => r.season)).size,
+    );
+    if (avg)
+      out.push({ label: avg.label, span: "", band: 0, values: avg.values });
   }
 
   const bucket = (key: (r: CareerRow) => string) => {
@@ -4157,7 +4415,10 @@ function summarise(
   bands.forEach((by, i) => {
     if (by.size < 2) return;
     for (const [label, lines] of by) {
-      const values = sumStatLines(group, lines.map((l) => l.values));
+      const values = sumStatLines(
+        group,
+        lines.map((l) => l.values),
+      );
       /* Measured against the league those seasons were played in, not the
          whole career's — a club line is the years he spent there. */
       fillPlus?.(values, lines);
@@ -4165,41 +4426,6 @@ function summarise(
     }
   });
   return out;
-}
-
-/**
- * Where a player stood each season, busiest position first and the primary
- * one starred — "*3B/DH" — keyed by season and club so a split season labels
- * each half. Read off the fielding ledger, which is per position by nature.
- */
-async function getPlayerPositions(
-  id: number,
-  postseason = false
-): Promise<Map<string, string>> {
-  const data = await mlb(
-    `/people/${id}/stats?stats=yearByYear&group=fielding&sportId=1` +
-      `${postseason ? "&gameType=P" : ""}`,
-    86400
-  );
-  const by = new Map<string, { pos: string; games: number }[]>();
-  for (const s of ((data.stats?.[0]?.splits ?? []) as any[])) {
-    if (s.sport?.id !== undefined && s.sport.id !== 1) continue;
-    const key = `${s.season ?? ""}:${s.team?.id ?? ""}`;
-    const pos = s.stat?.position?.abbreviation;
-    const games = teamStatNum(s.stat?.games) ?? 0;
-    if (!pos || games === 0) continue;
-    (by.get(key) ?? by.set(key, []).get(key)!).push({ pos, games });
-  }
-  return new Map(
-    [...by.entries()].map(([key, spots]) => {
-      const sorted = [...spots].sort((a, b) => b.games - a.games);
-      /* The star means "this is where he played", the way a printed line
-         marks it: only when one position is most of the season. */
-      const total = sorted.reduce((n, p) => n + p.games, 0);
-      const star = sorted[0].games / total > 0.5 ? "*" : "";
-      return [key, star + sorted.map((p) => p.pos).join("/")];
-    })
-  );
 }
 
 /* ── Player splits ──────────────────────────────────────────────────── */
@@ -4216,13 +4442,13 @@ const PLAYER_SPLIT_SECTIONS = [
 export async function getPlayerSplits(
   id: number,
   season: number,
-  group: "hitting" | "pitching"
+  group: "hitting" | "pitching",
 ): Promise<SplitSection[]> {
   return buildSplits(
     (codes) =>
       `/people/${id}/stats?stats=season,statSplits&group=${group}&season=${season}&sitCodes=${codes}`,
     playerCols(group),
-    PLAYER_SPLIT_SECTIONS.filter((s) => !s.hittingOnly || group === "hitting")
+    PLAYER_SPLIT_SECTIONS.filter((s) => !s.hittingOnly || group === "hitting"),
   );
 }
 
@@ -4252,8 +4478,18 @@ export interface GameLogGroup {
 }
 
 const MONTHS = [
-  "JANUARY", "FEBRUARY", "MARCH", "APRIL", "MAY", "JUNE",
-  "JULY", "AUGUST", "SEPTEMBER", "OCTOBER", "NOVEMBER", "DECEMBER",
+  "JANUARY",
+  "FEBRUARY",
+  "MARCH",
+  "APRIL",
+  "MAY",
+  "JUNE",
+  "JULY",
+  "AUGUST",
+  "SEPTEMBER",
+  "OCTOBER",
+  "NOVEMBER",
+  "DECEMBER",
 ];
 
 /** How the game went for the club the player was on — "W 5-4", "L 3-2 F/11". */
@@ -4261,7 +4497,8 @@ function gameResult(g: Game | undefined, teamId: number): string {
   if (!g) return "";
   const us = g.home.id === teamId ? g.home : g.away;
   const them = g.home.id === teamId ? g.away : g.home;
-  if (us.score === null || them.score === null || g.state !== "Final") return "";
+  if (us.score === null || them.score === null || g.state !== "Final")
+    return "";
   const mark = us.score > them.score ? "W" : us.score < them.score ? "L" : "T";
   const extra = g.inning && g.inning > 9 ? ` F/${g.inning}` : "";
   return `${mark} ${us.score}-${them.score}${extra}`;
@@ -4286,7 +4523,7 @@ export async function getPlayerGameLog(
   id: number,
   season: number,
   group: StatGroup,
-  gameType: PlayerGameType = "R"
+  gameType: PlayerGameType = "R",
 ): Promise<GameLogGroup[]> {
   /* October is asked for as a career: the feed answers one season per
      `seasons=` entry, so the years he played are handed over at once. */
@@ -4299,10 +4536,10 @@ export async function getPlayerGameLog(
   const data = await mlb(
     `/people/${id}/stats?stats=gameLog&group=${group}&seasons=${seasons.join(",")}` +
       `&gameType=${gameType}&sportId=1`,
-    900
+    900,
   );
   const splits = ((data.stats?.[0]?.splits ?? []) as any[]).filter(
-    (s) => s.game?.gamePk
+    (s) => s.game?.gamePk,
   );
   if (splits.length === 0) return [];
 
@@ -4313,22 +4550,26 @@ export async function getPlayerGameLog(
     ...new Set(
       splits
         .filter((s) => s.team?.id)
-        .map((s) => `${s.team.id}:${s.season ?? season}`)
+        .map((s) => `${s.team.id}:${s.season ?? season}`),
     ),
   ];
   const schedules = await Promise.all(
     clubs.map((key) => {
       const [team, year] = key.split(":");
-      return getTeamSchedule(Number(team), Number(year)).catch(() => [] as Game[]);
-    })
+      return getTeamSchedule(Number(team), Number(year)).catch(
+        () => [] as Game[],
+      );
+    }),
   );
   const byPk = new Map(schedules.flat().map((g) => [g.pk, g]));
 
   /* Oldest first while the running line is built, then flipped: a log is
      read newest first, but a total only accumulates one way. */
-  const asc = [...splits].sort((a, b) => String(a.date).localeCompare(String(b.date)));
+  const asc = [...splits].sort((a, b) =>
+    String(a.date).localeCompare(String(b.date)),
+  );
   const lines = asc.map((s) =>
-    Object.fromEntries(keys.map((k) => [k, s.stat?.[k] ?? null]))
+    Object.fromEntries(keys.map((k) => [k, s.stat?.[k] ?? null])),
   );
 
   const rows: GameLogRow[] = asc.map((s, i) => {
@@ -4360,7 +4601,10 @@ export async function getPlayerGameLog(
     .map(([label, bandRows]) => ({
       label,
       rows: [...bandRows].reverse(),
-      total: sumStatLines(group, bandRows.map((r) => r.values)),
+      total: sumStatLines(
+        group,
+        bandRows.map((r) => r.values),
+      ),
     }))
     .reverse();
 }
@@ -4489,7 +4733,9 @@ export async function getPlayerBio(id: number): Promise<PlayerBio | null> {
     if (r.teamId === null) continue;
     const seen =
       stops.get(r.teamId) ??
-      stops.set(r.teamId, { team: r.teamName, years: new Set() }).get(r.teamId)!;
+      stops
+        .set(r.teamId, { team: r.teamName, years: new Set() })
+        .get(r.teamId)!;
     seen.years.add(Number(r.season));
   }
 
@@ -4537,7 +4783,7 @@ export async function getPlayerBio(id: number): Promise<PlayerBio | null> {
       .sort(
         (a, b) =>
           awardRank(a.name) - awardRank(b.name) ||
-          Number(b.seasons[0]) - Number(a.seasons[0])
+          Number(b.seasons[0]) - Number(a.seasons[0]),
       ),
   };
 }

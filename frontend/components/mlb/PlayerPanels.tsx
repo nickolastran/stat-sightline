@@ -264,23 +264,13 @@ function CareerTableBody({
   table,
   group,
   columns,
-  positions,
 }: {
   table: CareerTable;
   /** Which line is being added up when a span of seasons is picked. */
   group: StatGroup;
   columns: TeamStatCol[];
-  /** The batting table names where each season was played; the others don't. */
-  positions: boolean;
 }) {
-  const head = [
-    "SEASON",
-    "AGE",
-    "TEAM",
-    "LG",
-    ...columns.map((c) => c.label),
-    ...(positions ? ["POS"] : []),
-  ];
+  const head = ["SEASON", "AGE", "TEAM", "LG", ...columns.map((c) => c.label)];
   /* The label of a summary line runs across the four identity columns. */
   const LEAD = 4;
   const id = `px-1 py-1 text-[12px] whitespace-nowrap ${RULE}`;
@@ -338,9 +328,6 @@ function CareerTableBody({
               </td>
               <td className={`${id} text-ink-3`}>{r.league || "—"}</td>
               {careerCells(columns, r.values, r.led, !part)}
-              {positions && (
-                <td className={`${id} text-ink-3`}>{r.pos || "—"}</td>
-              )}
             </Row>
           );
         })}
@@ -364,7 +351,6 @@ function CareerTableBody({
               )}
             </td>
             {careerCells(columns, sum.values, {}, true)}
-            {positions && <td className={id} />}
           </tr>
         ))}
       </Table>
@@ -413,7 +399,6 @@ export function CareerPanel({ sections }: { sections: CareerSection[] }) {
     <div className="space-y-3">
       {sections.map(({ group, regular, postseason }) => {
         const columns = careerCols(group);
-        const positions = group === "hitting";
         return (
           <Fragment key={group}>
             <Panel title={`CAREER ${STAT_GROUP_LABEL[group]}`}>
@@ -421,7 +406,6 @@ export function CareerPanel({ sections }: { sections: CareerSection[] }) {
                 table={regular}
                 group={group}
                 columns={columns}
-                positions={positions}
               />
             </Panel>
             {postseason.rows.length > 0 && (
@@ -430,7 +414,6 @@ export function CareerPanel({ sections }: { sections: CareerSection[] }) {
                   table={postseason}
                   group={group}
                   columns={columns}
-                  positions={positions}
                 />
               </Panel>
             )}

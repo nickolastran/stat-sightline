@@ -64,19 +64,51 @@ assert.equal(clinchPhase(blank, true), "none", "1994, post-season cancelled");
 assert.equal(clinchPhase(blank, false), "live", "spring training, in progress");
 
 /* Letters, which mean the same thing in every phase. */
-assert.equal(clinchMark(row({ clinch: "z" }), "live"), "*", "Blue Jays — best AL record");
-assert.equal(clinchMark(row({ clinch: "y" }), "live"), "X", "Guardians — division");
-assert.equal(clinchMark(row({ clinch: "w", elim: "E" }), "live"), "Y", "Tigers — wild card, division race lost");
-assert.equal(clinchMark(row({ clinch: "x" }), "settled"), "Y", "2020's expanded field marks a berth 'x'");
+assert.equal(
+  clinchMark(row({ clinch: "z" }), "live"),
+  "*",
+  "Blue Jays — best AL record",
+);
+assert.equal(
+  clinchMark(row({ clinch: "y" }), "live"),
+  "X",
+  "Guardians — division",
+);
+assert.equal(
+  clinchMark(row({ clinch: "w", elim: "E" }), "live"),
+  "Y",
+  "Tigers — wild card, division race lost",
+);
+assert.equal(
+  clinchMark(row({ clinch: "x" }), "settled"),
+  "Y",
+  "2020's expanded field marks a berth 'x'",
+);
 
 /* Elimination, which does not. */
-assert.equal(clinchMark(row({ elim: "E", wcElim: "E" }), "live"), "E", "Royals — out of both races");
-assert.equal(clinchMark(row({ elim: "E", wcElim: "1" }), "live"), "", "Astros in September — division gone, wild card alive");
-assert.equal(clinchMark(row({ elim: "E", wcElim: "1" }), "settled"), "E", "Astros in the books — the tiebreaker settled it, the magic number never moved");
+assert.equal(
+  clinchMark(row({ elim: "E", wcElim: "E" }), "live"),
+  "E",
+  "Royals — out of both races",
+);
+assert.equal(
+  clinchMark(row({ elim: "E", wcElim: "1" }), "live"),
+  "",
+  "Astros in September — division gone, wild card alive",
+);
+assert.equal(
+  clinchMark(row({ elim: "E", wcElim: "1" }), "settled"),
+  "E",
+  "Astros in the books — the tiebreaker settled it, the magic number never moved",
+);
 assert.equal(clinchMark(row({}), "live"), "", "nothing decided yet");
 
 /* A season with no post-season claims nothing about anyone. */
-assert.equal(clinchMark(row({ elim: "E", wcElim: "E" }), "none"), "", "1994 — no October to be eliminated from");
+assert.equal(
+  clinchMark(row({ elim: "E", wcElim: "E" }), "none"),
+  "",
+  "1994 — no October to be eliminated from",
+);
 
 /*
  * Games back, against MLB's own published 2026 American League figures — the
@@ -101,7 +133,11 @@ assert.deepEqual(april.map(gamesBack(april)), [2.5, 0], "no negative figures");
 
 // Two clubs level at the top are both level with the leader.
 const tied = [club(65, 66), club(65, 66), club(62, 69)];
-assert.deepEqual(tied.map(gamesBack(tied)), [0, 0, 3], "a tie leaves both at 0");
+assert.deepEqual(
+  tied.map(gamesBack(tied)),
+  [0, 0, 3],
+  "a tie leaves both at 0",
+);
 
 /*
  * First pitch in the viewer's zone. These cards are server-rendered, where the
@@ -121,27 +157,41 @@ assert.equal(gameStatus(preview).text, "10:40 PM EDT", "defaults to Eastern");
 assert.equal(
   gameStatus(preview, "America/Los_Angeles").text,
   "7:40 PM PDT",
-  "renders in the zone it is given"
+  "renders in the zone it is given",
 );
 assert.equal(gameStatus(preview).tone, "pre");
 
 // A game under way or finished reports its state, not a clock.
-const live = { ...preview, state: "Live", inning: 7, inningState: "Top" } as Game;
-assert.equal(gameStatus(live, "Asia/Tokyo").text, "TOP 7", "zone is irrelevant once it starts");
+const live = {
+  ...preview,
+  state: "Live",
+  inning: 7,
+  inningState: "Top",
+} as Game;
 assert.equal(
-  gameStatus({ ...live, state: "Preview", inning: 1, detailedState: "Warmup" } as Game).text,
+  gameStatus(live, "Asia/Tokyo").text,
+  "TOP 7",
+  "zone is irrelevant once it starts",
+);
+assert.equal(
+  gameStatus({
+    ...live,
+    state: "Preview",
+    inning: 1,
+    detailedState: "Warmup",
+  } as Game).text,
   "WARMUP",
-  "warmup beats the Top 1 linescore it already carries"
+  "warmup beats the Top 1 linescore it already carries",
 );
 assert.equal(
   gameStatus({ ...preview, state: "Final", inning: 10 } as Game).text,
   "SCHEDULED/10",
-  "extra innings ride along with the final state"
+  "extra innings ride along with the final state",
 );
 assert.equal(
   firstPitch(preview.startTime, "America/Los_Angeles"),
   "7:40 PM PDT · MON, AUG 24, 2026",
-  "a first pitch carries the day it falls on in the reader's own zone"
+  "a first pitch carries the day it falls on in the reader's own zone",
 );
 
 /*
@@ -152,7 +202,10 @@ assert.equal(notStarted(preview), true);
 assert.equal(notStarted({ ...live, detailedState: "Warmup" } as Game), true);
 assert.equal(notStarted(live), false);
 assert.equal(notStarted({ ...preview, state: "Final" } as Game), false);
-assert.equal(inProgress({ ...live, detailedState: "In Progress" } as Game), true);
+assert.equal(
+  inProgress({ ...live, detailedState: "In Progress" } as Game),
+  true,
+);
 assert.equal(inProgress({ ...live, detailedState: "Warmup" } as Game), false);
 assert.equal(inProgress(preview), false);
 
@@ -162,10 +215,26 @@ assert.equal(inProgress(preview), false);
  * the club taken off the end — and one club has no town in its name at all.
  */
 assert.equal(clubCity("Los Angeles Dodgers", "Dodgers"), "Los Angeles");
-assert.equal(clubCity("Chicago White Sox", "White Sox"), "Chicago", "two-word clubs come off whole");
-assert.equal(clubCity("Tampa Bay Rays", "Rays"), "Tampa Bay", "two-word towns survive");
-assert.equal(clubCity("Athletics", "Athletics"), "Athletics", "the club with no town keeps its name");
-assert.equal(clubCity("—", ""), "—", "a row with no club name falls back to the name");
+assert.equal(
+  clubCity("Chicago White Sox", "White Sox"),
+  "Chicago",
+  "two-word clubs come off whole",
+);
+assert.equal(
+  clubCity("Tampa Bay Rays", "Rays"),
+  "Tampa Bay",
+  "two-word towns survive",
+);
+assert.equal(
+  clubCity("Athletics", "Athletics"),
+  "Athletics",
+  "the club with no town keeps its name",
+);
+assert.equal(
+  clubCity("—", ""),
+  "—",
+  "a row with no club name falls back to the name",
+);
 console.log("clubCity ok");
 
 /*
@@ -175,7 +244,14 @@ console.log("clubCity ok");
  * it to compare against.
  */
 const play = (awayScore: number, homeScore: number, description = "x") =>
-  ({ inning: 1, half: "top", description, awayScore, homeScore, homeProb: 50 }) as PlayProb;
+  ({
+    inning: 1,
+    half: "top",
+    description,
+    awayScore,
+    homeScore,
+    homeProb: 50,
+  }) as PlayProb;
 
 assert.deepEqual(
   scoringPlays([play(0, 0), play(1, 0), play(1, 0), play(1, 2)]).map((p) => [
@@ -186,12 +262,12 @@ assert.deepEqual(
     [1, 0],
     [1, 2],
   ],
-  "only the plays where the score moved"
+  "only the plays where the score moved",
 );
 assert.equal(
   scoringPlays([play(3, 0)]).length,
   1,
-  "a game whose first logged play already scored still reports it"
+  "a game whose first logged play already scored still reports it",
 );
 assert.deepEqual(scoringPlays([play(0, 0)]), [], "0-0 is not a scoring play");
 assert.deepEqual(scoringPlays([]), []);
@@ -201,8 +277,12 @@ assert.deepEqual(scoringPlays([]), []);
  * plays sharing inning and side — extras mean the ninth is not the last, and
  * the runs per half are the score's own movement, whichever club moved it.
  */
-const at = (inning: number, half: string, awayScore: number, homeScore: number) =>
-  ({ ...play(awayScore, homeScore), inning, half }) as PlayProb;
+const at = (
+  inning: number,
+  half: string,
+  awayScore: number,
+  homeScore: number,
+) => ({ ...play(awayScore, homeScore), inning, half }) as PlayProb;
 
 const halves = halfInnings([
   at(1, "top", 0, 0),
@@ -219,12 +299,14 @@ assert.deepEqual(
     [2, "top", 1, 0],
     [2, "bottom", 1, 3],
   ],
-  "one group per half, runs read off the score moving"
+  "one group per half, runs read off the score moving",
 );
 assert.deepEqual(
-  halfInnings([at(9, "bottom", 1, 1), at(10, "top", 1, 1)]).map((h) => h.inning),
+  halfInnings([at(9, "bottom", 1, 1), at(10, "top", 1, 1)]).map(
+    (h) => h.inning,
+  ),
   [9, 10],
-  "extras open a new half rather than folding into the ninth"
+  "extras open a new half rather than folding into the ninth",
 );
 assert.deepEqual(halfInnings([]), []);
 console.log("halfInnings ok");
@@ -234,18 +316,30 @@ console.log("halfInnings ok");
  * two identical clubs are not 50/50, the home one is favoured, and the two
  * sides always add up to the whole.
  */
-const record = (wins: number, losses: number) => ({ wins, losses }) as Game["home"];
+const record = (wins: number, losses: number) =>
+  ({ wins, losses }) as Game["home"];
 const odds = (h: [number, number], a: [number, number]) =>
   winProbability({ home: record(...h), away: record(...a) } as Game);
 
 const even = odds([70, 70], [70, 70])!;
 assert.ok(even.home > even.away, "home field breaks a tie between equal clubs");
 assert.equal(even.home.toFixed(3), "0.535", "and is worth about .535");
-assert.equal((even.home + even.away).toFixed(6), "1.000000", "the two sides are the whole");
+assert.equal(
+  (even.home + even.away).toFixed(6),
+  "1.000000",
+  "the two sides are the whole",
+);
 
 const strong = odds([100, 40], [40, 100])!;
-assert.equal(strong.home.toFixed(2), "0.88", "a far better club at home is a heavy favourite");
-assert.ok(odds([60, 80], [90, 50])!.away > 0.5, "a good enough road club still leads");
+assert.equal(
+  strong.home.toFixed(2),
+  "0.88",
+  "a far better club at home is a heavy favourite",
+);
+assert.ok(
+  odds([60, 80], [90, 50])!.away > 0.5,
+  "a good enough road club still leads",
+);
 assert.equal(odds([0, 0], [0, 0]), null, "no record, no number");
 
 /*
@@ -274,19 +368,23 @@ const schedule = [
 assert.deepEqual(
   headToHead(schedule, 139).map((g) => g.pk),
   [1, 3, 4, 5],
-  "only the games against that club, oldest first"
+  "only the games against that club, oldest first",
 );
 assert.deepEqual(
   seriesGames(headToHead(schedule, 139), 4).map((g) => g.pk),
   [3, 4, 5],
-  "the series is the run of consecutive days around the game"
+  "the series is the run of consecutive days around the game",
 );
 assert.deepEqual(
   seriesGames(headToHead(schedule, 139), 1).map((g) => g.pk),
   [1],
-  "a one-game series stands alone"
+  "a one-game series stands alone",
 );
-assert.deepEqual(seriesGames(schedule, 99), [], "an unknown game has no series");
+assert.deepEqual(
+  seriesGames(schedule, 99),
+  [],
+  "an unknown game has no series",
+);
 
 /*
  * Team stat ranks, the other figure the pages derive rather than read: MLB
@@ -306,14 +404,18 @@ const clubs = [
 assert.equal(statRank(clubs, "runs", 2), 1, "most runs leads");
 assert.equal(statRank(clubs, "runs", 1), 2, "tied clubs share the rank");
 assert.equal(statRank(clubs, "runs", 3), 2, "…both of them");
-assert.equal(statRank(clubs, "runs", 4), 4, "a tie consumes the place behind it");
+assert.equal(
+  statRank(clubs, "runs", 4),
+  4,
+  "a tie consumes the place behind it",
+);
 assert.equal(statRank(clubs, "era", 1, true), 1, "lowest ERA leads");
 assert.equal(statRank(clubs, "era", 4, true), 4, "highest ERA trails");
 assert.equal(statRank(clubs, "runs", 5), null, "no figure, no rank");
 assert.equal(
   statRank(clubs, "era", 4),
   1,
-  "read the wrong way round, the worst staff would lead — the direction is the caller's"
+  "read the wrong way round, the worst staff would lead — the direction is the caller's",
 );
 assert.equal(statRank(clubs, "runs", 99), null, "a club not in the table");
 
@@ -323,7 +425,12 @@ assert.equal(statRank(clubs, "runs", 99), null, "a club not in the table");
  * the summer hurt with one name where three were asked for.
  */
 const arm = (id: number, era: string, ip: number) =>
-  ({ id, name: `P${id}`, position: "P", values: { era, inningsPitched: ip } }) as PlayerStatRow;
+  ({
+    id,
+    name: `P${id}`,
+    position: "P",
+    values: { era, inningsPitched: ip },
+  }) as PlayerStatRow;
 const eraSpec = {
   key: "era",
   label: "ERA",
@@ -339,31 +446,41 @@ assert.deepEqual(
   names(
     leaderBoard(
       eraSpec,
-      [arm(1, "4.00", 120), arm(2, "3.00", 110), arm(3, "2.00", 105), arm(4, "1.00", 3)],
-      100
-    )
+      [
+        arm(1, "4.00", 120),
+        arm(2, "3.00", 110),
+        arm(3, "2.00", 105),
+        arm(4, "1.00", 3),
+      ],
+      100,
+    ),
   ),
   [
     ["P3", "2.00"],
     ["P2", "3.00"],
     ["P1", "4.00"],
   ],
-  "three qualify, so the mop-up arm's 1.00 over three innings stays off the board"
+  "three qualify, so the mop-up arm's 1.00 over three innings stays off the board",
 );
 assert.deepEqual(
   names(
     leaderBoard(
       eraSpec,
-      [arm(1, "3.10", 152), arm(2, "3.06", 60), arm(3, "3.47", 55), arm(4, "0.00", 2)],
-      138
-    )
+      [
+        arm(1, "3.10", 152),
+        arm(2, "3.06", 60),
+        arm(3, "3.47", 55),
+        arm(4, "0.00", 2),
+      ],
+      138,
+    ),
   ),
   [
     ["P2", "3.06"],
     ["P1", "3.10"],
     ["P3", "3.47"],
   ],
-  "one qualifier alone fills the board from the half bar, not from a two-inning shutout"
+  "one qualifier alone fills the board from the half bar, not from a two-inning shutout",
 );
 assert.deepEqual(
   names(leaderBoard(eraSpec, [arm(1, "5.00", 4), arm(2, "9.00", 1)], 138)),
@@ -371,7 +488,7 @@ assert.deepEqual(
     ["P1", "5.00"],
     ["P2", "9.00"],
   ],
-  "a board can only be as long as the staff"
+  "a board can only be as long as the staff",
 );
 assert.deepEqual(
   names(
@@ -382,31 +499,41 @@ assert.deepEqual(
         { id: 2, name: "P2", position: "", values: { homeRuns: 30 } },
         { id: 3, name: "P3", position: "", values: { homeRuns: null } },
       ],
-      138
-    )
+      138,
+    ),
   ),
   [
     ["P2", "30"],
     ["P1", "12"],
   ],
-  "a counting stat needs no bar, and an unreported figure never ranks"
+  "a counting stat needs no bar, and an unreported figure never ranks",
 );
 
 /* Club URLs carry the name for the reader and the id for the route. */
-assert.equal(teamHref(137, "San Francisco Giants"), "/team/137-san-francisco-giants");
+assert.equal(
+  teamHref(137, "San Francisco Giants"),
+  "/team/137-san-francisco-giants",
+);
 assert.equal(
   teamHref(120, "Washington Nationals", "roster"),
-  "/team/120-washington-nationals/roster"
+  "/team/120-washington-nationals/roster",
 );
 assert.equal(
   teamHref(146, "Miami Marlins/Florida"),
   "/team/146-miami-marlins-florida",
-  "punctuation collapses to one hyphen, and never a trailing one"
+  "punctuation collapses to one hyphen, and never a trailing one",
 );
-assert.equal(teamHref(158, ""), "/team/158", "a nameless club still has a page");
+assert.equal(
+  teamHref(158, ""),
+  "/team/158",
+  "a nameless club still has a page",
+);
 assert.equal(teamIdOf("137-san-francisco-giants"), 137);
 assert.equal(teamIdOf("137"), 137, "the bare id a bookmark still carries");
-assert.ok(Number.isNaN(teamIdOf("san-francisco-giants")), "a name alone names no club");
+assert.ok(
+  Number.isNaN(teamIdOf("san-francisco-giants")),
+  "a name alone names no club",
+);
 assert.ok(Number.isNaN(teamIdOf("")), "and neither does nothing");
 
 assert.equal(ordinal(1), "1ST");
@@ -439,14 +566,14 @@ assert.deepEqual(
     [824664, "Final"],
     [824700, "Scheduled"],
   ],
-  "the makeup replaces the rain-out, and the season stays in date order"
+  "the makeup replaces the rain-out, and the season stays in date order",
 );
 assert.deepEqual(
   latestByGame([sched(824424, "2026-06-14T17:40:00Z", "Postponed")]).map(
-    (g) => g.state
+    (g) => g.state,
   ),
   ["Postponed"],
-  "a postponement with no makeup yet is still a game on the schedule"
+  "a postponement with no makeup yet is still a game on the schedule",
 );
 
 /*
@@ -459,7 +586,7 @@ const decided = (
   startTime: string,
   winner: number | null,
   loser: number | null,
-  save: number | null
+  save: number | null,
 ) =>
   ({
     pk,
@@ -480,24 +607,28 @@ const lines = runningRecords([
 assert.deepEqual(
   lines.get("1:425844"),
   { wins: 1, losses: 0, saves: 0 },
-  "opening day win is (1-0), not the season total"
+  "opening day win is (1-0), not the season total",
 );
 assert.deepEqual(
   lines.get("2:425844"),
   { wins: 1, losses: 1, saves: 0 },
-  "the loss the next day lands on the same line"
+  "the loss the next day lands on the same line",
 );
 assert.deepEqual(
   lines.get("3:425844"),
   { wins: 2, losses: 1, saves: 0 },
-  "and the line keeps climbing through the season"
+  "and the line keeps climbing through the season",
 );
 assert.deepEqual(
   lines.get("3:605280"),
   { wins: 0, losses: 0, saves: 2 },
-  "saves are counted on their own"
+  "saves are counted on their own",
 );
-assert.equal(lines.get("4:425844"), undefined, "a game with no decision has no line");
+assert.equal(
+  lines.get("4:425844"),
+  undefined,
+  "a game with no decision has no line",
+);
 
 /*
  * Where the halves part — the All-Star break, so a club that played 95 before
@@ -509,14 +640,26 @@ const half = [
   sched(3, "2026-07-17T23:10:00Z", "Final"),
 ];
 const allStar = "2026-07-15T00:00:00Z";
-assert.equal(breakIndex(half, allStar), 2, "the second half starts with the first game after the break");
+assert.equal(
+  breakIndex(half, allStar),
+  2,
+  "the second half starts with the first game after the break",
+);
 assert.equal(
   breakIndex(half, "2026-11-01T00:00:00Z"),
   3,
-  "a season played entirely before the break is all first half"
+  "a season played entirely before the break is all first half",
 );
-assert.equal(breakIndex(half, null), 2, "no All-Star Game falls back to the midpoint");
-assert.equal(breakIndex([], allStar), 0, "a season with no games splits nowhere");
+assert.equal(
+  breakIndex(half, null),
+  2,
+  "no All-Star Game falls back to the midpoint",
+);
+assert.equal(
+  breakIndex([], allStar),
+  0,
+  "a season with no games splits nowhere",
+);
 
 /*
  * The transaction log's shape — months, then days, then the day's moves in
@@ -524,7 +667,14 @@ assert.equal(breakIndex([], allStar), 0, "a season with no games splits nowhere"
  * the same sentence, which must not be read out twice.
  */
 const move = (date: string, description: string, id = 1) =>
-  ({ id, date, description, type: "", personId: null, person: "" }) as Transaction;
+  ({
+    id,
+    date,
+    description,
+    type: "",
+    personId: null,
+    person: "",
+  }) as Transaction;
 const log = transactionMonths([
   move("2026-08-29", "Optioned RHP Spencer Bivens to Sacramento."),
   move("2026-08-26", "Placed RHP Adrian Houser on the 15-day injured list."),
@@ -535,18 +685,22 @@ const log = transactionMonths([
 assert.deepEqual(
   log.map((m) => m.key),
   ["2026-08", "2026-07"],
-  "months keep the order the moves arrived in, newest first"
+  "months keep the order the moves arrived in, newest first",
 );
 assert.deepEqual(
   log[0].days.map((d) => d.date),
   ["2026-08-29", "2026-08-26"],
-  "a month reads day by day"
+  "a month reads day by day",
 );
-assert.equal(log[0].days[1].notes.length, 2, "a day carries every move made on it");
+assert.equal(
+  log[0].days[1].notes.length,
+  2,
+  "a day carries every move made on it",
+);
 assert.deepEqual(
   log[1].days[0].notes,
   ["Traded OF Heliot Ramos to the Yankees."],
-  "both sides of a trade are the same sentence, written once"
+  "both sides of a trade are the same sentence, written once",
 );
 
 console.log("clinchMark ok");
@@ -572,12 +726,21 @@ const spot = (
   innings: string,
   putOuts: number,
   assists: number,
-  errors: number
+  errors: number,
 ) => ({
   id,
   name: `F${id}`,
   position: pos,
-  values: { games: 1, gamesStarted: 1, innings, putOuts, assists, errors, doublePlays: 0, chances: null },
+  values: {
+    games: 1,
+    gamesStarted: 1,
+    innings,
+    putOuts,
+    assists,
+    errors,
+    doublePlays: 0,
+    chances: null,
+  },
 });
 
 const merged = mergeFielding([
@@ -589,11 +752,27 @@ const merged = mergeFielding([
 assert.equal(merged.length, 2, "one row per player, not per position");
 assert.equal(merged[0].position, "SS", "the most innings names the spot");
 assert.equal(merged[1].position, "C");
-assert.equal(merged[0].values.innings, "151.1", "innings add as thirds: 100.2 + 50.2 is 151.1, not 151.4");
+assert.equal(
+  merged[0].values.innings,
+  "151.1",
+  "innings add as thirds: 100.2 + 50.2 is 151.1, not 151.4",
+);
 assert.equal(merged[0].values.putOuts, 120);
-assert.equal(merged[0].values.chances, 386, "chances fall back to PO + A + E when unreported");
-assert.equal(merged[0].values.fielding, ".984", "pct is recomputed from the totals, not averaged");
-assert.equal(merged[0].values.rangeFactorPer9Inn, "22.60", "range factor is per nine, off the summed outs");
+assert.equal(
+  merged[0].values.chances,
+  386,
+  "chances fall back to PO + A + E when unreported",
+);
+assert.equal(
+  merged[0].values.fielding,
+  ".984",
+  "pct is recomputed from the totals, not averaged",
+);
+assert.equal(
+  merged[0].values.rangeFactorPer9Inn,
+  "22.60",
+  "range factor is per nine, off the summed outs",
+);
 console.log("mergeFielding ok");
 
 /* ── boardDir ───────────────────────────────────────────────────────── */
@@ -605,13 +784,29 @@ console.log("mergeFielding ok");
 
 assert.equal(boardDir([60, 56, 55, 40]), "desc", "most home runs first");
 assert.equal(boardDir(["1.97", "2.21", "2.43"]), "asc", "lowest ERA first");
-assert.equal(boardDir([".331", ".311", ".300"]), "desc", "rates read like any other number");
+assert.equal(
+  boardDir([".331", ".311", ".300"]),
+  "desc",
+  "rates read like any other number",
+);
 assert.equal(boardDir([3, 5, 5, 9]), "asc", "reversed board");
-assert.equal(boardDir([null, 60, 55, null]), "desc", "blanks are skipped, not counted as zero");
-assert.equal(boardDir([7, 7, 7]), "desc", "all ties fall back to MLB's usual order");
+assert.equal(
+  boardDir([null, 60, 55, null]),
+  "desc",
+  "blanks are skipped, not counted as zero",
+);
+assert.equal(
+  boardDir([7, 7, 7]),
+  "desc",
+  "all ties fall back to MLB's usual order",
+);
 assert.equal(boardDir([42]), "desc", "one row has no direction to read");
 assert.equal(boardDir([]), "desc", "nor does none");
-assert.equal(boardDir(["121.2", "118.0"]), "desc", "innings compare as the numbers they print as");
+assert.equal(
+  boardDir(["121.2", "118.0"]),
+  "desc",
+  "innings compare as the numbers they print as",
+);
 console.log("boardDir ok");
 
 /* ── sumStatLines ───────────────────────────────────────────────────── */
@@ -623,81 +818,270 @@ console.log("boardDir ok");
  */
 
 const batLine = (
-  ab: number, h: number, tb: number, bb: number, hbp = 0, sf = 0
-) => ({ atBats: ab, hits: h, totalBases: tb, baseOnBalls: bb, hitByPitch: hbp, sacFlies: sf, avg: ".000" });
+  ab: number,
+  h: number,
+  tb: number,
+  bb: number,
+  hbp = 0,
+  sf = 0,
+) => ({
+  atBats: ab,
+  hits: h,
+  totalBases: tb,
+  baseOnBalls: bb,
+  hitByPitch: hbp,
+  sacFlies: sf,
+  avg: ".000",
+});
 
-const batted = sumStatLines("hitting", [batLine(4, 2, 5, 1), batLine(4, 0, 0, 0), batLine(2, 1, 1, 1, 1, 1)]);
+const batted = sumStatLines("hitting", [
+  batLine(4, 2, 5, 1),
+  batLine(4, 0, 0, 0),
+  batLine(2, 1, 1, 1, 1, 1),
+]);
 assert.equal(batted.atBats, 10);
 assert.equal(batted.hits, 3);
-assert.equal(batted.avg, ".300", "average is the summed hits over the summed at-bats");
+assert.equal(
+  batted.avg,
+  ".300",
+  "average is the summed hits over the summed at-bats",
+);
 assert.equal(batted.slg, ".600", "6 total bases in 10 at-bats");
-assert.equal(batted.obp, ".429", "walks, hit-by-pitch and sac flies all count in on-base: 6 of 14");
-assert.equal(batted.ops, "1.029", "OPS is on-base plus slugging, worked out once from the totals");
+assert.equal(
+  batted.obp,
+  ".429",
+  "walks, hit-by-pitch and sac flies all count in on-base: 6 of 14",
+);
+assert.equal(
+  batted.ops,
+  "1.029",
+  "OPS is on-base plus slugging, worked out once from the totals",
+);
 
-const armLine = (ip: string, er: number, h: number, bb: number, k: number, ab: number) =>
-  ({ inningsPitched: ip, earnedRuns: er, hits: h, baseOnBalls: bb, strikeOuts: k, atBats: ab, era: "0.00" });
+const armLine = (
+  ip: string,
+  er: number,
+  h: number,
+  bb: number,
+  k: number,
+  ab: number,
+) => ({
+  inningsPitched: ip,
+  earnedRuns: er,
+  hits: h,
+  baseOnBalls: bb,
+  strikeOuts: k,
+  atBats: ab,
+  era: "0.00",
+});
 
-const pitched = sumStatLines("pitching", [armLine("6.2", 2, 5, 1, 8, 24), armLine("5.1", 1, 3, 2, 6, 19)]);
-assert.equal(pitched.inningsPitched, "12.0", "innings add as thirds: 6.2 + 5.1 is 12.0, not 11.3");
+const pitched = sumStatLines("pitching", [
+  armLine("6.2", 2, 5, 1, 8, 24),
+  armLine("5.1", 1, 3, 2, 6, 19),
+]);
+assert.equal(
+  pitched.inningsPitched,
+  "12.0",
+  "innings add as thirds: 6.2 + 5.1 is 12.0, not 11.3",
+);
 assert.equal(pitched.era, "2.25", "three earned runs over twelve innings");
-assert.equal(pitched.whip, "0.92", "walks plus hits per inning, off the summed outs");
-assert.equal(pitched.avg, ".186", "opponent average is hits over batters retired at the plate");
+assert.equal(
+  pitched.whip,
+  "0.92",
+  "walks plus hits per inning, off the summed outs",
+);
+assert.equal(
+  pitched.avg,
+  ".186",
+  "opponent average is hits over batters retired at the plate",
+);
 assert.equal(pitched.strikeoutsPer9Inn, "10.50");
 
 /* WAR adds up across seasons, but it is the one decimal in a table of whole
    numbers: added as binary floats, eleven seasons of it end in a tail. */
 const war = sumStatLines("hitting", [
-  { war: "4.3" }, { war: "2.1" }, { war: "1.3" }, { war: "2.8" },
+  { war: "4.3" },
+  { war: "2.1" },
+  { war: "1.3" },
+  { war: "2.8" },
 ]);
-assert.equal(war.war, "10.5", "WAR is a counting stat and adds, written to the tenth it is quoted in");
-assert.equal(sumStatLines("hitting", [{ war: null }]).war, undefined, "no WAR reported is no WAR shown");
-assert.equal(sumStatLines("hitting", [{ opsPlus: "218" }]).opsPlus, undefined, "OPS+ is a rate against a league — left off a total, never added");
+assert.equal(
+  war.war,
+  "10.5",
+  "WAR is a counting stat and adds, written to the tenth it is quoted in",
+);
+assert.equal(
+  sumStatLines("hitting", [{ war: null }]).war,
+  undefined,
+  "no WAR reported is no WAR shown",
+);
+assert.equal(
+  sumStatLines("hitting", [{ opsPlus: "218" }]).opsPlus,
+  undefined,
+  "OPS+ is a rate against a league — left off a total, never added",
+);
 
-assert.equal(sumStatLines("hitting", []).avg, null, "no at-bats is no average, not .000");
-assert.equal(sumStatLines("pitching", []).era, null, "and no innings is no ERA");
+assert.equal(
+  sumStatLines("hitting", []).avg,
+  null,
+  "no at-bats is no average, not .000",
+);
+assert.equal(
+  sumStatLines("pitching", []).era,
+  null,
+  "and no innings is no ERA",
+);
 console.log("sumStatLines ok");
 
 /* OPS+ — the one figure on the career line worked out here rather than read
    off a feed. Checked against Baseball-Reference's own for seasons whose
    park factor is near enough to one that the two should land together. */
 const lg2024 = { obp: 0.3121, slg: 0.3992, era: 4.072 };
-assert.equal(opsPlus({ obp: ".458", slg: ".701" }, lg2024), "222", "Judge 2024 — B-Ref has 218 with the park in it");
-assert.equal(opsPlus({ obp: ".312", slg: ".399" }, lg2024), "100", "the league's own line is 100 by construction");
-assert.equal(opsPlus({ obp: ".458", slg: ".701" }, null), null, "a season with no league line has no OPS+");
-assert.equal(opsPlus({ obp: null, slg: ".701" }, lg2024), null, "and neither has a line with no on-base");
+assert.equal(
+  opsPlus({ obp: ".458", slg: ".701" }, lg2024),
+  "222",
+  "Judge 2024 — B-Ref has 218 with the park in it",
+);
+assert.equal(
+  opsPlus({ obp: ".312", slg: ".399" }, lg2024),
+  "100",
+  "the league's own line is 100 by construction",
+);
+assert.equal(
+  opsPlus({ obp: ".458", slg: ".701" }, null),
+  null,
+  "a season with no league line has no OPS+",
+);
+assert.equal(
+  opsPlus({ obp: null, slg: ".701" }, lg2024),
+  null,
+  "and neither has a line with no on-base",
+);
 console.log("opsPlus ok");
 
 /* ERA+ is the same idea the other way up — the league over the arm, so that
    higher is better and a plus is the right sign for it. */
-assert.equal(eraPlus({ era: "4.07" }, lg2024), "100", "the league's own ERA is 100 by construction");
-assert.equal(eraPlus({ era: "2.04" }, lg2024), "200", "half the league's earned runs is twice the league");
-assert.equal(eraPlus({ era: "8.14" }, lg2024), "50", "and twice its earned runs is half");
-assert.equal(eraPlus({ era: "0.00" }, lg2024), null, "a scoreless line has no ratio, not an infinite one");
-assert.equal(eraPlus({ era: "3.00" }, null), null, "a season with no league line has no ERA+");
-assert.equal(eraPlus({ era: "-.--" }, lg2024), null, "and neither has an arm that never pitched");
+assert.equal(
+  eraPlus({ era: "4.07" }, lg2024),
+  "100",
+  "the league's own ERA is 100 by construction",
+);
+assert.equal(
+  eraPlus({ era: "2.04" }, lg2024),
+  "200",
+  "half the league's earned runs is twice the league",
+);
+assert.equal(
+  eraPlus({ era: "8.14" }, lg2024),
+  "50",
+  "and twice its earned runs is half",
+);
+assert.equal(
+  eraPlus({ era: "0.00" }, lg2024),
+  null,
+  "a scoreless line has no ratio, not an infinite one",
+);
+assert.equal(
+  eraPlus({ era: "3.00" }, null),
+  null,
+  "a season with no league line has no ERA+",
+);
+assert.equal(
+  eraPlus({ era: "-.--" }, lg2024),
+  null,
+  "and neither has an arm that never pitched",
+);
 console.log("eraPlus ok");
 
 /* How a player got into the game — MLB reports a draft year or nothing, and
    nothing means two different things depending on where he was born. */
 const bio = (p: Partial<PlayerBio>) =>
-  ({ draftYear: null, birthCountry: "", draftRound: "", draftPick: null, ...p }) as PlayerBio;
-assert.equal(signingText(bio({ draftYear: 2013, birthCountry: "USA", draftRound: "1", draftPick: 32 })), "DRAFTED 2013 · RD 1, PICK 32", "Judge — the 2013 first round, not the 2010 thirty-first");
-assert.equal(signingText(bio({ draftYear: 2011, birthCountry: "USA", draftRound: "5", draftPick: 172 })), "DRAFTED 2011 · RD 5, PICK 172", "Betts");
-assert.equal(signingText(bio({ draftYear: 2013, birthCountry: "USA" })), "DRAFTED 2013", "a draft on record with no pick still prints the year");
-assert.equal(signingText(bio({ birthCountry: "Dominican Republic" })), "SIGNED INTERNATIONALLY", "Soto — no draft covers him");
-assert.equal(signingText(bio({ birthCountry: "Japan" })), "SIGNED INTERNATIONALLY", "Ohtani — posted, not drafted");
-assert.equal(signingText(bio({ birthCountry: "Puerto Rico" })), "UNDRAFTED", "Puerto Rico is in the draft, so a missing year is a missing year");
+  ({
+    draftYear: null,
+    birthCountry: "",
+    draftRound: "",
+    draftPick: null,
+    ...p,
+  }) as PlayerBio;
+assert.equal(
+  signingText(
+    bio({
+      draftYear: 2013,
+      birthCountry: "USA",
+      draftRound: "1",
+      draftPick: 32,
+    }),
+  ),
+  "DRAFTED 2013 · RD 1, PICK 32",
+  "Judge — the 2013 first round, not the 2010 thirty-first",
+);
+assert.equal(
+  signingText(
+    bio({
+      draftYear: 2011,
+      birthCountry: "USA",
+      draftRound: "5",
+      draftPick: 172,
+    }),
+  ),
+  "DRAFTED 2011 · RD 5, PICK 172",
+  "Betts",
+);
+assert.equal(
+  signingText(bio({ draftYear: 2013, birthCountry: "USA" })),
+  "DRAFTED 2013",
+  "a draft on record with no pick still prints the year",
+);
+assert.equal(
+  signingText(bio({ birthCountry: "Dominican Republic" })),
+  "SIGNED INTERNATIONALLY",
+  "Soto — no draft covers him",
+);
+assert.equal(
+  signingText(bio({ birthCountry: "Japan" })),
+  "SIGNED INTERNATIONALLY",
+  "Ohtani — posted, not drafted",
+);
+assert.equal(
+  signingText(bio({ birthCountry: "Puerto Rico" })),
+  "UNDRAFTED",
+  "Puerto Rico is in the draft, so a missing year is a missing year",
+);
 assert.equal(signingText(bio({ birthCountry: "USA" })), "UNDRAFTED");
-assert.equal(signingText(bio({})), "UNDRAFTED", "no birthplace either — the safer of the two");
+assert.equal(
+  signingText(bio({})),
+  "UNDRAFTED",
+  "no birthplace either — the safer of the two",
+);
 console.log("signingText ok");
 
 /* A park factor is the club's scoring at home against its scoring on the road,
    halved — a player only spends half a schedule in his own yard. */
-assert.equal(parkFactorOf([]), 1, "no home-and-road split on record is no adjustment");
-assert.equal(parkFactorOf([1]), 1, "a park that plays neutral leaves the line alone");
-assert.equal(Number(parkFactorOf([1.32]).toFixed(3)), 1.16, "Coors scoring a third again at home is worth 16 points, not 32");
-assert.equal(Number(parkFactorOf([0.88]).toFixed(3)), 0.94, "and a pitcher's park cuts the same way");
-assert.equal(Number(parkFactorOf([1.4, 1.2, 1.3]).toFixed(3)), 1.15, "the window is averaged before it is halved");
+assert.equal(
+  parkFactorOf([]),
+  1,
+  "no home-and-road split on record is no adjustment",
+);
+assert.equal(
+  parkFactorOf([1]),
+  1,
+  "a park that plays neutral leaves the line alone",
+);
+assert.equal(
+  Number(parkFactorOf([1.32]).toFixed(3)),
+  1.16,
+  "Coors scoring a third again at home is worth 16 points, not 32",
+);
+assert.equal(
+  Number(parkFactorOf([0.88]).toFixed(3)),
+  0.94,
+  "and a pitcher's park cuts the same way",
+);
+assert.equal(
+  Number(parkFactorOf([1.4, 1.2, 1.3]).toFixed(3)),
+  1.15,
+  "the window is averaged before it is halved",
+);
 console.log("parkFactorOf ok");
 
 /* The compare page reads a season as one row, but a season split by trade is
@@ -710,7 +1094,6 @@ const careerRow = (p: Partial<CareerRow>): CareerRow => ({
   teamId: null,
   age: null,
   league: "",
-  pos: "",
   teams: 1,
   led: {},
   values: {},
@@ -724,10 +1107,34 @@ const splitRows = [
 ];
 const splitTable: CareerTable = { rows: splitRows, total: null, summaries: [] };
 
-assert.equal(isSplitPart(splitRows, splitRows[1]), true, "a per-club line of a split season sits under the combined one");
-assert.equal(isSplitPart(splitRows, splitRows[0]), false, "an ordinary season stands on its own");
-assert.equal(isSplitPart(splitRows, splitRows[3]), false, "the combined line itself is not a part");
-assert.equal(wholeSeasonRow(splitTable, 2021)?.values.h, 1, "an ordinary season reads as its own line");
-assert.equal(wholeSeasonRow(splitTable, 2022)?.values.h, 5, "a split season reads as the combined line, not either club's half");
-assert.equal(wholeSeasonRow(splitTable, 1999), null, "a season never played has no line to read");
+assert.equal(
+  isSplitPart(splitRows, splitRows[1]),
+  true,
+  "a per-club line of a split season sits under the combined one",
+);
+assert.equal(
+  isSplitPart(splitRows, splitRows[0]),
+  false,
+  "an ordinary season stands on its own",
+);
+assert.equal(
+  isSplitPart(splitRows, splitRows[3]),
+  false,
+  "the combined line itself is not a part",
+);
+assert.equal(
+  wholeSeasonRow(splitTable, 2021)?.values.h,
+  1,
+  "an ordinary season reads as its own line",
+);
+assert.equal(
+  wholeSeasonRow(splitTable, 2022)?.values.h,
+  5,
+  "a split season reads as the combined line, not either club's half",
+);
+assert.equal(
+  wholeSeasonRow(splitTable, 1999),
+  null,
+  "a season never played has no line to read",
+);
 console.log("wholeSeasonRow ok");
