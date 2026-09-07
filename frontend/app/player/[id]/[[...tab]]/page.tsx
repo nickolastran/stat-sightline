@@ -41,6 +41,7 @@ import {
   PLAYER_GAME_TYPES,
   playerHeadshot,
   seasonOf,
+  seriesTotals,
   teamLogo,
   todayET,
   type Game,
@@ -71,6 +72,12 @@ export async function generateMetadata({
   const p = await getPlayer(Number(id), seasonOf(todayET())).catch(() => null);
   return { title: p ? `${p.name} — STAT//SIGHTLINE` : "STAT//SIGHTLINE" };
 }
+
+/** What the splits tab can be read over — one season, or all of them. */
+const SPLIT_SPANS = [
+  { value: "season", label: "SEASON" },
+  { value: "career", label: "CAREER" },
+];
 
 function Unavailable({ what }: { what: string }) {
   return (
@@ -201,6 +208,7 @@ async function TabBody({
   tab,
   player,
   season,
+  career,
   group,
   groups,
   gameType,
@@ -209,6 +217,8 @@ async function TabBody({
   tab: PlayerTab;
   player: PlayerSummary;
   season: number;
+  /** Splits only: read the whole career rather than the picked season. */
+  career: boolean;
   /** The line the one-season tabs are reading. */
   group: StatGroup;
   /** Every line the player has — the stats tab shows them all at once. */
@@ -261,11 +271,12 @@ async function TabBody({
       }
       case "splits": {
         const g = group === "pitching" ? "pitching" : "hitting";
+        const over = career ? "career" : season;
         return (
           <SplitsPanels
             group={g}
-            sections={await getPlayerSplits(id, season, g)}
-            season={season}
+            sections={await getPlayerSplits(id, over, g)}
+            season={over}
             columns={playerCols(g)}
           />
         );
@@ -275,9 +286,11 @@ async function TabBody({
         /* October is not a season's log but a career's, so it is not banded
            by month and carries no year in its title. */
         const post = gameType === "P";
+        const bands = await getPlayerGameLog(id, season, group, gameType);
         return (
           <GameLogPanel
-            bands={await getPlayerGameLog(id, season, group, gameType)}
+            bands={bands}
+            totals={post ? seriesTotals(group, bands) : undefined}
             group={group}
             title={post ? "POSTSEASON GAME LOG" : `GAME LOG — ${season}`}
             empty={post ? "NO POSTSEASON GAMES ON RECORD" : "NO GAMES IN THIS SEASON"}
@@ -338,7 +351,12 @@ export default async function PlayerPage({
   /* The catch-all is optional, so /player/592450 arrives with no segment at
      all — that is the overview, which keeps the canonical URL clean. */
   params: Promise<{ id: string; tab?: string[] }>;
-  searchParams: Promise<{ season?: string; group?: string; type?: string }>;
+  searchParams: Promise<{
+    season?: string;
+    group?: string;
+    type?: string;
+    over?: string;
+  }>;
 }) {
   const { id, tab } = await params;
   const playerId = Number(id);
@@ -380,8 +398,11 @@ export default async function PlayerPage({
   /* Only the game log reads it, and only two of the three values mean
      anything there — a player has no spring-training log worth a tab. */
   const gameType = pickPlayerGameType(sp.type) === "P" ? "P" : "R";
-  /* October's log is the whole career at once, so there is no year to pick. */
-  const seasonal = !(section === "gamelog" && gameType === "P");
+  /* The splits tab reads one season, or the whole career at once. */
+  const career = section === "splits" && sp.over === "career";
+  /* Neither October's log nor a career of splits has a year to pick — both
+     are the whole of it at once. */
+  const seasonal = !(section === "gamelog" && gameType === "P") && !career;
   /* There is no fielding split, so that tab offers one fewer choice than the
      rest and lands on batting when fielding was the standing pick. */
   const splitGroups = groups.filter((g) => g !== "fielding");
@@ -389,23 +410,27 @@ export default async function PlayerPage({
      stacks every line of every season rather than showing one at a time. */
   const hasControls = section !== "bio" && section !== "stats";
 
+  /* One group strip either way — splits offer one line fewer and land on
+     batting when fielding was the standing pick. No fragment around the pair:
+     this is a server component, and a fragment's children reach the client as
+     a bare array, which React then wants keys on. */
+  const splits = section === "splits";
   const controls = hasControls ? (
     <div className="flex w-full flex-wrap items-center gap-3">
-      {section === "splits" ? (
-        splitGroups.length > 1 && (
-          <ParamTabs
-            param="group"
-            ariaLabel="Stat group"
-            value={group === "pitching" ? "pitching" : "hitting"}
-            options={groupOptions(splitGroups)}
-          />
-        )
-      ) : (
+      {(!splits || splitGroups.length > 1) && (
         <ParamTabs
           param="group"
           ariaLabel="Stat group"
-          value={group}
-          options={groupOptions(groups)}
+          value={splits && group === "fielding" ? "hitting" : group}
+          options={groupOptions(splits ? splitGroups : groups)}
+        />
+      )}
+      {splits && (
+        <ParamTabs
+          param="over"
+          ariaLabel="Span"
+          value={career ? "career" : "season"}
+          options={SPLIT_SPANS}
         />
       )}
       {/* Pushed right in the control bar, where the group tabs lead; inert
@@ -447,13 +472,14 @@ export default async function PlayerPage({
       {/* Keyed on the view, so switching re-suspends into the skeleton rather
           than holding the last section on screen. */}
       <Suspense
-        key={`${section}-${season}-${group}-${gameType}`}
+        key={`${section}-${season}-${group}-${gameType}-${career}`}
         fallback={<TabSkeleton tab={section as PlayerTab} />}
       >
         <TabBody
           tab={section as PlayerTab}
           player={player}
           season={season}
+          career={career}
           group={group}
           groups={groups}
           gameType={gameType}

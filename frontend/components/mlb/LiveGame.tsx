@@ -705,11 +705,11 @@ export default async function LiveGame({
     standings?.find((d) => d.teams.some((t) => t.id === id)) ?? null;
 
   return (
-    /* Both rails are sized to what they carry — a standings table wants its
-       seven columns — and the middle takes whatever is left, which is where
-       the at-bat and the play descriptions want it. Below the breakpoint the
-       three stack, each at the full width of the page. */
-    <div className="grid grid-cols-1 gap-2 min-[1440px]:grid-cols-[28rem_minmax(0,1fr)_28rem]">
+    /* Both rails hold what a standings table wants — seven columns — and the
+       middle takes whatever is left, which is where the at-bat and the play
+       descriptions want it. See `.bento` in globals.css for how the three
+       scale. */
+    <div className="bento gap-2">
       <div className="space-y-2">
         <MiniBox box={box} pk={game.pk} />
         <Panel title="TEAM TOTALS">
