@@ -5,7 +5,7 @@ import { useState } from "react";
 /*
  * Month-grid date picker. Works entirely on YYYY-MM-DD strings and UTC date
  * math so a browser east or west of the game day never shifts a cell — the
- * scoreboard's notion of "day" is MLB's (America/New_York), resolved by the
+ * scoreboard's notion of "day" is the game day (America/Los_Angeles), resolved by the
  * caller, not the local clock.
  */
 

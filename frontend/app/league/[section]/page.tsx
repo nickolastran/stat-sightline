@@ -37,7 +37,7 @@ import {
   LEADER_POSITIONS,
   PLAYER_GAME_TYPES,
   QUALIFIER_NOTE,
-  todayET,
+  todayPT,
   seasonOf,
   pickGameType,
   FIRST_SEASON,
@@ -239,7 +239,7 @@ export default async function LeagueSectionPage({
   const found = findSection(section);
   if (!found) notFound();
 
-  const today = todayET();
+  const today = todayPT();
   const current = seasonOf(today);
   /* Which controls a section carries: the scoreboard picks a game day, and
      everything that reports a season total picks the season — the standings

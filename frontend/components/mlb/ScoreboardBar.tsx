@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { sortGames, todayET, type Game } from "@/lib/mlb";
+import { sortGames, todayPT, type Game } from "@/lib/mlb";
 import GameCard from "@/components/mlb/GameCard";
 import DatePicker from "@/components/ui/DatePicker";
 import { SkeletonGameCard } from "@/components/ui/Skeleton";
@@ -42,13 +42,26 @@ const ArrowButton = ({
 );
 
 export default function ScoreboardBar() {
-  const today = todayET();
+  const [today, setToday] = useState(todayPT);
   const [date, setDate] = useState(today);
   const [games, setGames] = useState<Game[] | null>(null); // null = loading
   const [error, setError] = useState(false);
   const [arrows, setArrows] = useState({ prev: false, next: false });
 
   const stripRef = useRef<HTMLDivElement>(null);
+
+  /* The bar can sit open across midnight, so the game day is polled rather
+     than read once at mount. A viewer parked on the old today follows it to
+     the new one; one who picked a date stays where they put themselves. */
+  useEffect(() => {
+    const id = setInterval(() => {
+      const d = todayPT();
+      if (d === today) return;
+      setToday(d);
+      setDate((cur) => (cur === today ? d : cur));
+    }, 60_000);
+    return () => clearInterval(id);
+  }, [today]);
 
   useEffect(() => {
     let alive = true;

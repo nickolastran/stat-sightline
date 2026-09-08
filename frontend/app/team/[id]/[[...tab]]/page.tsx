@@ -39,7 +39,7 @@ import {
   type PlayerGameType,
   type StatGroup,
   teamLogo,
-  todayET,
+  todayPT,
   type TeamIdentity,
 } from "@/lib/mlb";
 
@@ -66,7 +66,7 @@ export async function generateMetadata({
   params: Promise<{ id: string; tab?: string[] }>;
 }): Promise<Metadata> {
   const { id } = await params;
-  const t = await getTeamIdentity(teamIdOf(id), seasonOf(todayET())).catch(
+  const t = await getTeamIdentity(teamIdOf(id), seasonOf(todayPT())).catch(
     () => null
   );
   return { title: t ? `${t.name} — STAT//SIGHTLINE` : "STAT//SIGHTLINE" };
@@ -152,7 +152,7 @@ function pickHalf(
   season: number
 ): string {
   if (HALVES.some((h) => h.value === raw)) return raw!;
-  if (season !== seasonOf(todayET())) return "all";
+  if (season !== seasonOf(todayPT())) return "all";
   return games.filter((g) => g.state === "Final").length > mid ? "2" : "1";
 }
 
@@ -189,7 +189,7 @@ async function TeamSchedule({
       controls={
         <div className="flex flex-wrap items-center gap-3">
           <ParamSelect param="half" label="SHOW" value={shown} options={HALVES} />
-          <SeasonSelect value={season} first={first} last={seasonOf(todayET())} />
+          <SeasonSelect value={season} first={first} last={seasonOf(todayPT())} />
         </div>
       }
     />
@@ -321,7 +321,7 @@ async function TabBody({
               <SeasonSelect
                 value={statSeason}
                 first={first}
-                last={seasonOf(todayET())}
+                last={seasonOf(todayPT())}
               />
             }
           />
@@ -384,7 +384,7 @@ export default async function TeamPage({
   if (!Number.isFinite(teamId)) notFound();
   const section = tab?.[0] ?? "home";
   if (tab && (tab.length > 1 || !isTeamTab(section))) notFound();
-  const season = seasonOf(todayET());
+  const season = seasonOf(todayPT());
 
   let team: TeamIdentity | null;
   try {

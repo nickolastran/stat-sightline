@@ -18,6 +18,8 @@ export interface Pitch {
   pfx_z: number | null;
   description: string | null;
   stand: string | null;
+  sz_top: number | null; // this batter's zone top, ft
+  sz_bot: number | null; // this batter's zone bottom, ft
   game_date: string | null; // ISO date
   balls: number | null;
   strikes: number | null;

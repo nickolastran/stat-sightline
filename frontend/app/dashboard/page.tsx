@@ -13,7 +13,7 @@ import {
   getSchedule,
   getStandings,
   getLeaderboards,
-  todayET,
+  todayPT,
   seasonOf,
   type Game,
 } from "@/lib/mlb";
@@ -86,7 +86,7 @@ async function LeadersSection({ season }: { season: number }) {
 /* ── Page ───────────────────────────────────────────────────────────── */
 
 export default async function DashboardPage() {
-  const date = todayET();
+  const date = todayPT();
   const season = seasonOf(date);
 
   return (

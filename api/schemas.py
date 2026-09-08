@@ -24,6 +24,8 @@ class Pitch(BaseModel):
     pfx_z: float | None = None
     description: str | None = None
     stand: str | None = None          # batter handedness this pitch
+    sz_top: float | None = None       # this batter's zone top, ft
+    sz_bot: float | None = None       # this batter's zone bottom, ft
     game_date: date | None = None
     balls: int | None = None
     strikes: int | None = None

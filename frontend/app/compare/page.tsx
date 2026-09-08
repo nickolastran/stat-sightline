@@ -20,7 +20,7 @@ import {
   pickPlayerGroup,
   playerHeadshot,
   seasonOf,
-  todayET,
+  todayPT,
   wholeSeasonRow,
   type PlayerSummary,
   type StatGroup,
@@ -138,7 +138,7 @@ export default async function ComparePage({
   }>;
 }) {
   const sp = await searchParams;
-  const current = seasonOf(todayET());
+  const current = seasonOf(todayPT());
   const ids = parseIds(sp.ids);
 
   const fetched = await Promise.all(ids.map((id) => getPlayer(id, current).catch(() => null)));
