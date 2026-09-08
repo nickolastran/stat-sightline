@@ -17,7 +17,7 @@ import {
   seasonOf,
   teamHref,
   teamLogo,
-  todayET,
+  todayPT,
   type TeamStatValue,
 } from "@/lib/mlb";
 
@@ -52,7 +52,7 @@ export default async function CompareTeamsPage({
   searchParams: Promise<{ ids?: string; group?: string; season?: string; stats?: string }>;
 }) {
   const sp = await searchParams;
-  const current = seasonOf(todayET());
+  const current = seasonOf(todayPT());
   const season = pickSeason(sp.season, current);
   const ids = parseIds(sp.ids);
   const group = sp.group === "pitching" ? "pitching" : "hitting";

@@ -6,7 +6,7 @@ import {
   pickLeaderStat,
   pickPlayerGameType,
   seasonOf,
-  todayET,
+  todayPT,
   FIRST_SEASON,
   LEADER_LEAGUES,
   LEADER_POSITIONS,
@@ -33,7 +33,7 @@ export async function moreStatLeaders(q: {
   offset: number;
   limit: number;
 }): Promise<StatLeaderRow[]> {
-  const current = seasonOf(todayET());
+  const current = seasonOf(todayPT());
   const season =
     Number.isInteger(q.season) && q.season >= FIRST_SEASON && q.season <= current
       ? q.season

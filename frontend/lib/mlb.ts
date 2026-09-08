@@ -69,10 +69,15 @@ export const teamLogo = (id: number) =>
 export const playerHeadshot = (id: number, size = 60) =>
   `https://img.mlbstatic.com/mlb-photos/image/upload/w_${size},q_auto:best/v1/people/${id}/headshot/silo/current.png`;
 
-/** Today's date in America/New_York (MLB's game day), as YYYY-MM-DD. */
-export function todayET(): string {
+/*
+ * The current game day, as YYYY-MM-DD. Pacific, not Eastern: a west-coast
+ * night game is still today's game at 11pm ET, so rolling the scoreboard
+ * over at midnight ET would swap the slate out from under a game in the
+ * seventh. Midnight PT is the first moment no game is left in the day.
+ */
+export function todayPT(): string {
   return new Intl.DateTimeFormat("en-CA", {
-    timeZone: "America/New_York",
+    timeZone: "America/Los_Angeles",
   }).format(new Date());
 }
 

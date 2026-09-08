@@ -1,4 +1,4 @@
-import { getSchedule, todayET } from "@/lib/mlb";
+import { getSchedule, todayPT } from "@/lib/mlb";
 
 /*
  * Same-origin proxy for the schedule so the client scoreboard bar can fetch
@@ -8,7 +8,7 @@ import { getSchedule, todayET } from "@/lib/mlb";
 export async function GET(req: Request) {
   const url = new URL(req.url);
   const raw = url.searchParams.get("date");
-  const date = raw && /^\d{4}-\d{2}-\d{2}$/.test(raw) ? raw : todayET();
+  const date = raw && /^\d{4}-\d{2}-\d{2}$/.test(raw) ? raw : todayPT();
   try {
     const games = await getSchedule(date);
     return Response.json({ date, games });

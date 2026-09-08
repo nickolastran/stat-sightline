@@ -43,7 +43,7 @@ import {
   seasonOf,
   seriesTotals,
   teamLogo,
-  todayET,
+  todayPT,
   type Game,
   type PlayerGameType,
   type PlayerSummary,
@@ -69,7 +69,7 @@ export async function generateMetadata({
   params: Promise<{ id: string }>;
 }): Promise<Metadata> {
   const { id } = await params;
-  const p = await getPlayer(Number(id), seasonOf(todayET())).catch(() => null);
+  const p = await getPlayer(Number(id), seasonOf(todayPT())).catch(() => null);
   return { title: p ? `${p.name} — STAT//SIGHTLINE` : "STAT//SIGHTLINE" };
 }
 
@@ -363,7 +363,7 @@ export default async function PlayerPage({
   if (!Number.isFinite(playerId)) notFound();
   const section = tab?.[0] ?? "overview";
   if (tab && (tab.length > 1 || !isPlayerTab(section))) notFound();
-  const current = seasonOf(todayET());
+  const current = seasonOf(todayPT());
 
   // A career that can't be read is only the season picker missing, not the
   // page — fall back to the running season and carry on.
