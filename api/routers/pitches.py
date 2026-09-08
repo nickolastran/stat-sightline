@@ -60,6 +60,7 @@ def pitcher_pitches(
             text("""
                 SELECT pitch_type, pitch_name, plate_x, plate_z, release_speed,
                        release_spin_rate, pfx_x, pfx_z, description, stand,
+                       sz_top, sz_bot,
                        game_date, balls, strikes, outs_when_up, inning,
                        (on_1b IS NOT NULL OR on_2b IS NOT NULL OR on_3b IS NOT NULL)
                            AS runners_on,

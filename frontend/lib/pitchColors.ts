@@ -50,3 +50,26 @@ export const heatColor = (value: number, max: number): string | null => {
   );
   return HEAT_RAMP[i];
 };
+
+/*
+ * Diverging ramp for the 3×3 hot/cold zone grid — blue (cold) ↔ red (hot),
+ * split at roughly league-average BA. The breaks are fixed rather than
+ * stretched to the slice's own range, so one pitcher's grid can be read
+ * against another's and a filter can't repaint an unchanged cell. Both arms
+ * brighten outward off the dark surface; the near-average steps recede
+ * toward it, which is the neutral midpoint doing its job.
+ */
+export const BA_BREAKS = [0.15, 0.21, 0.25, 0.29, 0.35] as const;
+
+export const BA_RAMP = [
+  "#5598e7", // < .150 — coldest
+  "#2a78d6",
+  "#1c5cab",
+  "#8f3b39",
+  "#c74b48",
+  "#e66767", // ≥ .350 — hottest
+] as const;
+
+/** null (too few at-bats to average) stays uncolored — bare surface. */
+export const baColor = (ba: number | null): string | null =>
+  ba === null ? null : BA_RAMP[BA_BREAKS.filter((b) => ba >= b).length];

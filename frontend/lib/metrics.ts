@@ -134,3 +134,77 @@ export const fmt = {
   pct: (v: number | null, digits = 1) =>
     v === null ? "—" : `${(v * 100).toFixed(digits)}%`,
 };
+
+/* ── Uniform strike zone ────────────────────────────────────────────────
+ *
+ * Every batter gets a different zone (Statcast reports sz_bot..sz_top per
+ * pitch, from the batter's stance), so raw plate_z smears a tall hitter's
+ * belt-high pitch and a short one's letter-high pitch across the same row.
+ * Normalizing z onto the rulebook rectangle below makes one square mean the
+ * same thing for every batter faced — which is what the 3×3 grid needs to be
+ * comparable at all. Horizontal is already uniform: the plate is the plate.
+ */
+export const ZONE = { x1: -0.83, x2: 0.83, z1: 1.5, z2: 3.5 } as const;
+
+/** plate_z rescaled so this batter's zone lands on ZONE.z1..z2. */
+export function normZ(p: Pitch): number | null {
+  if (p.plate_z === null) return null;
+  const { sz_top: top, sz_bot: bot } = p;
+  if (top === null || bot === null || top - bot < 0.5) return p.plate_z; // sensor gap: plot raw
+  return (
+    ZONE.z1 + ((p.plate_z - bot) / (top - bot)) * (ZONE.z2 - ZONE.z1)
+  );
+}
+
+/* Plate appearances that aren't at-bats — the BA denominator is every other
+   terminal event. Listing the exclusions beats listing the ~20 out events. */
+const NON_AB = new Set([
+  "walk",
+  "intent_walk",
+  "hit_by_pitch",
+  "sac_fly",
+  "sac_bunt",
+  "sac_fly_double_play",
+  "sac_bunt_double_play",
+  "catcher_interf",
+]);
+const HITS = new Set(["single", "double", "triple", "home_run"]);
+
+export interface ZoneCell {
+  row: number; // 0 = top of zone
+  col: number; // 0 = left, catcher's view
+  n: number; // pitches thrown here
+  ab: number;
+  hits: number;
+  ba: number | null; // null until MIN_AB
+}
+
+/** Below this an average is noise, so it's shown as "—" rather than a color. */
+export const MIN_AB = 10;
+
+/** The 3×3 hot/cold grid: batting average allowed in each ninth of the zone. */
+export function zoneGrid(pitches: Pitch[]): ZoneCell[] {
+  const cells: ZoneCell[] = [];
+  for (let row = 0; row < 3; row++)
+    for (let col = 0; col < 3; col++)
+      cells.push({ row, col, n: 0, ab: 0, hits: 0, ba: null });
+
+  const wx = (ZONE.x2 - ZONE.x1) / 3;
+  const wz = (ZONE.z2 - ZONE.z1) / 3;
+  for (const p of pitches) {
+    const z = normZ(p);
+    if (p.plate_x === null || z === null) continue;
+    const col = Math.floor((p.plate_x - ZONE.x1) / wx);
+    const row = 2 - Math.floor((z - ZONE.z1) / wz); // row 0 = top
+    if (col < 0 || col > 2 || row < 0 || row > 2) continue;
+    const c = cells[row * 3 + col];
+    c.n += 1;
+    // events lands on the pitch that ended the PA, so each PA counts once.
+    if (p.events && !NON_AB.has(p.events)) {
+      c.ab += 1;
+      if (HITS.has(p.events)) c.hits += 1;
+    }
+  }
+  for (const c of cells) if (c.ab >= MIN_AB) c.ba = c.hits / c.ab;
+  return cells;
+}

@@ -217,6 +217,7 @@ export default function DashboardClient({ data }: { data: PitcherPitches }) {
                 options={[
                   { value: "scatter", label: "SCATTER" },
                   { value: "heat", label: "DENSITY" },
+                  { value: "zones", label: "HOT/COLD" },
                 ]}
               />
             }
