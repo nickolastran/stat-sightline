@@ -125,50 +125,110 @@ const HEAT: Record<string, string> = {
   cold: "fill-accent/45",
 };
 
-function Heat({ zones, atBat }: { zones: HeatZone[]; atBat: AtBat }) {
-  if (zones.length === 0) return null;
+/** Every heat cell as plot pixels — the shading and the hover targets over it
+    are the same boxes, so the geometry is written once here. */
+function heatCells(atBat: AtBat) {
   const w = (PLATE * 2) / 3;
   const h = (atBat.zoneTop - atBat.zoneBottom) / 3;
   const midZ = (atBat.zoneTop + atBat.zoneBottom) / 2;
-  const cell = (x: number, z: number, wide: number, tall: number, zone: string) => {
-    const heat = zones.find((z) => z.zone === zone);
-    return (
-      <rect
-        key={zone}
-        x={sx(x)}
-        y={sz(z + tall)}
-        width={wide * PX_FT}
-        height={tall * PX_FT}
-        className={HEAT[heat?.temp ?? ""] ?? "fill-transparent"}
-      >
-        {/* The browser's own tooltip: the shading says hot or cold, this says
-            how hot. */}
-        {heat && <title>{`${heat.value} in this zone this season`}</title>}
-      </rect>
-    );
-  };
+  const box = (x: number, z: number, wide: number, tall: number, zone: string) => ({
+    zone,
+    x: sx(x),
+    y: sz(z + tall),
+    w: wide * PX_FT,
+    h: tall * PX_FT,
+  });
+  return [
+    /* The four quadrants outside the zone, one cell deep so the shading
+       stays around the plate instead of flooding the plot. They tile the
+       whole band and the strike zone paints back over the middle. */
+    box(-PLATE - w, midZ, PLATE + w, atBat.zoneTop + h - midZ, "11"),
+    box(0, midZ, PLATE + w, atBat.zoneTop + h - midZ, "12"),
+    box(-PLATE - w, atBat.zoneBottom - h, PLATE + w, midZ - atBat.zoneBottom + h, "13"),
+    box(0, atBat.zoneBottom - h, PLATE + w, midZ - atBat.zoneBottom + h, "14"),
+    /* The zone's own nine, left to right and top to bottom. */
+    ...[0, 1, 2].flatMap((r) =>
+      [0, 1, 2].map((c) =>
+        box(-PLATE + c * w, atBat.zoneTop - (r + 1) * h, w, h, `0${r * 3 + c + 1}`)
+      )
+    ),
+  ];
+}
 
+function Heat({ zones, atBat }: { zones: HeatZone[]; atBat: AtBat }) {
+  if (zones.length === 0) return null;
+  return (
+    /* Shading only: the hover targets ride on top of the plot, not down here
+       under the pitches. */
+    <g className="pointer-events-none">
+      {heatCells(atBat).map((c) => (
+        <rect
+          key={c.zone}
+          x={c.x}
+          y={c.y}
+          width={c.w}
+          height={c.h}
+          className={
+            HEAT[zones.find((z) => z.zone === c.zone)?.temp ?? ""] ?? "fill-transparent"
+          }
+        />
+      ))}
+    </g>
+  );
+}
+
+/* The tip is a fixed box the text is fitted into — the plot is only ~200
+   units wide, and a label sized by a guess at glyph widths ran off the edge
+   of it. */
+const TIP_W = 106;
+const TIP_H = 17;
+const clamp = (v: number, lo: number, hi: number) => Math.min(Math.max(v, lo), hi);
+
+/**
+ * The shading says hot or cold; hovering a cell says how hot. Drawn in the
+ * plot's own chrome rather than left to the browser's tooltip, and drawn last
+ * so it sits over the pitches instead of under them.
+ */
+function HeatTips({ zones, atBat }: { zones: HeatZone[]; atBat: AtBat }) {
+  if (zones.length === 0) return null;
   return (
     <g>
-      {/* The four quadrants outside the zone, one cell deep so the shading
-          stays around the plate instead of flooding the plot. They tile the
-          whole band and the strike zone paints back over the middle. */}
-      {cell(-PLATE - w, midZ, PLATE + w, atBat.zoneTop + h - midZ, "11")}
-      {cell(0, midZ, PLATE + w, atBat.zoneTop + h - midZ, "12")}
-      {cell(-PLATE - w, atBat.zoneBottom - h, PLATE + w, midZ - atBat.zoneBottom + h, "13")}
-      {cell(0, atBat.zoneBottom - h, PLATE + w, midZ - atBat.zoneBottom + h, "14")}
-      {/* The zone's own nine, left to right and top to bottom. */}
-      {[0, 1, 2].map((r) =>
-        [0, 1, 2].map((c) =>
-          cell(
-            -PLATE + c * w,
-            atBat.zoneTop - (r + 1) * h,
-            w,
-            h,
-            `0${r * 3 + c + 1}`
-          )
-        )
-      )}
+      {heatCells(atBat).map((c) => {
+        const heat = zones.find((z) => z.zone === c.zone);
+        if (!heat) return null;
+        const cx = clamp(c.x + c.w / 2, TIP_W / 2 + 1, W - TIP_W / 2 - 1);
+        /* Above the cell, unless that is off the top of the plot. */
+        const top = c.y + c.h / 2 - TIP_H - 8;
+        const y = top < 1 ? c.y + c.h / 2 + 8 : top;
+        return (
+          <g key={c.zone} className="group">
+            <rect x={c.x} y={c.y} width={c.w} height={c.h} className="fill-transparent" />
+            <g className="pointer-events-none opacity-0 transition-opacity group-hover:opacity-100">
+              <rect
+                x={cx - TIP_W / 2}
+                y={y}
+                width={TIP_W}
+                height={TIP_H}
+                className="fill-bg stroke-line"
+              />
+              <text
+                x={cx}
+                y={y + TIP_H / 2 + 3}
+                textAnchor="middle"
+                textLength={TIP_W - 12}
+                lengthAdjust="spacingAndGlyphs"
+                fontSize={8}
+                className="fill-ink-3"
+              >
+                <tspan fontWeight="bold" className="fill-ink">
+                  {heat.value}
+                </tspan>
+                {" THIS SEASON"}
+              </text>
+            </g>
+          </g>
+        );
+      })}
     </g>
   );
 }
@@ -235,6 +295,7 @@ function Zone({ atBat, zones }: { atBat: AtBat; zones: HeatZone[] }) {
           </text>
         </g>
       ))}
+      <HeatTips zones={zones} atBat={atBat} />
     </svg>
   );
 }
