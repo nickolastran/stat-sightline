@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
 import { notFound } from "next/navigation";
+import ScrollToTop from "@/components/ScrollToTop";
 import AutoRefresh from "@/components/mlb/AutoRefresh";
 import GameSkeleton from "@/components/mlb/GameSkeleton";
 import BoxScoreView, { FullBox, NoBoxYet } from "@/components/mlb/BoxScoreView";
@@ -153,6 +154,7 @@ export default async function GamePage({
 
   return (
     <div className="mx-auto max-w-[96rem] space-y-2 p-3">
+      <ScrollToTop />
       <div className={NARROW}>
         <BoxScoreView game={game} box={box}>
           {/* Any game with lines puts its box behind the tabs below; one

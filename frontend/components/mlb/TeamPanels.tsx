@@ -189,7 +189,14 @@ export function SchedulePanel({
                   }`}
                 >
                   <Link href={`/game/${g.pk}`} className="hover:text-accent">
-                    {r.text}
+                    {gameStatus(g).tone === "live" ? (
+                      <span className="whitespace-nowrap text-[10px] tracking-widest text-crit">
+                        <span className="mr-1 inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-crit align-middle" />
+                        LIVE
+                      </span>
+                    ) : (
+                      r.text
+                    )}
                   </Link>
                 </td>
                 {r.final ? (
