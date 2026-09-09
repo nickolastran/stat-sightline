@@ -2,7 +2,13 @@
 
 import { useState } from "react";
 import SegmentedControl from "@/components/ui/SegmentedControl";
-import { TOTAL_ROWS, teamStatNum, teamStatText, type BoxScore } from "@/lib/mlb";
+import {
+  TOTAL_ROWS,
+  teamColor,
+  teamStatNum,
+  teamStatText,
+  type BoxScore,
+} from "@/lib/mlb";
 
 /*
  * The two clubs' running totals, one figure per row with a bar apiece — the
@@ -56,9 +62,14 @@ export default function TeamTotals({ box }: { box: BoxScore }) {
                     aria-hidden
                     className={`mt-1 flex h-1 bg-grid ${right ? "justify-end" : ""}`}
                   >
+                    {/* Each club's own colour: two bars on one row, and the
+                        accent can only stand for one of them. */}
                     <span
-                      className="block h-full bg-accent"
-                      style={{ width: `${(v / top) * 100}%` }}
+                      className="block h-full"
+                      style={{
+                        width: `${(v / top) * 100}%`,
+                        background: teamColor(box[right ? "home" : "away"].id),
+                      }}
                     />
                   </span>
                 </td>

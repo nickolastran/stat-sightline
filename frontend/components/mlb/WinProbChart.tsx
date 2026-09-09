@@ -6,7 +6,7 @@ import type { Game, PlayProb } from "@/lib/mlb";
 /*
  * Win probability, play by play. The line is the home club's number as MLB
  * reports it; the fill between it and the even line is who was holding the
- * game at that point, accent when the home club had it and amber when the
+ * game at that point, black when the home club had it and light grey when the
  * visitors did.
  *
  * The axis reads 100 out from the middle in both directions, because a chart
@@ -88,14 +88,14 @@ export default function WinProbChart({
           aria-label={`Win probability by play, now ${edge(game, plays[last]).side} ${edge(game, plays[last]).pct.toFixed(1)} percent`}
         >
           <defs>
-            {/* One vertical ramp does both sides: it fades out at the even
-                line, so the fill takes its colour from whichever half of the
-                chart the lobe sits in. */}
+            {/* One vertical ramp does both sides: light grey where the
+                visitors hold the game, black where the home club does, fading
+                out at the even line so neither lobe bleeds across it. */}
             <linearGradient id="wp-advantage" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="var(--color-warn)" stopOpacity="0.45" />
-              <stop offset="50%" stopColor="var(--color-warn)" stopOpacity="0" />
-              <stop offset="50%" stopColor="var(--color-accent)" stopOpacity="0" />
-              <stop offset="100%" stopColor="var(--color-accent)" stopOpacity="0.45" />
+              <stop offset="0%" stopColor="#9a9790" stopOpacity="0.55" />
+              <stop offset="50%" stopColor="#9a9790" stopOpacity="0" />
+              <stop offset="50%" stopColor="var(--color-ink)" stopOpacity="0" />
+              <stop offset="100%" stopColor="var(--color-ink)" stopOpacity="0.55" />
             </linearGradient>
           </defs>
 
