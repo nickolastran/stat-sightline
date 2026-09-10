@@ -8,7 +8,7 @@
  * Run with:  npx tsx lib/abs.check.ts
  */
 import assert from "node:assert/strict";
-import { parseAbs, pickAbsMin, pickAbsType } from "./abs";
+import { parseAbs, pickAbsQuery } from "./abs";
 
 const row = (o: Record<string, unknown>) =>
   JSON.stringify({
@@ -34,12 +34,13 @@ const row = (o: Record<string, unknown>) =>
     ...o,
   });
 
-const page = (body: string) =>
-  `<script>var x = [1];\n  const absData = ${body};\n  const leagueData = [{"player_name":"League"}];</script>`;
+const page = (body: string, league = `[${row({ player_name: "League", n_challenges: 4312 })}]`) =>
+  `<script>var x = [1];\n  const absData = ${body};\n  const leagueData = ${league};</script>`;
 
 /* ── The literal comes out whole, and it's the right one ─────────────── */
 
-const [col] = parseAbs(page(`[${row({})}]`));
+const { rows: one, league } = parseAbs(page(`[${row({})}]`));
+const [col] = one;
 assert.equal(col.name, "Colorado Rockies");
 assert.equal(col.chal, 188);
 assert.equal(col.won + col.lost, 188);
@@ -47,20 +48,42 @@ assert.equal(col.netOvr, 25.8);
 assert.equal(col.rsnOpp, 453);
 
 // Two rows: the match must not stop at the first "]" it can find.
-const two = parseAbs(page(`[${row({})},${row({ id: 120, player_name: "WSH" })}]`));
+const two = parseAbs(page(`[${row({})},${row({ id: 120, player_name: "WSH" })}]`)).rows;
 assert.equal(two.length, 2);
 assert.equal(two[1].name, "WSH");
 
-// And it must not pick up leagueData when absData is empty.
-assert.deepEqual(parseAbs(page("[]")), []);
+/* ── The league line comes off the same page, and only the league line ─ */
+
+assert.equal(league?.chal, 4312);
+assert.equal(league?.name, "LEAGUE");
+// An empty board must not fall through to leagueData for its rows.
+assert.deepEqual(parseAbs(page("[]")).rows, []);
+// A page without the league literal still yields a board.
+assert.equal(parseAbs(`const absData = [${row({})}];`).league, null);
 
 /* ── Missing fields degrade, they don't produce NaN ──────────────────── */
 
-const [sparse] = parseAbs(page(`[{"id":1,"player_name":"X"}]`));
+const [sparse] = parseAbs(page(`[{"id":1,"player_name":"X"}]`)).rows;
 assert.equal(sparse.chal, 0);
 assert.equal(sparse.netRuns, 0);
 assert.equal(sparse.wonPct, null); // no rate at all ≠ a rate of zero
 assert.equal(sparse.teamId, null);
+
+/* ── GROUP BY labels each row with the slice it is ───────────────────── */
+
+const grouped = parseAbs(
+  page(`[${row({ home_away: "Home", uniqueId: "115_Home" })}]`),
+  ["home_away"],
+).rows;
+assert.equal(grouped[0].split, "Home");
+assert.equal(grouped[0].key, "115_Home"); // rows must stay distinct per split
+// The league line splits too, so a grouped board pins none of it.
+assert.equal(
+  parseAbs(page(`[${row({ home_away: "Home" })}]`), ["home_away"]).league,
+  null,
+);
+// Ungrouped rows carry no split, and fall back to the id for their key.
+assert.equal(one[0].split, null);
 
 /* ── A page that no longer carries the table fails loudly ────────────── */
 
@@ -68,10 +91,21 @@ assert.throws(() => parseAbs("<html>no table here</html>"), /no absData/);
 
 /* ── Query parameters can't be hand-edited into an unserved board ────── */
 
-assert.equal(pickAbsType("catcher"), "catcher");
-assert.equal(pickAbsType("shortstop"), "batting-team");
-assert.equal(pickAbsType(undefined), "batting-team");
-assert.equal(pickAbsMin("10"), "10");
-assert.equal(pickAbsMin("7"), "1");
+assert.equal(pickAbsQuery({ type: "catcher" }).type, "catcher");
+assert.equal(pickAbsQuery({ type: "shortstop" }).type, "batting-team");
+assert.equal(pickAbsQuery({}).type, "batting-team");
+assert.equal(pickAbsQuery({ min: "10" }).min, "10");
+assert.equal(pickAbsQuery({ min: "7" }).min, "1");
+assert.equal(pickAbsQuery({}).minOpp, "0");
+
+// Pipe-joined lists keep only what the board serves — the rest is dropped
+// rather than forwarded, since Savant errors on a value it doesn't know.
+assert.deepEqual(pickAbsQuery({ pitch: "FF|SL|XX" }).pitch, ["FF", "SL"]);
+assert.deepEqual(pickAbsQuery({ zone: "11|15|19" }).zone, ["11", "19"]); // 15 is the zone itself
+assert.deepEqual(pickAbsQuery({ org: "147|ohio|1470" }).org, ["147"]);
+assert.deepEqual(pickAbsQuery({ split: "home_away|nonsense" }).group, ["home_away"]);
+assert.deepEqual(pickAbsQuery({}).pitch, []);
+// The player board's own ?group= must not reach the ABS grouping.
+assert.deepEqual(pickAbsQuery({ split: undefined }).group, []);
 
 console.log("abs.check.ts OK");

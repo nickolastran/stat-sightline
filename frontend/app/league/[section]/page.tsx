@@ -43,18 +43,13 @@ import {
   pickGameType,
   FIRST_SEASON,
   GAME_TYPES,
+  getClubs,
   type GameType,
   type PlayerGameType,
   type StatGroup,
 } from "@/lib/mlb";
-import {
-  getAbsLeaders,
-  pickAbsType,
-  pickAbsMin,
-  ABS_TYPES,
-  ABS_MINS,
-  type AbsType,
-} from "@/lib/abs";
+import AbsFilterBar from "@/components/mlb/AbsFilterBar";
+import { getAbsLeaders, pickAbsQuery, type AbsQuery } from "@/lib/abs";
 import { getProjections, type StandingsProjection } from "@/lib/api";
 
 /*
@@ -153,8 +148,8 @@ async function SectionBody({
   gameType: GameType;
   /** What the player table is showing — group, sort, filters, page size. */
   players: PlayerQuery;
-  /** Which ABS board, and the challenge floor a row has to clear. */
-  abs: { type: AbsType; min: string };
+  /** Which ABS board, and everything it is filtered by. */
+  abs: AbsQuery;
   /** A past season, so who made the playoffs is already decided. */
   seasonOver: boolean;
   /** The STANDINGS / WILD CARD buttons, for the two sections that show them. */
@@ -197,12 +192,7 @@ async function SectionBody({
       case "teams":
         return <TeamStats tables={await getTeamStats(season, gameType)} />;
       case "abs":
-        return (
-          <AbsBoard
-            rows={await getAbsLeaders(season, abs.type, abs.min)}
-            type={abs.type}
-          />
-        );
+        return <AbsBoard board={await getAbsLeaders(season, abs)} type={abs.type} />;
       case "players": {
         const columns = playerCols(players.group);
         const board = await getStatLeaders({
@@ -253,6 +243,14 @@ export default async function LeagueSectionPage({
     pos?: string;
     order?: string;
     min?: string;
+    minopp?: string;
+    inout?: string;
+    conf?: string;
+    org?: string;
+    opp?: string;
+    pitch?: string;
+    zone?: string;
+    split?: string;
   }>;
 }) {
   const { section } = await params;
@@ -295,7 +293,7 @@ export default async function LeagueSectionPage({
     position: inList(sp.pos, LEADER_POSITIONS),
     order: pickLeaderOrder(sp.order),
   };
-  const abs = { type: pickAbsType(sp.type), min: pickAbsMin(sp.min) };
+  const abs = pickAbsQuery(sp);
 
   /* The standings and the wild-card race are two routes with one control row,
      so switching between them carries the season and game type across rather
@@ -318,21 +316,7 @@ export default async function LeagueSectionPage({
           scoreboard ? (
             <ScoreboardDate value={date} today={today} />
           ) : absBoard ? (
-            <div className="flex flex-wrap items-center gap-3">
-              <ParamSelect
-                param="type"
-                label="BOARD"
-                value={abs.type}
-                options={ABS_TYPES}
-              />
-              <ParamSelect
-                param="min"
-                label="MIN CHAL"
-                value={abs.min}
-                options={ABS_MINS}
-              />
-              <span className="text-[10px] text-ink-3">{season}</span>
-            </div>
+            <span className="text-[10px] text-ink-3">{season}</span>
           ) : playerBoard ? (
             <div className="flex flex-wrap items-center gap-3">
               <ParamSelect
@@ -373,6 +357,9 @@ export default async function LeagueSectionPage({
           )
         }
       >
+        {absBoard && (
+          <AbsFilterBar query={abs} clubs={await getClubs().catch(() => [])} />
+        )}
         {playerBoard && (
           <div className="mb-3 flex">
             <ParamTabs
@@ -387,7 +374,7 @@ export default async function LeagueSectionPage({
         {/* Keyed on what the section is showing, so switching year or day
             re-suspends into the skeleton rather than holding the last one. */}
         <Suspense
-          key={`${season}-${date}-${gameType}-${abs.type}-${abs.min}-${Object.values(players).join("-")}`}
+          key={`${season}-${date}-${gameType}-${Object.values(abs).join("-")}-${Object.values(players).join("-")}`}
           fallback={<SectionSkeleton section={found.id} />}
         >
           <SectionBody

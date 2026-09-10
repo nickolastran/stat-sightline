@@ -876,6 +876,41 @@ async function mlbTeams(): Promise<any[]> {
   return (data.teams ?? []) as any[];
 }
 
+/** One club, as the ABS org pickers list them: nickname, league, division. */
+export interface Club {
+  id: number;
+  name: string;
+  abbr: string;
+  leagueId: number;
+  division: string;
+}
+
+/**
+ * The thirty clubs, in scoreboard order — east to west down each league.
+ *
+ * Only the pickers that name clubs by id use this, so it carries the nickname
+ * rather than the full name: a checkbox grid of thirty "Los Angeles ..." reads
+ * as one column of Los Angeles.
+ */
+export async function getClubs(): Promise<Club[]> {
+  const teams = await mlbTeams();
+  return teams
+    .map((t) => ({
+      id: t.id as number,
+      name: (t.teamName ?? t.name ?? "") as string,
+      abbr: (t.abbreviation ?? "") as string,
+      leagueId: (t.league?.id ?? 0) as number,
+      divisionId: (t.division?.id ?? 0) as number,
+      division: DIVISIONS[t.division?.id] ?? "",
+    }))
+    .sort(
+      (a, b) =>
+        DIVISION_ORDER.indexOf(a.divisionId) -
+          DIVISION_ORDER.indexOf(b.divisionId) || a.name.localeCompare(b.name),
+    )
+    .map(({ divisionId: _divisionId, ...club }): Club => club);
+}
+
 /**
  * Clubs and people matching what has been typed, clubs first.
  *

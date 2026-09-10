@@ -7,7 +7,7 @@ import TeamLink from "@/components/mlb/TeamLink";
 import PlayerLink from "@/components/mlb/PlayerLink";
 import { teamLogo } from "@/lib/mlb";
 import { sortRows, toggleSort, type Sort } from "@/lib/sortTable";
-import { isTeamBoard, type AbsRow, type AbsType } from "@/lib/abs";
+import { isTeamBoard, type AbsBoard as Board, type AbsRow, type AbsType } from "@/lib/abs";
 
 /*
  * One ABS challenge board — a club or a player per row, its challenges, and
@@ -24,6 +24,11 @@ import { isTeamBoard, type AbsRow, type AbsType } from "@/lib/abs";
  * The two "vs expected" columns are shaded rather than just signed: they are
  * the point of the table, and a column of ±numbers all reads the same at a
  * glance. Everything else is plain, so the shading means one thing.
+ *
+ * The league's own line is pinned above the board on the same slice of
+ * pitches, so every figure below it has something to be read against. It is
+ * outside the sort, the rank and the search on purpose — it is the baseline,
+ * not a competitor for first place.
  */
 
 /** Rows added per click of the button under the table. */
@@ -100,13 +105,17 @@ const GLOSSARY = [
 ];
 
 export default function AbsBoard({
-  rows,
+  board,
   type,
 }: {
-  rows: AbsRow[];
+  board: Board;
   type: AbsType;
 }) {
+  const { rows, league } = board;
   const teams = isTeamBoard(type);
+  /* GROUP BY splits every club or player into several rows; the column only
+     exists when there is something in it. */
+  const split = rows.some((r) => r.split !== null);
   const [sort, setSort] = useState<Sort>({ key: "netOvr", dir: "desc" });
   const [query, setQuery] = useState("");
   const [visible, setVisible] = useState(PAGE);
@@ -163,7 +172,8 @@ export default function AbsBoard({
           <colgroup>
             <col className="w-10" />
             <col className="w-48" />
-            <col className="w-10" />
+            <col className="w-16" />
+            {split && <col className="w-24" />}
             {COLUMNS.map((c) => (
               <col key={c.key} className={c.width} />
             ))}
@@ -188,10 +198,21 @@ export default function AbsBoard({
                   link you read, the logo is the club you scan for. */}
               <th
                 scope="col"
-                className="sticky top-0 z-10 border-b border-line border-l border-grid bg-surface px-3 py-1.5 text-[10px] font-normal tracking-widest text-ink-3"
+                className="sticky top-0 z-10 border-b border-line border-l border-grid bg-surface px-3 py-1.5 text-left text-[10px] font-normal tracking-widest text-ink-3"
               >
-                <span className="sr-only">Team</span>
+                TEAM
               </th>
+              {split && (
+                <SortHeader
+                  label="SPLIT"
+                  title="Which slice of the board this row is"
+                  sortKey="split"
+                  sort={sort}
+                  onSort={(k) => setSort((s) => toggleSort(s, k))}
+                  align="left"
+                  className="sticky top-0 z-10"
+                />
+              )}
               {COLUMNS.map((c, i) => (
                 <SortHeader
                   key={c.key}
@@ -210,16 +231,38 @@ export default function AbsBoard({
             {shown.length === 0 && (
               <tr>
                 <td
-                  colSpan={COLUMNS.length + 3}
+                  colSpan={COLUMNS.length + (split ? 4 : 3)}
                   className="px-3 py-6 text-center text-ink-3"
                 >
                   {query ? "NOBODY BY THAT NAME ON THIS BOARD" : "NO ABS CHALLENGES ON THIS BOARD"}
                 </td>
               </tr>
             )}
+            {league && (
+              /* The baseline, above the sort and outside the rank: every
+                 challenge on this slice, whoever made it. */
+              <tr className="border-b border-line bg-surface-2/60 font-bold text-ink">
+                <td className="px-3 py-1.5" />
+                <td className="px-3 py-1.5 text-[10px] tracking-[0.2em] text-ink-3">
+                  LEAGUE
+                </td>
+                <td className="border-l border-grid px-3 py-1.5" />
+                {split && <td className="px-3 py-1.5" />}
+                {COLUMNS.map((c, j) => (
+                  <td
+                    key={c.key}
+                    className={`px-3 py-1.5 text-right tabular-nums ${
+                      j === 0 ? "border-l border-grid" : ""
+                    }`}
+                  >
+                    {c.text(league)}
+                  </td>
+                ))}
+              </tr>
+            )}
             {shown.map((r, i) => (
               <tr
-                key={r.id}
+                key={r.key}
                 className="border-b border-grid last:border-b-0 hover:bg-surface-2"
               >
                 <td className="px-3 py-1.5 text-right tabular-nums text-ink-3">
@@ -229,16 +272,14 @@ export default function AbsBoard({
                   {teams ? (
                     <TeamLink id={r.id} name={r.name} logo={false} />
                   ) : (
-                    <PlayerLink id={r.id} headshot={false}>
-                      {r.name}
-                    </PlayerLink>
+                    <PlayerLink id={r.id}>{r.name}</PlayerLink>
                   )}
                 </td>
                 <td className="border-l border-grid px-3 py-1.5">
-                  {r.teamId !== null && (
+                  {(teams || r.teamId !== null) && (
                     /* eslint-disable-next-line @next/next/no-img-element */
                     <img
-                      src={teamLogo(teams ? r.id : r.teamId)}
+                      src={teamLogo(teams ? r.id : r.teamId!)}
                       alt={r.teamAbbr ?? ""}
                       title={r.teamAbbr ?? ""}
                       width={18}
@@ -248,6 +289,11 @@ export default function AbsBoard({
                     />
                   )}
                 </td>
+                {split && (
+                  <td className="overflow-hidden px-3 py-1.5 text-[10px] tracking-wider whitespace-nowrap text-ink-3">
+                    {r.split ?? "—"}
+                  </td>
+                )}
                 {COLUMNS.map((c, j) => {
                   const value = r[c.key];
                   return (
