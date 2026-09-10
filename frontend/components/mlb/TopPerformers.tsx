@@ -46,10 +46,12 @@ function Card({ card }: { card: TopCard }) {
                 className="h-4 w-4 shrink-0"
               />
             )}
+            {/* Five faces to a card is what a leader board looks like on
+                Savant, and at this size the photo is what the eye picks a
+                player out by. The forty-column tables keep to names: a
+                hundred and fifty headshots is a different page. */}
             <span className="min-w-0 flex-1 truncate text-ink-2">
-              <PlayerLink id={l.id} headshot={false}>
-                {l.name}
-              </PlayerLink>
+              <PlayerLink id={l.id}>{l.name}</PlayerLink>
             </span>
             <span className="shrink-0 text-right font-bold text-ink tabular-nums">
               {l.value}

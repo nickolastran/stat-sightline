@@ -19,8 +19,11 @@
  */
 import {
   getClubs,
+  LEADER_POSITIONS,
   mlb,
   teamStatNum,
+  type Club,
+  type StatGroup,
   type TeamStatCol,
   type TeamStatValue,
 } from "./mlb";
@@ -53,6 +56,11 @@ export const ADV_VIEWS = [
     title: "ADVANCED PITCHING — CLUBS",
   },
   { id: "top", label: "TOP PERFORMERS", title: "ADVANCED TOP PERFORMERS" },
+  {
+    id: "custom",
+    label: "CUSTOM LEADERBOARD",
+    title: "CUSTOM LEADERBOARD",
+  },
 ] as const;
 
 export type AdvView = (typeof ADV_VIEWS)[number]["id"];
@@ -1050,4 +1058,458 @@ export async function getTopPerformers(season: number): Promise<TopCard[]> {
     ...boardCards("player-pitching", pitching, season),
     ...fielding,
   ];
+}
+
+/* ── The custom board ───────────────────────────────────────────────── */
+
+/*
+ * Everything else — the standard line, so a reader building their own board
+ * can put age and hits beside xwOBA and bat speed rather than choosing one
+ * table or the other.
+ *
+ * These come off `stats=season`, which MLB has already formatted: ".312",
+ * "3.47", "121.2" are what it sends and what a line prints, so they pass
+ * through untouched rather than being parsed and rebuilt into the same
+ * string. `low` marks the columns whose good end is the low one, which is
+ * the direction a first click on the heading takes.
+ */
+type Std = [key: string, label: string, title: string, low?: 1];
+
+const STD_HITTING: Std[] = [
+  ["age", "AGE", "Age during the season"],
+  ["gamesPlayed", "G", "Games played"],
+  ["plateAppearances", "PA", "Plate appearances"],
+  ["atBats", "AB", "At-bats"],
+  ["avg", "AVG", "Batting average — hits per at-bat"],
+  ["obp", "OBP", "On-base percentage"],
+  ["slg", "SLG", "Slugging percentage"],
+  ["ops", "OPS", "On-base plus slugging"],
+  ["babip", "BABIP", "Batting average on balls in play"],
+  ["runs", "R", "Runs scored"],
+  ["hits", "H", "Hits"],
+  ["doubles", "2B", "Doubles"],
+  ["triples", "3B", "Triples"],
+  ["homeRuns", "HR", "Home runs"],
+  ["rbi", "RBI", "Runs batted in"],
+  ["totalBases", "TB", "Total bases"],
+  ["baseOnBalls", "BB", "Walks"],
+  ["intentionalWalks", "IBB", "Intentional walks"],
+  ["strikeOuts", "K", "Strikeouts", 1],
+  ["hitByPitch", "HBP", "Times hit by a pitch"],
+  ["stolenBases", "SB", "Stolen bases"],
+  ["caughtStealing", "CS", "Caught stealing", 1],
+  ["stolenBasePercentage", "SB%", "Share of steal attempts succeeded"],
+  ["sacFlies", "SF", "Sacrifice flies"],
+  ["sacBunts", "SH", "Sacrifice bunts"],
+  ["groundIntoDoublePlay", "GIDP", "Grounded into a double play", 1],
+  ["leftOnBase", "LOB", "Runners left on base", 1],
+  ["atBatsPerHomeRun", "AB/HR", "At-bats per home run", 1],
+  ["groundOutsToAirouts", "GO/AO", "Ground outs per air out"],
+  ["groundOuts", "GO", "Ground outs"],
+  ["airOuts", "AO", "Air outs"],
+  ["numberOfPitches", "P", "Pitches seen"],
+  ["catchersInterference", "CI", "Times awarded first on interference"],
+];
+
+const STD_PITCHING: Std[] = [
+  ["age", "AGE", "Age during the season"],
+  ["gamesPlayed", "G", "Games pitched"],
+  ["gamesStarted", "GS", "Games started"],
+  ["gamesFinished", "GF", "Games finished"],
+  ["wins", "W", "Wins"],
+  ["losses", "L", "Losses", 1],
+  ["winPercentage", "W%", "Share of decisions won"],
+  ["saves", "SV", "Saves"],
+  ["saveOpportunities", "SVO", "Save opportunities"],
+  ["blownSaves", "BS", "Blown saves", 1],
+  ["holds", "HLD", "Holds"],
+  ["completeGames", "CG", "Complete games"],
+  ["shutouts", "SHO", "Shutouts"],
+  ["inningsPitched", "IP", "Innings pitched"],
+  ["era", "ERA", "Earned run average", 1],
+  ["whip", "WHIP", "Walks and hits per inning pitched", 1],
+  ["battersFaced", "BF", "Batters faced"],
+  ["hits", "H", "Hits allowed", 1],
+  ["runs", "R", "Runs allowed", 1],
+  ["earnedRuns", "ER", "Earned runs allowed", 1],
+  ["homeRuns", "HR", "Home runs allowed", 1],
+  ["baseOnBalls", "BB", "Walks issued", 1],
+  ["intentionalWalks", "IBB", "Intentional walks issued", 1],
+  ["strikeOuts", "K", "Strikeouts recorded"],
+  ["hitBatsmen", "HB", "Batters hit by a pitch", 1],
+  ["wildPitches", "WP", "Wild pitches", 1],
+  ["balks", "BK", "Balks", 1],
+  ["pickoffs", "PK", "Runners picked off"],
+  ["avg", "OAVG", "Opponent batting average", 1],
+  ["obp", "OOBP", "Opponent on-base percentage", 1],
+  ["slg", "OSLG", "Opponent slugging", 1],
+  ["ops", "OOPS", "Opponent OPS", 1],
+  ["strikeoutsPer9Inn", "K/9", "Strikeouts per nine innings"],
+  ["walksPer9Inn", "BB/9", "Walks per nine innings", 1],
+  ["hitsPer9Inn", "H/9", "Hits per nine innings", 1],
+  ["homeRunsPer9", "HR/9", "Home runs per nine innings", 1],
+  ["runsScoredPer9", "RS/9", "Runs the club scored per nine innings behind him"],
+  ["strikeoutWalkRatio", "K/BB", "Strikeouts per walk"],
+  ["strikePercentage", "STR%", "Pitches thrown for strikes"],
+  ["pitchesPerInning", "P/IP", "Pitches thrown per inning", 1],
+  ["groundOutsToAirouts", "GO/AO", "Ground outs per air out"],
+  ["inheritedRunners", "IR", "Runners inherited"],
+  ["inheritedRunnersScored", "IRS", "Inherited runners who scored", 1],
+  ["strikes", "STR", "Strikes thrown"],
+  ["numberOfPitches", "P", "Pitches thrown"],
+];
+
+const STD_FIELDING: Std[] = [
+  ["age", "AGE", "Age during the season"],
+  ["games", "G", "Games at this position"],
+  ["gamesStarted", "GS", "Games started at this position"],
+  ["innings", "INN", "Innings played at this position"],
+  ["fielding", "FPCT", "Fielding percentage"],
+  ["chances", "TC", "Total chances"],
+  ["putOuts", "PO", "Putouts"],
+  ["assists", "A", "Assists"],
+  ["errors", "E", "Errors", 1],
+  ["throwingErrors", "TE", "Throwing errors", 1],
+  ["doublePlays", "DP", "Double plays turned"],
+  ["triplePlays", "TP", "Triple plays turned"],
+  ["rangeFactorPer9Inn", "RF/9", "Range factor per nine innings"],
+  ["rangeFactorPerGame", "RF/G", "Range factor per game"],
+];
+
+/** MLB has already formatted these — parsing and rebuilding gains nothing. */
+const asIs = (v: Raw): TeamStatValue =>
+  v === null || v === undefined || v === "" ? null : v;
+
+const standardCols = (rows: Std[]): AdvCol[] =>
+  rows.map(([raw, label, title, low]) =>
+    col("STANDARD", "season", raw, label, title, asIs, {
+      best: low ? "asc" : undefined,
+    }),
+  );
+
+/*
+ * The fielding figures Savant tracks, which MLB publishes none of. Pop time
+ * and framing stay on the leader cards: both are catcher-only, and a column
+ * blank for everyone but two dozen players isn't one to build a board out of.
+ */
+const FIELD_TRACKED: AdvCol[] = [
+  col("TRACKED", "oaa", "outs_above_average", "OAA", "Outs made beyond what an average fielder makes on the same chances", signed(0)),
+  col("TRACKED", "oaa", "fielding_runs_prevented", "FRP", "Outs above average converted to the runs they saved", signed(0)),
+  col("TRACKED", "arm", "arm_overall", "ARM", "Average of a fielder's hardest throws", dec(1), { unit: " MPH" }),
+  col("TRACKED", "arm", "max_arm_strength", "MAXARM", "The single hardest throw of the season", dec(1), { unit: " MPH" }),
+];
+
+/** Every column a group can put on a custom board, in menu order. */
+export const catalogFor = (group: StatGroup): AdvCol[] =>
+  group === "hitting"
+    ? [...standardCols(STD_HITTING), ...ADV_BATTING_COLS]
+    : group === "pitching"
+      ? [...standardCols(STD_PITCHING), ...ADV_PITCHING_COLS]
+      : [...standardCols(STD_FIELDING), ...FIELD_TRACKED];
+
+/** What a board opens on before anyone picks — a readable line, not forty. */
+const CUSTOM_DEFAULTS: Record<StatGroup, string[]> = {
+  hitting: [
+    "season.age",
+    "season.plateAppearances",
+    "season.homeRuns",
+    "season.avg",
+    "season.ops",
+    "saber.war",
+    "saber.wRcPlus",
+    "x.est_woba",
+    "ev.avg_hit_speed",
+    "ev.brl_pa",
+  ],
+  pitching: [
+    "season.age",
+    "season.inningsPitched",
+    "season.era",
+    "season.whip",
+    "season.strikeOuts",
+    "saber.war",
+    "saber.fip",
+    "x.est_woba",
+    "adv.whiffPercentage",
+    "ev.avg_hit_speed",
+  ],
+  fielding: [
+    "season.age",
+    "season.innings",
+    "season.chances",
+    "season.errors",
+    "season.fielding",
+    "oaa.outs_above_average",
+    "oaa.fielding_runs_prevented",
+    "arm.arm_overall",
+  ],
+};
+
+/*
+ * What a board opens ordered by. Without this it would be whichever column
+ * happens to sit leftmost, which is age — a leaderboard whose first answer is
+ * "the oldest qualified hitter" is not a leaderboard.
+ */
+const CUSTOM_SORT: Record<StatGroup, string> = {
+  hitting: "saber.war",
+  pitching: "saber.war",
+  fielding: "oaa.outs_above_average",
+};
+
+export const CUSTOM_GROUPS = [
+  { value: "hitting", label: "BATTERS" },
+  { value: "pitching", label: "PITCHERS" },
+  { value: "fielding", label: "FIELDERS" },
+] as const;
+
+/** MLB's own qualifying pool, or everyone and a floor of our own. */
+export const CUSTOM_MINS = [
+  { value: "q", label: "QUALIFIED" },
+  { value: "0", label: "NO MINIMUM" },
+  { value: "50", label: "50+" },
+  { value: "100", label: "100+" },
+  { value: "200", label: "200+" },
+  { value: "300", label: "300+" },
+  { value: "400", label: "400+" },
+] as const;
+
+/** What the floor counts, per group — plate appearances, innings, innings. */
+const MIN_KEY: Record<StatGroup, string> = {
+  hitting: "plateAppearances",
+  pitching: "inningsPitched",
+  fielding: "innings",
+};
+
+export const CUSTOM_LEAGUES = [
+  { value: "all", label: "BOTH LEAGUES" },
+  { value: "103", label: "AMERICAN LEAGUE" },
+  { value: "104", label: "NATIONAL LEAGUE" },
+];
+
+/**
+ * The six divisions, named rather than numbered: MLB's stats endpoint takes a
+ * `divisionId` and quietly ignores it — the board comes back whole — so the
+ * filter is applied here against the club list, which carries the name.
+ */
+export const CUSTOM_DIVISIONS = [
+  { value: "all", label: "ALL DIVISIONS" },
+  ...["AL EAST", "AL CENTRAL", "AL WEST", "NL EAST", "NL CENTRAL", "NL WEST"].map(
+    (d) => ({ value: d, label: d }),
+  ),
+];
+
+/** Everything a custom board is built from, as the page resolves it once. */
+export interface CustomQuery {
+  group: StatGroup;
+  cols: string[];
+  league: string;
+  division: string;
+  team: string;
+  position: string;
+  min: string;
+  sort?: string;
+}
+
+const oneOf = (raw: string | undefined, options: readonly { value: string }[], fallback: string) =>
+  options.some((o) => o.value === raw) ? raw! : fallback;
+
+/**
+ * The whole control set out of the query string, anything unserved dropped.
+ * These values reach an upstream URL and a column lookup, so none of them is
+ * taken on trust — a hand-edited `?cols=` names real columns or none.
+ */
+export function pickCustomQuery(
+  sp: {
+    group?: string;
+    cols?: string;
+    league?: string;
+    div?: string;
+    team?: string;
+    pos?: string;
+    min?: string;
+    sort?: string;
+  },
+  clubIds: Set<string>,
+): CustomQuery {
+  const group: StatGroup =
+    sp.group === "pitching" || sp.group === "fielding" ? sp.group : "hitting";
+  const known = new Set(catalogFor(group).map((c) => c.key));
+  const chosen = (sp.cols ?? "").split("|").filter((k) => known.has(k));
+  /* An empty pick is the default line rather than a board of names and
+     nothing else — clearing every box should still show a table. */
+  const picked = chosen.length ? chosen : CUSTOM_DEFAULTS[group];
+  return {
+    group,
+    cols: picked,
+    league: oneOf(sp.league, CUSTOM_LEAGUES, "all"),
+    division: oneOf(sp.div, CUSTOM_DIVISIONS, "all"),
+    team: sp.team && clubIds.has(sp.team) ? sp.team : "all",
+    position: oneOf(sp.pos, LEADER_POSITIONS, "all"),
+    min: oneOf(sp.min, CUSTOM_MINS, "q"),
+    /* The reader's own column if they picked one, else this group's headline
+       figure — and its leftmost column when that isn't on the board. */
+    sort: picked.includes(sp.sort ?? "")
+      ? sp.sort
+      : picked.includes(CUSTOM_SORT[group])
+        ? CUSTOM_SORT[group]
+        : picked[0],
+  };
+}
+
+/** How the board reads under itself — what it is showing, and of whom. */
+const customNote = (q: CustomQuery, clubs: Club[], rows: number): string => {
+  const club = clubs.find((c) => String(c.id) === q.team);
+  const where = [
+    club?.name.toUpperCase(),
+    q.division === "all" ? undefined : q.division,
+    CUSTOM_LEAGUES.find((l) => l.value === q.league && l.value !== "all")?.label,
+    LEADER_POSITIONS.find((p) => p.value === q.position && p.value !== "all")?.label,
+  ].filter(Boolean);
+  const pool =
+    q.min === "q"
+      ? "MLB's qualified pool"
+      : q.min === "0"
+        ? "everyone who appeared"
+        : `everyone with ${q.min}+ ${q.group === "hitting" ? "plate appearances" : "innings"}`;
+  return `${rows} ${rows === 1 ? "player" : "players"} — ${pool}${
+    where.length ? `, ${where.join(" · ").toLowerCase()}` : ""
+  }. Pick columns and filters above; the board is the link.`;
+};
+
+/**
+ * A board of whatever was asked for.
+ *
+ * Only the feeds the picked columns actually read are fetched, so a board of
+ * standard stats costs one request and a board of bat speed and wRC+ costs
+ * four. The spine is `stats=season`, which every group has and which carries
+ * the club and position each row is filtered on.
+ */
+export async function getCustomBoard(
+  season: number,
+  q: CustomQuery,
+): Promise<AdvBoard> {
+  const columns = catalogFor(q.group).filter((c) => q.cols.includes(c.key));
+  const want = new Set(columns.map((c) => c.src));
+  const savant = (board: string, params: Record<string, string>) =>
+    orNone(savantCsv(board, params));
+  const side = q.group === "pitching" ? "pitcher" : "batter";
+
+  const [data, clubs, adv, saber, x, ev, bat, oaa, arm] = await Promise.all([
+    mlb(
+      `/stats?stats=season&group=${q.group}&season=${season}&sportId=1` +
+        `&gameType=R&playerPool=${q.min === "q" ? "qualified" : "all"}` +
+        `&hydrate=team&limit=2000` +
+        (q.league === "all" ? "" : `&leagueId=${q.league}`) +
+        (q.team === "all" ? "" : `&teamId=${q.team}`) +
+        (q.position === "all" ? "" : `&position=${q.position}`),
+      3600,
+    ),
+    getClubs().catch(() => [] as Club[]),
+    want.has("adv")
+      ? mlb(
+          `/stats?stats=seasonAdvanced&group=${q.group}&season=${season}` +
+            `&sportId=1&gameType=R&playerPool=all&limit=2000`,
+          3600,
+        ).catch(() => null)
+      : null,
+    want.has("saber") && q.group !== "fielding"
+      ? saberFeed(season, q.group)
+      : new Map<number, Record<string, Raw>>(),
+    want.has("x")
+      ? savant("expected_statistics", { ...SAVANT_YEAR(season), type: side })
+      : [],
+    want.has("ev")
+      ? savant("statcast", { ...SAVANT_YEAR(season), type: side })
+      : [],
+    want.has("bat")
+      ? savant("bat-tracking", { ...SAVANT_YEAR(season), type: "batter" })
+      : [],
+    want.has("oaa")
+      ? savant("outs_above_average", {
+          type: "Fielder",
+          startYear: String(season),
+          endYear: String(season),
+          split: "no",
+          team: "",
+          range: "year",
+          min: "q",
+          pos: "",
+          roles: "",
+          viz: "hide",
+        })
+      : [],
+    want.has("arm")
+      ? savant("arm-strength", {
+          type: "player",
+          year: String(season),
+          minThrows: "50",
+          pos: "",
+          team: "",
+        })
+      : [],
+  ]);
+
+  const advById = new Map<number, Record<string, Raw>>();
+  for (const s of (adv?.stats?.[0]?.splits ?? []) as any[])
+    if (typeof s.player?.id === "number") advById.set(s.player.id, s.stat ?? {});
+
+  const feeds: Feeds = {
+    adv: advById,
+    saber,
+    x: byId(x, "player_id"),
+    ev: byId(ev, "player_id"),
+    bat: byId(bat, "id"),
+    oaa: byId(oaa, "player_id"),
+    arm: byId(arm, "player_id"),
+  };
+
+  /* MLB ignores `divisionId` on this endpoint, so the division is applied
+     against the club list here — a club it doesn't know drops out rather
+     than passing an unfiltered board off as a filtered one. */
+  const inDivision = new Set(
+    clubs
+      .filter((c) => q.division === "all" || c.division === q.division)
+      .map((c) => c.id),
+  );
+  const floor = q.min === "q" || q.min === "0" ? null : Number(q.min);
+
+  const rows = ((data.stats?.[0]?.splits ?? []) as any[]).flatMap(
+    (s): AdvRow[] => {
+      const id = s.player?.id;
+      if (typeof id !== "number") return [];
+      if (q.division !== "all" && !inDivision.has(s.team?.id)) return [];
+      if (floor !== null && (teamStatNum(s.stat?.[MIN_KEY[q.group]]) ?? 0) < floor)
+        return [];
+      return [
+        {
+          id,
+          name: s.player?.fullName ?? "—",
+          team: s.team?.abbreviation ?? "",
+          teamId: s.team?.id ?? null,
+          position:
+            s.position?.abbreviation ??
+            s.player?.primaryPosition?.abbreviation ??
+            "",
+          values: {
+            ...valuesOf(columns, feeds, id),
+            ...Object.fromEntries(
+              columns
+                .filter((c) => c.src === "season")
+                .map((c) => [c.key, c.fmt(s.stat?.[c.raw])]),
+            ),
+          },
+        },
+      ];
+    },
+  );
+
+  return {
+    /* A custom board keeps every column that was asked for, blank or not —
+       an empty column is the answer to "does this season track it?", and
+       dropping it would look like the picker had ignored the click. */
+    columns: columns.map(viewCol),
+    rows,
+    missing: [],
+    note: customNote(q, clubs, rows.length),
+  };
 }

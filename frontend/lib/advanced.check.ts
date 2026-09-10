@@ -14,12 +14,16 @@ import {
   ADV_FIRST_SEASON,
   ADV_PITCHING_COLS,
   advCols,
+  catalogFor,
   colGroups,
+  CUSTOM_DIVISIONS,
+  CUSTOM_MINS,
   findAdvView,
   flipName,
   hasAllYears,
   parseCsv,
   pickAdvSeason,
+  pickCustomQuery,
 } from "./advanced";
 
 /* ── A quoted name doesn't shift the row ─────────────────────────────── */
@@ -114,3 +118,74 @@ assert.ok(hasAllYears("player-batting"));
 assert.ok(!hasAllYears("league-batting"));
 
 console.log("advanced.check.ts OK");
+
+/* ── The custom board can't be steered anywhere it doesn't serve ─────── */
+
+const clubs = new Set(["147", "141"]);
+
+// Nothing set at all is a readable default line, not an empty board.
+const plain = pickCustomQuery({}, clubs);
+assert.equal(plain.group, "hitting");
+assert.ok(plain.cols.length >= 8);
+assert.equal(plain.league, "all");
+assert.equal(plain.division, "all");
+assert.equal(plain.team, "all");
+assert.equal(plain.min, "q");
+
+// A hand-edited column list keeps only columns this group actually has.
+const picked = pickCustomQuery(
+  { group: "pitching", cols: "season.era|saber.fip|season.homeRuns|bat.avg_bat_speed|nonsense" },
+  clubs,
+);
+assert.deepEqual(picked.cols, ["season.era", "saber.fip", "season.homeRuns"]);
+// Clearing every box falls back to the default rather than a board of names.
+assert.ok(pickCustomQuery({ cols: "nonsense" }, clubs).cols.length >= 8);
+// A batting column can't be smuggled onto a pitching board.
+assert.ok(!picked.cols.includes("bat.avg_bat_speed"));
+
+// Filters that name nothing real fall back to unfiltered.
+assert.equal(pickCustomQuery({ team: "999" }, clubs).team, "all");
+assert.equal(pickCustomQuery({ team: "147" }, clubs).team, "147");
+assert.equal(pickCustomQuery({ div: "AL EAST" }, clubs).division, "AL EAST");
+assert.equal(pickCustomQuery({ div: "AL MIDDLE" }, clubs).division, "all");
+assert.equal(pickCustomQuery({ league: "105" }, clubs).league, "all");
+assert.equal(pickCustomQuery({ min: "1000" }, clubs).min, "q");
+assert.equal(pickCustomQuery({ pos: "SS" }, clubs).position, "SS");
+assert.equal(pickCustomQuery({ pos: "QB" }, clubs).position, "all");
+assert.equal(
+  pickCustomQuery({ cols: "season.hits|season.avg", sort: "season.hits" }, clubs).sort,
+  "season.hits",
+);
+// A sort naming a column the board isn't showing falls back to the headline
+// figure, not to whichever column happens to sit leftmost.
+assert.equal(pickCustomQuery({ sort: "nope" }, clubs).sort, "saber.war");
+assert.equal(pickCustomQuery({ sort: "season.hits" }, clubs).sort, "saber.war");
+assert.equal(
+  pickCustomQuery({ cols: "season.avg|season.hits" }, clubs).sort,
+  "season.avg",
+);
+assert.equal(
+  pickCustomQuery({ group: "fielding" }, clubs).sort,
+  "oaa.outs_above_average",
+);
+
+// Every division the picker offers is a name the club list actually uses.
+for (const d of CUSTOM_DIVISIONS)
+  assert.ok(d.value === "all" || /^(AL|NL) (EAST|CENTRAL|WEST)$/.test(d.value));
+
+// Every default names a column of its own group, or the board opens blank.
+for (const g of ["hitting", "pitching", "fielding"] as const) {
+  const keys = new Set(catalogFor(g).map((c) => c.key));
+  for (const k of pickCustomQuery({ group: g }, clubs).cols)
+    assert.ok(keys.has(k), `${g} default ${k} is not a column`);
+  // Standard and tracked columns can't collide on a key.
+  const all = catalogFor(g).map((c) => c.key);
+  assert.equal(new Set(all).size, all.length, `${g} has a duplicate key`);
+  assert.ok(all.length > 14, `${g} catalogue is too thin`);
+}
+
+// The floors are numbers the board can compare against, bar the two words.
+for (const m of CUSTOM_MINS)
+  assert.ok(m.value === "q" || Number.isInteger(Number(m.value)));
+
+console.log("advanced.check.ts custom OK");

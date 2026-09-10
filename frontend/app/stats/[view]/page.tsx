@@ -5,19 +5,24 @@ import { notFound } from "next/navigation";
 import Panel from "@/components/ui/Panel";
 import SeasonSelect from "@/components/mlb/SeasonSelect";
 import AdvancedTable from "@/components/mlb/AdvancedTable";
+import CustomFilterBar from "@/components/mlb/CustomFilterBar";
 import TopPerformers from "@/components/mlb/TopPerformers";
 import { SkeletonTable } from "@/components/ui/Skeleton";
-import { seasonOf, todayPT } from "@/lib/mlb";
+import { getClubs, seasonOf, todayPT, type Club } from "@/lib/mlb";
 import {
   ADV_FIRST_SEASON,
   ADV_VIEWS,
   advCols,
+  CUSTOM_GROUPS,
   findAdvView,
   getAdvBoard,
+  getCustomBoard,
   getTopPerformers,
   hasAllYears,
   pickAdvSeason,
+  pickCustomQuery,
   type AdvView,
+  type CustomQuery,
 } from "@/lib/advanced";
 
 /*
@@ -103,14 +108,24 @@ async function Body({
   view,
   season,
   sort,
+  custom,
 }: {
   view: AdvView;
   season: number;
   sort?: string;
+  /** What the custom board was asked for — unused by every other view. */
+  custom: CustomQuery;
 }) {
   try {
     if (view === "top")
       return <TopPerformers cards={await getTopPerformers(season)} />;
+    if (view === "custom")
+      return (
+        <AdvancedTable
+          board={await getCustomBoard(season, custom)}
+          initial={custom.sort}
+        />
+      );
     return <AdvancedTable board={await getAdvBoard(view, season)} initial={sort} />;
   } catch {
     return (
@@ -126,7 +141,17 @@ export default async function AdvancedPage({
   searchParams,
 }: {
   params: Promise<{ view: string }>;
-  searchParams: Promise<{ season?: string; sort?: string }>;
+  searchParams: Promise<{
+    season?: string;
+    sort?: string;
+    group?: string;
+    cols?: string;
+    league?: string;
+    div?: string;
+    team?: string;
+    pos?: string;
+    min?: string;
+  }>;
 }) {
   const { view } = await params;
   const found = findAdvView(view);
@@ -140,8 +165,11 @@ export default async function AdvancedPage({
   const index = sp.season === "all" && hasAllYears(found.id);
   /* A card links in already sorted; anything else in ?sort= is ignored
      rather than leaving the table under a heading it isn't ordered by. */
+  const custom = found.id === "custom";
+  const clubs: Club[] = custom ? await getClubs().catch(() => []) : [];
+  const query = pickCustomQuery(sp, new Set(clubs.map((c) => String(c.id))));
   const sort =
-    found.id === "top"
+    found.id === "top" || custom
       ? undefined
       : advCols(found.id).find((c) => c.key === sp.sort)?.key;
 
@@ -154,6 +182,13 @@ export default async function AdvancedPage({
             <span className="text-[10px] text-ink-3">
               {ADV_FIRST_SEASON}–{current}
             </span>
+          ) : custom ? (
+            /* The custom board's season lives in its own filter bar, beside
+               everything else it is filtered by — and the column count on the
+               bar that owns the columns. */
+            <span className="text-[10px] text-ink-3">
+              {CUSTOM_GROUPS.find((g) => g.value === query.group)?.label}
+            </span>
           ) : (
             <SeasonSelect
               value={season}
@@ -164,11 +199,19 @@ export default async function AdvancedPage({
         }
       >
         <Views active={found.id} season={season} />
+        {custom && (
+          <CustomFilterBar
+            query={query}
+            season={season}
+            current={current}
+            clubs={clubs}
+          />
+        )}
         {index ? (
           <SeasonIndex view={found.id} current={current} />
         ) : (
           <Suspense
-            key={`${found.id}-${season}-${sort ?? ""}`}
+            key={`${found.id}-${season}-${sort ?? ""}-${Object.values(query).join("-")}`}
             fallback={
               found.id === "top" ? (
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
@@ -181,7 +224,12 @@ export default async function AdvancedPage({
               )
             }
           >
-            <Body view={found.id} season={season} sort={sort} />
+            <Body
+              view={found.id}
+              season={season}
+              sort={sort}
+              custom={query}
+            />
           </Suspense>
         )}
       </Panel>

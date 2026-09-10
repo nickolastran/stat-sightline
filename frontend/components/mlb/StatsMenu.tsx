@@ -24,7 +24,9 @@ import {
 const menuYears = (current: number) =>
   Array.from({ length: MENU_SEASONS }, (_, i) => current - i);
 
-const boards = ADV_VIEWS.filter((v) => v.id !== "top");
+/* The four season boards get a row of years; the two that aren't one board
+   per season are links at the foot of the box. */
+const boards = ADV_VIEWS.filter((v) => v.id !== "top" && v.id !== "custom");
 
 function Section({
   id,
@@ -98,12 +100,20 @@ export default function StatsMenu({ current }: { current: number }) {
           {boards.map((v) => (
             <Section key={v.id} id={v.id} label={v.label} years={years} />
           ))}
-          <Link
-            href="/stats/top"
-            className="block border-t border-line pt-2 text-[11px] tracking-[0.2em] text-accent hover:underline"
-          >
-            TOP PERFORMERS
-          </Link>
+          <div className="space-y-1.5 border-t border-line pt-2">
+            <Link
+              href="/stats/top"
+              className="block text-[11px] tracking-[0.2em] text-accent hover:underline"
+            >
+              TOP PERFORMERS
+            </Link>
+            <Link
+              href="/stats/custom"
+              className="block text-[11px] tracking-[0.2em] text-accent hover:underline"
+            >
+              CUSTOM LEADERBOARD
+            </Link>
+          </div>
         </div>
       </div>
     </div>

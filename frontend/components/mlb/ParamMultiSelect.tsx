@@ -13,11 +13,20 @@ import { useSetParam } from "@/lib/useSetParam";
  * Ticking a box commits immediately rather than behind an APPLY button: the
  * bar sits outside the section's Suspense boundary, so the pop-out stays open
  * and keeps its place while the table behind it re-fetches.
+ *
+ * Several of these can share one parameter — the custom board gives each band
+ * of columns a picker of its own — which is what `keep` is for: a picker
+ * writes the whole parameter, so it has to carry the values it isn't
+ * responsible for or ticking a box in one band would clear every other.
  */
 
 export interface MultiOption {
   value: string;
   label: string;
+  /** What the closed control reads when this is the only thing ticked — the
+   *  abbreviation, where the box itself carries the whole definition and
+   *  would stretch the bar to fit it. Falls back to `label`. */
+  short?: string;
   /** A swatch before the label — the pitch types carry their series color. */
   color?: string;
 }
@@ -32,21 +41,29 @@ export default function ParamMultiSelect({
   param,
   label,
   value,
+  keep = [],
   groups,
   quick = [],
   cols = 1,
   width = "w-56",
+  align = "right",
   image,
 }: {
   param: string;
   label: string;
   value: string[];
+  /** Values of this same parameter that another picker owns — written back
+   *  untouched, so the two don't overwrite each other. */
+  keep?: string[];
   groups: MultiGroup[];
   /** One-click sets — "American League", "Top" — beside the CLEAR link. */
   quick?: { label: string; values: string[] }[];
   /** Columns the groups are dealt into, filled top to bottom. */
   cols?: number;
   width?: string;
+  /** Which edge the pop-out hangs from. A wide box on a control near the left
+   *  of its bar has to open rightwards, or half of it lands off the screen. */
+  align?: "left" | "right";
   /** A diagram under the boxes, for the zone picker. */
   image?: string;
 }) {
@@ -77,10 +94,10 @@ export default function ParamMultiSelect({
   /* Written back in the order the pop-out lists them, not the order they were
      ticked, so the same selection is always the same link. */
   const commit = (next: Set<string>) => {
-    const joined = all
-      .filter((o) => next.has(o.value))
-      .map((o) => o.value)
-      .join("|");
+    const joined = [
+      ...keep,
+      ...all.filter((o) => next.has(o.value)).map((o) => o.value),
+    ].join("|");
     /* Nothing ticked drops the parameter rather than setting it empty — an
        unfiltered board should have an unfiltered link. */
     startTransition(() => setParam({ [param]: joined || null }));
@@ -99,7 +116,9 @@ export default function ParamMultiSelect({
     value.length === 0
       ? "—"
       : value.length === 1
-        ? (all.find((o) => o.value === value[0])?.label ?? "1")
+        ? ((o) => o?.short ?? o?.label ?? "1")(
+            all.find((o) => o.value === value[0]),
+          )
         : `${value.length} PICKED`;
 
   const rows = Math.ceil(groups.length / cols);
@@ -125,7 +144,11 @@ export default function ParamMultiSelect({
 
       {open && (
         <div
-          className={`absolute right-0 z-40 mt-1 ${width} max-h-[26rem] space-y-2 overflow-y-auto border border-line bg-surface p-2 shadow-lg`}
+          /* Above the sticky heads of the table it filters — those carry a
+             z-40 of their own to hold the corner cell over both the row and
+             the column, and a tie is broken by document order, which the
+             table wins. */
+          className={`absolute ${align === "left" ? "left-0" : "right-0"} z-50 mt-1 ${width} max-h-[26rem] max-w-[calc(100vw-2rem)] space-y-2 overflow-y-auto border border-line bg-surface p-2 shadow-lg`}
         >
           <div
             className="grid gap-x-3 gap-y-2"
