@@ -77,6 +77,42 @@ class StandingsProjection(BaseModel):
     teams: list[TeamProjection]
 
 
+class TeamOdds(BaseModel):
+    """One club's line on the playoff-odds table.
+
+    The four odds are shares of simulated seasons, 0-1. `clinch_wild_card` is
+    a berth that wasn't the division, so it and `win_division` add up to
+    `make_playoffs` — which is how the table reads across.
+    """
+    team_id: int
+    name: str
+    league_id: int
+    division_id: int
+    division: str
+    wins: int
+    losses: int
+    win_pct: float
+    games_back: float
+    games_remaining: int
+    projected_wins: float
+    projected_losses: float
+    ros_win_pct: float           # expected win rate over what is left
+    strength_of_schedule: float  # mean projected win rate of the opponents left
+    win_division: float
+    clinch_bye: float            # a top-two seed, so a bye through round one
+    clinch_wild_card: float
+    make_playoffs: float
+    win_world_series: float
+
+
+class PlayoffOdds(BaseModel):
+    season: int
+    as_of: str | None = None
+    simulations: int             # drawn seasons behind every share above
+    model: ModelInfo
+    teams: list[TeamOdds]
+
+
 # ── Natural-language query ("ask") ──────────────────────────────────────
 
 

@@ -24,19 +24,24 @@ from src.stat_sightline.standings.ingest import (
 )
 
 
+# `is_remaining`, `record_played` and `blank` are public because odds.py draws
+# its simulated seasons from the same schedule and the same actual records —
+# two answers off one set of rules, rather than two sets that can disagree.
+
+
 def load_games() -> pd.DataFrame:
     """The ingested results. Raises FileNotFoundError until the ingest has run."""
     return pd.read_csv(GAMES_CSV)
 
 
-def _remaining(game: dict) -> bool:
+def is_remaining(game: dict) -> bool:
     """Still to be played. Postponed and cancelled slots are dropped — the
     makeup game is listed separately, so counting the placeholder too would
     inflate every affected club's games remaining."""
     return not is_placeholder(game) and not is_final(game)
 
 
-def _blank(team_id: int, name: str) -> dict:
+def blank(team_id: int, name: str) -> dict:
     return {
         "team_id": int(team_id), "name": name,
         "wins": 0, "losses": 0, "games_played": 0, "games_remaining": 0,
@@ -44,14 +49,14 @@ def _blank(team_id: int, name: str) -> dict:
     }
 
 
-def _record_played(season: int, games: pd.DataFrame) -> tuple[dict[int, dict], str | None]:
+def record_played(season: int, games: pd.DataFrame) -> tuple[dict[int, dict], str | None]:
     """Actual W-L per club for `season`, and the date of the latest game in it."""
     played = games[games["season"] == season]
     teams: dict[int, dict] = {}
     for _, g in played.iterrows():
         for side, other in (("home", "away"), ("away", "home")):
             tid = int(g[f"{side}_id"])
-            team = teams.setdefault(tid, _blank(tid, g[side]))
+            team = teams.setdefault(tid, blank(tid, g[side]))
             team["name"] = g[side]  # freshest spelling of the club's name
             team["games_played"] += 1
             if g[f"{side}_score"] > g[f"{other}_score"]:
@@ -69,7 +74,7 @@ def project_season(season: int, games: pd.DataFrame, bundle: dict) -> dict:
     Trained on every season in `games`; only `season`'s own results are counted
     as actual wins.
     """
-    teams, as_of = _record_played(season, games)
+    teams, as_of = record_played(season, games)
     form = latest_form(games)
 
     # One feature row per remaining game, scored in a single batched call —
@@ -77,7 +82,7 @@ def project_season(season: int, games: pd.DataFrame, bundle: dict) -> dict:
     rows, sides = [], []
     seen: set[int] = set()
     for game_date, game in iter_games(get_schedule(season)):
-        if not _remaining(game) or game["gamePk"] in seen:
+        if not is_remaining(game) or game["gamePk"] in seen:
             continue
         seen.add(game["gamePk"])  # one entry per game, as in the results feed
         home = game["teams"]["home"]["team"]
@@ -91,7 +96,7 @@ def project_season(season: int, games: pd.DataFrame, bundle: dict) -> dict:
         probs = bundle["clf"].predict_proba(pd.DataFrame(rows)[FEATURES])[:, 1]
         for (home, away), p in zip(sides, probs):
             for team, share in ((home, float(p)), (away, 1.0 - float(p))):
-                row = teams.setdefault(team["id"], _blank(team["id"], team.get("name", "")))
+                row = teams.setdefault(team["id"], blank(team["id"], team.get("name", "")))
                 row["projected_wins"] += share
                 row["games_remaining"] += 1
 

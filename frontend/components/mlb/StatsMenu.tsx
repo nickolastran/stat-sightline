@@ -92,10 +92,11 @@ export default function StatsMenu({ current }: { current: number }) {
        * order and focus-within can open the box for a keyboard reader — a
        * display:none menu can never be focused into, and so never opens.
        *
-       * Anchored to its right edge: the tab is the last thing on the bar, and
-       * a box hanging off its left would open past the edge of a phone.
+       * Anchored to its left edge, which is where the tab now sits: hung off
+       * its right the box would open leftwards across the sections it belongs
+       * beside, and off the side of the page on the narrower screens.
        */}
-      <div className="invisible absolute top-full right-0 z-50 w-[19rem] -translate-y-1 border border-line bg-bg p-3 opacity-0 shadow-lg transition group-focus-within:visible group-focus-within:translate-y-0 group-focus-within:opacity-100 group-hover:visible group-hover:translate-y-0 group-hover:opacity-100">
+      <div className="invisible absolute top-full left-0 z-50 w-[19rem] max-w-[calc(100vw-2rem)] -translate-y-1 border border-line bg-bg p-3 opacity-0 shadow-lg transition group-focus-within:visible group-focus-within:translate-y-0 group-focus-within:opacity-100 group-hover:visible group-hover:translate-y-0 group-hover:opacity-100">
         <div className="space-y-3">
           {boards.map((v) => (
             <Section key={v.id} id={v.id} label={v.label} years={years} />

@@ -84,7 +84,7 @@ def test_matchup_features_measure_rest_from_the_last_game():
 
 
 def test_record_played_counts_both_sides():
-    teams, as_of = project._record_played(2026, _games(10))
+    teams, as_of = project.record_played(2026, _games(10))
     assert teams[111]["wins"] == 10 and teams[111]["losses"] == 0
     assert teams[222]["wins"] == 0 and teams[222]["losses"] == 10
     assert teams[222]["games_played"] == 10
@@ -100,16 +100,16 @@ def test_postponed_slots_are_neither_results_nor_remaining():
     makeup carries the same game_pk — so counting it either way double-counts."""
     postponed = _status("Final", "Postponed")
     assert ingest.is_final(postponed) is False
-    assert project._remaining(postponed) is False
+    assert project.is_remaining(postponed) is False
 
 
 def test_played_and_upcoming_games_are_classified():
     assert ingest.is_final(_status("Final", "Final")) is True
     assert ingest.is_final(_status("Final", "Completed Early")) is True   # rain-shortened
     assert ingest.is_final(_status("Live", "In Progress")) is False
-    assert project._remaining(_status("Final", "Final")) is False
-    assert project._remaining(_status("Preview", "Scheduled")) is True
-    assert project._remaining(_status("Live", "In Progress")) is True
+    assert project.is_remaining(_status("Final", "Final")) is False
+    assert project.is_remaining(_status("Preview", "Scheduled")) is True
+    assert project.is_remaining(_status("Live", "In Progress")) is True
 
 
 def test_suspended_game_is_kept_once_at_its_resumption_date():
