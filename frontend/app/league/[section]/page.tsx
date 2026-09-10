@@ -15,6 +15,7 @@ import ParamTabs from "@/components/mlb/ParamTabs";
 import StatLeaders from "@/components/mlb/StatLeaders";
 import { Glossary } from "@/components/mlb/TeamPanels";
 import WildCard from "@/components/mlb/WildCard";
+import AbsBoard from "@/components/mlb/AbsBoard";
 import StandingsViews from "@/components/mlb/StandingsViews";
 import {
   LEAGUE_SECTIONS,
@@ -46,6 +47,14 @@ import {
   type PlayerGameType,
   type StatGroup,
 } from "@/lib/mlb";
+import {
+  getAbsLeaders,
+  pickAbsType,
+  pickAbsMin,
+  ABS_TYPES,
+  ABS_MINS,
+  type AbsType,
+} from "@/lib/abs";
 import { getProjections, type StandingsProjection } from "@/lib/api";
 
 /*
@@ -134,6 +143,7 @@ async function SectionBody({
   season,
   gameType,
   players,
+  abs,
   views,
   seasonOver,
 }: {
@@ -143,6 +153,8 @@ async function SectionBody({
   gameType: GameType;
   /** What the player table is showing — group, sort, filters, page size. */
   players: PlayerQuery;
+  /** Which ABS board, and the challenge floor a row has to clear. */
+  abs: { type: AbsType; min: string };
   /** A past season, so who made the playoffs is already decided. */
   seasonOver: boolean;
   /** The STANDINGS / WILD CARD buttons, for the two sections that show them. */
@@ -184,6 +196,13 @@ async function SectionBody({
         );
       case "teams":
         return <TeamStats tables={await getTeamStats(season, gameType)} />;
+      case "abs":
+        return (
+          <AbsBoard
+            rows={await getAbsLeaders(season, abs.type, abs.min)}
+            type={abs.type}
+          />
+        );
       case "players": {
         const columns = playerCols(players.group);
         const board = await getStatLeaders({
@@ -233,6 +252,7 @@ export default async function LeagueSectionPage({
     league?: string;
     pos?: string;
     order?: string;
+    min?: string;
   }>;
 }) {
   const { section } = await params;
@@ -248,6 +268,9 @@ export default async function LeagueSectionPage({
      stays statically prerenderable. */
   const scoreboard = found.id === "scoreboard";
   const playerBoard = found.id === "players";
+  /* The ABS boards are this season's only — the challenge system has no
+     earlier regular season to show — so they pick a board, not a year. */
+  const absBoard = found.id === "abs";
   const seasonal =
     found.id === "leaders" ||
     found.id === "standings" ||
@@ -257,7 +280,7 @@ export default async function LeagueSectionPage({
   /* Spring training has no wild-card race of its own, and the leader boards
      are regular-season figures. */
   const typed = found.id === "standings" || found.id === "teams";
-  const sp = seasonal || scoreboard ? await searchParams : {};
+  const sp = seasonal || scoreboard || absBoard ? await searchParams : {};
   const season = seasonal ? pickSeason(sp.season, current) : current;
   const date = scoreboard ? pickDate(sp.date, today) : today;
   const gameType = typed ? pickGameType(sp.type) : "R";
@@ -272,6 +295,7 @@ export default async function LeagueSectionPage({
     position: inList(sp.pos, LEADER_POSITIONS),
     order: pickLeaderOrder(sp.order),
   };
+  const abs = { type: pickAbsType(sp.type), min: pickAbsMin(sp.min) };
 
   /* The standings and the wild-card race are two routes with one control row,
      so switching between them carries the season and game type across rather
@@ -293,6 +317,22 @@ export default async function LeagueSectionPage({
         right={
           scoreboard ? (
             <ScoreboardDate value={date} today={today} />
+          ) : absBoard ? (
+            <div className="flex flex-wrap items-center gap-3">
+              <ParamSelect
+                param="type"
+                label="BOARD"
+                value={abs.type}
+                options={ABS_TYPES}
+              />
+              <ParamSelect
+                param="min"
+                label="MIN CHAL"
+                value={abs.min}
+                options={ABS_MINS}
+              />
+              <span className="text-[10px] text-ink-3">{season}</span>
+            </div>
           ) : playerBoard ? (
             <div className="flex flex-wrap items-center gap-3">
               <ParamSelect
@@ -347,7 +387,7 @@ export default async function LeagueSectionPage({
         {/* Keyed on what the section is showing, so switching year or day
             re-suspends into the skeleton rather than holding the last one. */}
         <Suspense
-          key={`${season}-${date}-${gameType}-${Object.values(players).join("-")}`}
+          key={`${season}-${date}-${gameType}-${abs.type}-${abs.min}-${Object.values(players).join("-")}`}
           fallback={<SectionSkeleton section={found.id} />}
         >
           <SectionBody
@@ -356,6 +396,7 @@ export default async function LeagueSectionPage({
             season={season}
             gameType={gameType}
             players={players}
+            abs={abs}
             seasonOver={season < current}
             views={
               standingsView ? (
