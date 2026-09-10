@@ -178,6 +178,11 @@ async function Overview({
     <div className="space-y-3">
       {line && <HeadlineTiles line={line} />}
       <NextGamePanel game={game} />
+      <RecentGamesPanel
+        columns={gameLogCols(group).game}
+        months={log}
+        href={`${href}/gamelog${query}`}
+      />
       <SplitsSummaryPanel
         sections={splits}
         columns={playerCols(splitGroup)}
@@ -191,11 +196,6 @@ async function Overview({
         postRows={post.rows.filter((r) => r.season === year)}
         career={career.total}
         href={`${href}/stats?group=${group}`}
-      />
-      <RecentGamesPanel
-        columns={gameLogCols(group).game}
-        months={log}
-        href={`${href}/gamelog${query}`}
       />
     </div>
   );

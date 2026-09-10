@@ -817,17 +817,66 @@ export const teamStatNum = (v: TeamStatValue): number | null => {
 const cols = (group: "hitting" | "pitching") =>
   group === "hitting" ? TEAM_HITTING_COLS : TEAM_PITCHING_COLS;
 
+/**
+ * Every player's WAR for one season, and each club's — the sum of the WAR its
+ * players earned there.
+ *
+ * One request per group, cached for the day: MLB's sabermetrics feed answers
+ * for the whole league at once, so the alternative — a request per row —
+ * isn't one. `playerPool=All` because this is joined onto tables that have
+ * already decided who qualifies; the feed's own qualified pool would blank
+ * the WAR of anyone those tables let through.
+ *
+ * A traded player gets one line carrying the club he finished at, so summing
+ * by club double-counts nobody. Spring and October have no published WAR at
+ * all and come back empty, which reads as a blank column rather than a zero.
+ */
+async function seasonWar(
+  season: number,
+  group: StatGroup,
+  gameType: string = "R",
+): Promise<{ player: Map<number, number>; team: Map<number, number> }> {
+  const player = new Map<number, number>();
+  const team = new Map<number, number>();
+  if (group === "fielding") return { player, team };
+
+  const data = await mlb(
+    `/stats?stats=sabermetrics&group=${group}&season=${season}&sportId=1` +
+      `&gameType=${gameType}&playerPool=All&limit=2000`,
+    86400,
+  ).catch(() => null);
+
+  for (const split of (data?.stats?.[0]?.splits ?? []) as any[]) {
+    const war = teamStatNum(split.stat?.war);
+    if (war === null) continue;
+    if (typeof split.player?.id === "number") player.set(split.player.id, war);
+    if (typeof split.team?.id === "number")
+      team.set(split.team.id, (team.get(split.team.id) ?? 0) + war);
+  }
+  return { player, team };
+}
+
+/** WAR as a table prints it, or blank where the feed has no line. */
+const warText = (war: number | undefined): TeamStatValue =>
+  war === undefined ? null : SABER_FORMAT.war(war);
+
 async function teamStatTable(
   group: "hitting" | "pitching",
   season: number,
   gameType: GameType,
 ): Promise<TeamStatTable> {
-  const data = await mlb(
-    `/teams/stats?season=${season}&sportIds=1&group=${group}&stats=season&gameType=${gameType}`,
-    1800,
-  );
+  const [data, war] = await Promise.all([
+    mlb(
+      `/teams/stats?season=${season}&sportIds=1&group=${group}&stats=season&gameType=${gameType}`,
+      1800,
+    ),
+    seasonWar(season, group, gameType),
+  ]);
   const splits = (data.stats?.[0]?.splits ?? []) as any[];
-  const columns = cols(group);
+  const standard = cols(group);
+  /* Sortable here, unlike on the player board: this table does its own
+     ordering in the browser, over rows it already holds. */
+  const columns = [WAR_COL, ...standard];
   return {
     group,
     columns,
@@ -836,9 +885,10 @@ async function teamStatTable(
       return {
         id: s.team?.id,
         name: s.team?.name ?? "—",
-        values: Object.fromEntries(
-          columns.map((c) => [c.key, stat[c.key] ?? null]),
-        ),
+        values: {
+          ...Object.fromEntries(standard.map((c) => [c.key, stat[c.key] ?? null])),
+          war: warText(war.team.get(s.team?.id)),
+        },
       };
     }),
   };
@@ -874,6 +924,41 @@ export interface SearchHit {
 async function mlbTeams(): Promise<any[]> {
   const data = await mlb(`/teams?sportId=1`, 86400);
   return (data.teams ?? []) as any[];
+}
+
+/** One club, as the ABS org pickers list them: nickname, league, division. */
+export interface Club {
+  id: number;
+  name: string;
+  abbr: string;
+  leagueId: number;
+  division: string;
+}
+
+/**
+ * The thirty clubs, in scoreboard order — east to west down each league.
+ *
+ * Only the pickers that name clubs by id use this, so it carries the nickname
+ * rather than the full name: a checkbox grid of thirty "Los Angeles ..." reads
+ * as one column of Los Angeles.
+ */
+export async function getClubs(): Promise<Club[]> {
+  const teams = await mlbTeams();
+  return teams
+    .map((t) => ({
+      id: t.id as number,
+      name: (t.teamName ?? t.name ?? "") as string,
+      abbr: (t.abbreviation ?? "") as string,
+      leagueId: (t.league?.id ?? 0) as number,
+      divisionId: (t.division?.id ?? 0) as number,
+      division: DIVISIONS[t.division?.id] ?? "",
+    }))
+    .sort(
+      (a, b) =>
+        DIVISION_ORDER.indexOf(a.divisionId) -
+          DIVISION_ORDER.indexOf(b.divisionId) || a.name.localeCompare(b.name),
+    )
+    .map(({ divisionId: _divisionId, ...club }): Club => club);
 }
 
 /**
@@ -1153,11 +1238,56 @@ async function oneBoard(
   };
 }
 
+/**
+ * The WAR card, which the leaders endpoint can't serve — MLB publishes no WAR
+ * leader category, so this reads the sabermetrics feed instead. It arrives
+ * ranked by WAR already, over MLB's own qualified pool, which is the same
+ * pool every other card is drawn from.
+ *
+ */
+async function warBoard(
+  group: "hitting" | "pitching",
+  season: number,
+  limit: number,
+): Promise<Leaderboard> {
+  const data = await mlb(
+    `/stats?stats=sabermetrics&group=${group}&season=${season}&sportId=1&limit=${limit}`,
+    1800,
+  ).catch(() => null);
+  const splits = (data?.stats?.[0]?.splits ?? []) as any[];
+  return {
+    code: `${group}.war`,
+    label: "WAR",
+    group,
+    stat: "war",
+    leaders: splits.flatMap((s, i): LeaderRow[] => {
+      const war = teamStatNum(s.stat?.war);
+      return war === null
+        ? []
+        : [
+            {
+              rank: s.rank ?? i + 1,
+              personId: s.player?.id,
+              name: s.player?.fullName ?? "—",
+              team: s.team?.name ?? "",
+              value: SABER_FORMAT.war(war),
+            },
+          ];
+    }),
+  };
+}
+
 export async function getLeaderboards(
   season: number,
   limit = 20,
 ): Promise<Leaderboard[]> {
-  return Promise.all(LEADER_SPECS.map((s) => oneBoard(s, season, limit)));
+  return Promise.all([
+    /* WAR opens each group — it is the one figure on the page that answers
+       "who had the best season" rather than "who led one column". */
+    warBoard("hitting", season, limit),
+    warBoard("pitching", season, limit),
+    ...LEADER_SPECS.map((s) => oneBoard(s, season, limit)),
+  ]);
 }
 
 /* ── Player summary ─────────────────────────────────────────────────── */
@@ -1512,6 +1642,11 @@ export const PLAYER_FIELDING_COLS: TeamStatCol[] = [
 
 /* Innings are thirds: "121.2" is 121 innings and two outs, so they are added
    as outs and written back in the same form rather than as decimals. */
+/**
+ * Outs behind an innings figure. MLB writes innings in thirds — "7.1" is
+ * seven and a third, not seven and a tenth — so anything that adds or
+ * averages innings has to come through here first.
+ */
 const outsOf = (v: TeamStatValue): number => {
   const n = teamStatNum(v);
   if (n === null) return 0;
@@ -1645,11 +1780,17 @@ export async function getTeamPlayerStats(
 
 /** One line of the full player leaderboard — a stat table row with a rank. */
 export interface StatLeaderRow extends PlayerStatRow {
-  /** MLB's own rank in the sort, ties sharing a number. */
+  /** MLB's own rank in the sort, ties sharing a number — renumbered 1..n
+   *  where the board did its own ordering. */
   rank: number | null;
   team: string;
   teamId: number | null;
+  /** Clubs the player played for this season; >1 means a trade split it. */
+  teams: number;
 }
+
+/** Enough rows to hold any qualified pool — MLB's qualifier keeps it small. */
+const WHOLE_BOARD = 1000;
 
 export interface StatLeaderPage {
   rows: StatLeaderRow[];
@@ -1702,11 +1843,30 @@ export const pickLeaderOrder = (
 ): "asc" | "desc" | undefined =>
   raw === "asc" || raw === "desc" ? raw : undefined;
 
+/**
+ * WAR, wherever a table that isn't the career one shows it. MLB publishes no
+ * WAR of its own — the figure is a third-party derivation — so this is the
+ * FanGraphs number its sabermetrics feed carries, the same one the career
+ * table prints.
+ */
+export const WAR_COL: TeamStatCol = {
+  key: "war",
+  label: "WAR",
+  title: "Wins above replacement (FanGraphs, via MLB)",
+};
+
+/**
+ * The player board's columns: WAR ahead of the standard line. Fielding has no
+ * sabermetric line at all, so it has no column.
+ */
+export const leaderCols = (group: StatGroup): TeamStatCol[] =>
+  group === "fielding" ? playerCols(group) : [WAR_COL, ...playerCols(group)];
+
 export const pickLeaderStat = (
   raw: string | undefined,
   group: StatGroup,
 ): string =>
-  playerCols(group).some((c) => c.key === raw)
+  leaderCols(group).some((c) => c.key === raw)
     ? raw!
     : defaultLeaderStat(group);
 
@@ -1790,19 +1950,33 @@ export async function getStatLeaders({
    */
   order?: "asc" | "desc";
 }): Promise<StatLeaderPage> {
-  const data = await mlb(
-    `/stats?stats=season&group=${group}&season=${season}&sportId=1` +
-      `&gameType=${gameType}&playerPool=qualified&hydrate=team` +
-      `&sortStat=${stat}&limit=${limit}&offset=${offset}` +
-      (order ? `&order=${order}` : "") +
-      (league === "all" ? "" : `&leagueId=${league}`) +
-      (position === "all" ? "" : `&position=${position}`),
-    1800,
-  );
+  /*
+   * WAR is the one column MLB can't rank: it lives on a feed of its own, and
+   * the stats endpoint silently ignores `sortStat=war` rather than refusing
+   * it, which would leave the board in somebody else's order under WAR's
+   * heading. So a WAR sort asks for the whole qualified pool in one request
+   * and does the ordering here. That pool is a couple of hundred players —
+   * MLB's qualifier is what keeps it small — so this is one request either
+   * way, not a page's worth more.
+   */
+  const byWar = stat === "war";
+  const [data, war] = await Promise.all([
+    mlb(
+      `/stats?stats=season&group=${group}&season=${season}&sportId=1` +
+        `&gameType=${gameType}&playerPool=qualified&hydrate=team` +
+        `&sortStat=${byWar ? defaultLeaderStat(group) : stat}` +
+        `&limit=${byWar ? WHOLE_BOARD : limit}&offset=${byWar ? 0 : offset}` +
+        (order && !byWar ? `&order=${order}` : "") +
+        (league === "all" ? "" : `&leagueId=${league}`) +
+        (position === "all" ? "" : `&position=${position}`),
+      1800,
+    ),
+    seasonWar(season, group, gameType),
+  ]);
   const columns = playerCols(group);
   const board = data.stats?.[0];
   const splits = (board?.splits ?? []) as any[];
-  const rows = splits.map(
+  let rows = splits.map(
     (s): StatLeaderRow => ({
       rank: s.rank ?? null,
       id: s.player?.id,
@@ -1810,17 +1984,42 @@ export async function getStatLeaders({
       position: s.position?.abbreviation ?? "",
       team: s.team?.abbreviation ?? "",
       teamId: s.team?.id ?? null,
-      values: Object.fromEntries(
-        columns.map((c) => [c.key, s.stat?.[c.key] ?? null]),
-      ),
+      /* Carried so the trade lookup below can still find the multi-club
+         players after a WAR sort has moved them. */
+      teams: s.numTeams ?? 1,
+      values: {
+        ...Object.fromEntries(
+          columns.map((c) => [c.key, s.stat?.[c.key] ?? null]),
+        ),
+        /* WAR comes from a feed of its own, so it is joined on by player id
+           rather than read off this split. */
+        war: warText(war.player.get(s.player?.id)),
+      },
     }),
   );
+
+  if (byWar) {
+    /* Best first, like every other column's first click. A player the feed
+       has no WAR for sinks to the bottom in both directions rather than
+       reading as the worst season in the league. */
+    const sign = order === "asc" ? 1 : -1;
+    rows = rows
+      .sort((a, b) => {
+        const va = teamStatNum(a.values.war);
+        const vb = teamStatNum(b.values.war);
+        if (va === null) return vb === null ? 0 : 1;
+        if (vb === null) return -1;
+        return (va - vb) * sign;
+      })
+      .map((r, i) => ({ ...r, rank: i + 1 }))
+      .slice(offset, offset + limit);
+  }
 
   /* Only the handful a trade moved cost a request of their own, and a failed
      one leaves the club they finished the season on rather than no club. */
   await Promise.all(
-    rows.map(async (r, i) => {
-      if ((splits[i]?.numTeams ?? 1) < 2) return;
+    rows.map(async (r) => {
+      if (r.teams < 2) return;
       const stops = await tradedTeams(
         r.id,
         season,
@@ -3335,9 +3534,14 @@ export const gameLogCols = (
 ): { game: TeamStatCol[]; running: TeamStatCol[] } => {
   const rates = new Set(RATE_KEYS[group]);
   const cols = playerCols(group);
+  /* Every row of a game log is one game, so the games columns are a column of
+     1s and a column of 0s and 1s — they count seasons, not appearances, and
+     belong to a season line rather than to this one. */
+  const GAME_COUNTS = new Set(["gamesPlayed", "games", "gamesStarted"]);
+  const counted = cols.filter((c) => !GAME_COUNTS.has(c.key));
   return {
-    game: cols.filter((c) => !rates.has(c.key)),
-    running: cols.filter((c) => rates.has(c.key)),
+    game: counted.filter((c) => !rates.has(c.key)),
+    running: counted.filter((c) => rates.has(c.key)),
   };
 };
 

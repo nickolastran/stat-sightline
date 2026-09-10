@@ -113,7 +113,7 @@ export default function DataTable<T>({
                         {/* Marker hangs in the padding — see SortHeader. */}
                         <span className="relative inline-block -mr-[0.1em]">
                           {c.label}
-                          <span className="absolute left-full top-1/2 ml-1 w-2.5 -translate-y-1/2 text-center text-[11px] leading-none">
+                          <span className="absolute left-full top-1/2 w-2.5 -translate-y-1/2 text-center text-[11px] leading-none">
                             {active ? (sort!.dir === "desc" ? "▼" : "▲") : ""}
                           </span>
                         </span>

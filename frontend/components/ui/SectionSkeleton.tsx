@@ -73,6 +73,9 @@ export default function SectionSkeleton({ section }: { section: string }) {
         </div>
       );
 
+    case "abs":
+      return <SkeletonTable rows={16} heading={false} />;
+
     case "leaders":
       return (
         <div className="space-y-3">
