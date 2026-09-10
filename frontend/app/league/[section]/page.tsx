@@ -30,8 +30,8 @@ import {
   getTeamStats,
   getLeaderboards,
   getStatLeaders,
+  leaderCols,
   pickLeaderOrder,
-  playerCols,
   pickLeaderStat,
   pickPlayerGameType,
   LEADER_LEAGUES,
@@ -194,7 +194,7 @@ async function SectionBody({
       case "abs":
         return <AbsBoard board={await getAbsLeaders(season, abs)} type={abs.type} />;
       case "players": {
-        const columns = playerCols(players.group);
+        const columns = leaderCols(players.group);
         const board = await getStatLeaders({
           season,
           group: players.group,
