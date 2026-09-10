@@ -1547,6 +1547,11 @@ export const PLAYER_FIELDING_COLS: TeamStatCol[] = [
 
 /* Innings are thirds: "121.2" is 121 innings and two outs, so they are added
    as outs and written back in the same form rather than as decimals. */
+/**
+ * Outs behind an innings figure. MLB writes innings in thirds — "7.1" is
+ * seven and a third, not seven and a tenth — so anything that adds or
+ * averages innings has to come through here first.
+ */
 const outsOf = (v: TeamStatValue): number => {
   const n = teamStatNum(v);
   if (n === null) return 0;
@@ -3370,9 +3375,14 @@ export const gameLogCols = (
 ): { game: TeamStatCol[]; running: TeamStatCol[] } => {
   const rates = new Set(RATE_KEYS[group]);
   const cols = playerCols(group);
+  /* Every row of a game log is one game, so the games columns are a column of
+     1s and a column of 0s and 1s — they count seasons, not appearances, and
+     belong to a season line rather than to this one. */
+  const GAME_COUNTS = new Set(["gamesPlayed", "games", "gamesStarted"]);
+  const counted = cols.filter((c) => !GAME_COUNTS.has(c.key));
   return {
-    game: cols.filter((c) => !rates.has(c.key)),
-    running: cols.filter((c) => rates.has(c.key)),
+    game: counted.filter((c) => !rates.has(c.key)),
+    running: counted.filter((c) => rates.has(c.key)),
   };
 };
 
