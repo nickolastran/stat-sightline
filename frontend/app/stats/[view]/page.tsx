@@ -119,13 +119,22 @@ async function Body({
   try {
     if (view === "top")
       return <TopPerformers cards={await getTopPerformers(season)} />;
-    if (view === "custom")
+    if (view === "custom") {
+      /* Nothing chosen is a blank board, not a board of names — and not a
+         request to MLB and four to Savant for columns nobody asked for. */
+      if (custom.cols.length === 0)
+        return (
+          <p className="border border-line bg-bg px-3 py-6 text-center text-xs text-ink-3">
+            NO COLUMNS CHOSEN — PICK SOME ABOVE AND PRESS UPDATE
+          </p>
+        );
       return (
         <AdvancedTable
           board={await getCustomBoard(season, custom)}
           initial={custom.sort}
         />
       );
+    }
     return <AdvancedTable board={await getAdvBoard(view, season)} initial={sort} />;
   } catch {
     return (
@@ -201,6 +210,9 @@ export default async function AdvancedPage({
         <Views active={found.id} season={season} />
         {custom && (
           <CustomFilterBar
+            /* Remounted on what was applied, so the draft it holds starts
+               from the board actually on screen. */
+            key={`${season}-${Object.values(query).join("-")}`}
             query={query}
             season={season}
             current={current}

@@ -42,6 +42,7 @@ export default function ParamMultiSelect({
   label,
   value,
   keep = [],
+  onChange,
   groups,
   quick = [],
   cols = 1,
@@ -55,6 +56,9 @@ export default function ParamMultiSelect({
   /** Values of this same parameter that another picker owns — written back
    *  untouched, so the two don't overwrite each other. */
   keep?: string[];
+  /** Given, this is called with the whole new list instead of the parameter
+   *  being written — for a bar that stages its controls behind an UPDATE. */
+  onChange?: (values: string[]) => void;
   groups: MultiGroup[];
   /** One-click sets — "American League", "Top" — beside the CLEAR link. */
   quick?: { label: string; values: string[] }[];
@@ -94,13 +98,14 @@ export default function ParamMultiSelect({
   /* Written back in the order the pop-out lists them, not the order they were
      ticked, so the same selection is always the same link. */
   const commit = (next: Set<string>) => {
-    const joined = [
+    const values = [
       ...keep,
       ...all.filter((o) => next.has(o.value)).map((o) => o.value),
-    ].join("|");
+    ];
+    if (onChange) return onChange(values);
     /* Nothing ticked drops the parameter rather than setting it empty — an
        unfiltered board should have an unfiltered link. */
-    startTransition(() => setParam({ [param]: joined || null }));
+    startTransition(() => setParam({ [param]: values.join("|") || null }));
   };
 
   const toggle = (values: string[], on: boolean) => {

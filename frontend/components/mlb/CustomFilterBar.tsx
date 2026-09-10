@@ -1,13 +1,17 @@
+"use client";
+
+import { useState } from "react";
 import ParamSelect from "@/components/mlb/ParamSelect";
 import ParamMultiSelect, {
   type MultiGroup,
 } from "@/components/mlb/ParamMultiSelect";
-import SeasonSelect from "@/components/mlb/SeasonSelect";
+import { useSetParam } from "@/lib/useSetParam";
 import { LEADER_POSITIONS, type Club } from "@/lib/mlb";
 import {
   ADV_FIRST_SEASON,
   catalogFor,
   colGroups,
+  CUSTOM_DEFAULTS,
   CUSTOM_DIVISIONS,
   CUSTOM_GROUPS,
   CUSTOM_LEAGUES,
@@ -20,21 +24,24 @@ import {
  * Everything a custom board is built from: who is on it on the top bar, and
  * which figures it prints on the one below.
  *
+ * Nothing here navigates on its own. Every control writes to a draft held
+ * beside the applied query, and UPDATE sends the lot in one go — the board is
+ * a request to MLB and up to four to Savant, and a reader assembling a
+ * fifteen-column line would otherwise spend that fifteen times over on boards
+ * they were only passing through. It also makes a half-built selection
+ * harmless: ticking the first of five columns doesn't blank the table while
+ * you tick the rest.
+ *
  * The columns get a bar of their own, a picker per band, rather than one
  * COLUMNS pop-out holding all five. A single pop-out has to be as tall as the
  * standard line — thirty-three boxes — before it shows a reader the four
- * shorter bands at all, and it puts the choice of a batted-ball column behind
- * the same click as the choice of a club. Split, each band opens on its own
- * and the bar says at a glance how many of each are on the board.
+ * shorter bands at all. Split, each band opens on its own and the bar says at
+ * a glance how many of each are on the board.
  *
- * All five write the same `?cols=`, so each carries what the others picked:
- * see `keep` on ParamMultiSelect.
- *
- * A server component holding client controls, the same shape the ABS bar
- * takes — the club list behind the team picker is a cached MLB read, resolved
- * once here rather than fetched again in the browser — and it sits outside
- * the section's Suspense boundary, which is what lets a pop-out stay open
- * while the board it just filtered re-fetches behind it.
+ * The club list behind the team picker is a cached MLB read handed down from
+ * the page, so it costs nothing here, and the bar sits outside the section's
+ * Suspense boundary — which is what lets a pop-out stay open while the board
+ * behind it re-fetches.
  */
 
 /** Long bands are dealt into two columns; the short ones read as one list. */
@@ -70,6 +77,21 @@ function groupsOf(options: AdvCol[], columns: number): MultiGroup[] {
   }));
 }
 
+/** The thirty clubs, plus the unfiltered board they all sit under. */
+const teamOptions = (clubs: Club[]) => [
+  { value: "all", label: "ALL CLUBS" },
+  ...clubs.map((c) => ({ value: String(c.id), label: c.name.toUpperCase() })),
+];
+
+const yearOptions = (first: number, last: number) =>
+  Array.from({ length: last - first + 1 }, (_, i) => ({
+    value: String(last - i),
+    label: String(last - i),
+  }));
+
+/** What the draft is: the applied query, plus the season it was read at. */
+type Draft = CustomQuery & { season: number };
+
 export default function CustomFilterBar({
   query,
   season,
@@ -81,48 +103,108 @@ export default function CustomFilterBar({
   current: number;
   clubs: Club[];
 }) {
-  const catalogue = catalogFor(query.group);
-  const picked = new Set(query.cols);
+  const setParam = useSetParam();
+  /* Seeded once per applied query: the page keys this component on what it
+     applied, so an UPDATE that lands — or a reader going back — remounts it
+     with the draft already matching, rather than leaving an effect to notice
+     and undo itself. */
+  const [draft, setDraft] = useState<Draft>({ ...query, season });
+
+  const set = <K extends keyof Draft>(key: K, value: Draft[K]) =>
+    setDraft((d) => ({ ...d, [key]: value }));
+
+  const catalogue = catalogFor(draft.group);
+
+  /* Changing group changes what the columns even are, so the old picks would
+     be filtered away to nothing on the next read. Better the new group's own
+     opening line than a board that clears itself. */
+  const setGroup = (group: string) =>
+    setDraft((d) => ({
+      ...d,
+      group: group as CustomQuery["group"],
+      cols: CUSTOM_DEFAULTS[group as CustomQuery["group"]],
+    }));
+
+  /* Compared field by field rather than serialised: `sort` isn't a control,
+     and two objects that mean the same thing can still stringify apart. */
+  const pending =
+    draft.group !== query.group ||
+    draft.season !== season ||
+    draft.min !== query.min ||
+    draft.league !== query.league ||
+    draft.division !== query.division ||
+    draft.team !== query.team ||
+    draft.position !== query.position ||
+    draft.cols.join("|") !== query.cols.join("|");
+
+  const update = (e: React.FormEvent) => {
+    e.preventDefault();
+    setParam({
+      group: draft.group === "hitting" ? null : draft.group,
+      season: String(draft.season),
+      min: draft.min === "q" ? null : draft.min,
+      league: draft.league === "all" ? null : draft.league,
+      div: draft.division === "all" ? null : draft.division,
+      team: draft.team === "all" ? null : draft.team,
+      pos: draft.position === "all" ? null : draft.position,
+      /* Always written, even empty: an absent `cols` is a first visit and
+         opens on the default line, where an empty one is a reader who
+         cleared every box and means it. */
+      cols: draft.cols.join("|"),
+    });
+  };
 
   return (
-    <div className="mb-3 space-y-px">
+    <form onSubmit={update} className="mb-3 space-y-px">
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border border-line bg-bg px-3 py-2">
         <ParamSelect
           param="group"
           label="PLAYERS"
-          value={query.group}
+          value={draft.group}
           options={CUSTOM_GROUPS}
+          onChange={setGroup}
         />
-        <SeasonSelect value={season} first={ADV_FIRST_SEASON} last={current} />
+        <ParamSelect
+          param="season"
+          label="SEASON"
+          value={String(draft.season)}
+          options={yearOptions(ADV_FIRST_SEASON, current)}
+          onChange={(v) => set("season", Number(v))}
+        />
         <ParamSelect
           param="min"
           label="MINIMUM"
-          value={query.min}
+          value={draft.min}
           options={CUSTOM_MINS}
+          onChange={(v) => set("min", v)}
         />
         <ParamSelect
           param="league"
           label="LEAGUE"
-          value={query.league}
+          value={draft.league}
           options={CUSTOM_LEAGUES}
+          onChange={(v) => set("league", v)}
         />
         <ParamSelect
           param="div"
           label="DIVISION"
-          value={query.division}
+          value={draft.division}
           options={CUSTOM_DIVISIONS}
+          onChange={(v) => set("division", v)}
         />
         <ParamSelect
           param="team"
           label="CLUB"
-          value={query.team}
+          value={draft.team}
           options={teamOptions(clubs)}
+          onChange={(v) => set("team", v)}
         />
         <ParamSelect
           param="pos"
           label="POS"
-          value={query.position}
+          value={draft.position}
           options={LEADER_POSITIONS}
+          onChange={(v) => set("position", v)}
         />
       </div>
 
@@ -137,9 +219,10 @@ export default function CustomFilterBar({
               key={band.label}
               param="cols"
               label={band.label}
-              value={query.cols.filter((k) => mine.has(k))}
+              value={draft.cols.filter((k) => mine.has(k))}
               /* The other bands' picks, carried through this write. */
-              keep={query.cols.filter((k) => !mine.has(k))}
+              keep={draft.cols.filter((k) => !mine.has(k))}
+              onChange={(v) => set("cols", v)}
               groups={groupsOf(band.options, columns)}
               quick={[{ label: "ALL", values: keys }]}
               cols={columns}
@@ -151,18 +234,23 @@ export default function CustomFilterBar({
             />
           );
         })}
-        <span className="ml-auto text-[10px] tracking-wider text-ink-3 tabular-nums">
-          {picked.size} OF {catalogue.length} ON THE BOARD
+        <span className="ml-auto flex items-center gap-3">
+          <span className="text-[10px] tracking-wider text-ink-3 tabular-nums">
+            {draft.cols.length} OF {catalogue.length} CHOSEN
+          </span>
+          <button
+            type="submit"
+            disabled={!pending}
+            className={`border px-3 py-1 text-[10px] tracking-[0.2em] ${
+              pending
+                ? "border-accent bg-accent font-bold text-white hover:opacity-90"
+                : "border-line text-ink-3"
+            }`}
+          >
+            UPDATE
+          </button>
         </span>
       </div>
-    </div>
+    </form>
   );
-}
-
-/** The thirty clubs, plus the unfiltered board they all sit under. */
-function teamOptions(clubs: Club[]) {
-  return [
-    { value: "all", label: "ALL CLUBS" },
-    ...clubs.map((c) => ({ value: String(c.id), label: c.name.toUpperCase() })),
-  ];
 }

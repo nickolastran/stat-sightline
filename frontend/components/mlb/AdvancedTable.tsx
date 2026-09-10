@@ -20,19 +20,52 @@ import { colGroups, type AdvBoard, type ViewCol } from "@/lib/advanced";
  * The first click on a column takes its good end first — most barrels, but
  * lowest FIP — which is what "who leads this" means either way. A second
  * click reverses it.
+ *
+ * ── The chrome, which is most of what is going on below ──
+ *
+ * A board this wide has to freeze two things at once: the headings, so a
+ * column of numbers keeps its name, and the rank and player, so a row keeps
+ * its owner. Three things follow from that, none of them optional:
+ *
+ *  - `border-separate`. A cell that sticks in both axes at once does not
+ *    stick reliably in a `border-collapse` table — the corner and the two
+ *    frozen columns scroll away under the body while the plain headings stay
+ *    put. Separated borders behave, at the cost of every border being the
+ *    cell's own: a `<tr>`'s border isn't painted at all in this mode, so the
+ *    row rules live on the cells.
+ *  - `table-fixed` and a colgroup. The frozen columns are offset by hand
+ *    (`left-10` is the rank column's own width), so those widths have to be
+ *    declared rather than left to whatever the longest name in the board
+ *    happens to be.
+ *  - Opaque backgrounds and a z-order, everywhere. A sticky cell has the
+ *    table scrolling underneath it, so a tint over nothing shows the rows
+ *    through the heading — which is why the sorted column's highlight sits on
+ *    the button inside the cell and the cell itself stays solid.
  */
 
 /** Which way a column reads best first — the direction a first click takes. */
 const bestFirst = (c: ViewCol): "asc" | "desc" => c.best ?? "desc";
 
-/* The rank and name columns stay put while the figures scroll under them —
-   forty columns in, a row of numbers with no name on it is unreadable. The
-   backgrounds are opaque so the scrolled cells pass behind rather than
-   through. */
-const STUCK_RANK = "sticky left-0 z-20 bg-bg";
-const STUCK_NAME = "sticky left-10 z-20 bg-bg";
-const STUCK_HEAD_RANK = "sticky left-0 z-30 bg-surface";
-const STUCK_HEAD_NAME = "sticky left-10 z-30 bg-surface";
+/*
+ * The frozen columns. `left-10` is the rank column's declared width, so the
+ * two meet exactly; the panel behind the table is white, so these are
+ * `bg-surface` and not the page's own warm paper, which would print the
+ * frozen pair as a grey block down the side of the board.
+ *
+ * The z-order runs body < headings < frozen headings, so the corner where
+ * the two freezes cross covers both.
+ */
+const RANK_W = "w-10";
+const NAME_W = "w-64";
+const POS_W = "w-12";
+const STAT_W = "w-16";
+
+const FROZEN = "sticky bg-surface group-hover:bg-surface-2";
+const FROZEN_HEAD = "sticky z-30 bg-surface";
+const HEAD = "sticky z-20 bg-surface";
+/** The band row's declared height, and so the offset the headings sit at. */
+const BAND_H = "h-6";
+const HEAD_TOP = "top-6";
 
 export default function AdvancedTable({
   board,
@@ -67,24 +100,35 @@ export default function AdvancedTable({
 
   return (
     <div className="space-y-2">
-      <div className="overflow-auto border border-line" style={{ maxHeight: "42rem" }}>
-        <table className="border-collapse text-xs whitespace-nowrap">
+      <div
+        className="overflow-auto border border-line"
+        style={{ maxHeight: "42rem" }}
+      >
+        <table className="min-w-full table-fixed border-separate border-spacing-0 text-xs">
+          <colgroup>
+            <col className={RANK_W} />
+            <col className={NAME_W} />
+            {pos && <col className={POS_W} />}
+            {board.columns.map((c) => (
+              <col key={c.key} className={STAT_W} />
+            ))}
+          </colgroup>
           <thead>
             {/* The band row names where a run of columns comes from, so a
                 reader meeting xwOBA∆ knows it is Savant's and not MLB's. */}
             <tr>
               <th
                 colSpan={lead.length}
-                className={`${STUCK_HEAD_RANK} top-0 z-40 border-b border-r border-line px-3 py-1 text-left text-[10px] font-normal tracking-[0.2em] text-ink-3`}
+                className={`${FROZEN_HEAD} ${BAND_H} top-0 left-0 border-r border-b border-line`}
               >
-                &nbsp;
+                <span className="sr-only">Player</span>
               </th>
               {bands.map((b) => (
                 <th
                   key={b.label}
                   colSpan={b.span}
                   scope="colgroup"
-                  className="sticky top-0 z-10 border-b border-r border-line bg-surface-2 px-3 py-1 text-center text-[10px] font-normal tracking-[0.2em] text-ink-2 last:border-r-0"
+                  className={`${HEAD} ${BAND_H} top-0 border-r border-b border-line bg-surface-2 px-3 text-center text-[10px] font-normal tracking-[0.2em] text-ink-2 last:border-r-0`}
                 >
                   {b.label}
                 </th>
@@ -95,9 +139,11 @@ export default function AdvancedTable({
                 <th
                   key={h}
                   scope="col"
-                  className={`${i === 0 ? STUCK_HEAD_RANK : i === 1 ? STUCK_HEAD_NAME : "bg-surface"} sticky top-[25px] z-30 border-b border-line px-3 py-2 text-[10px] font-normal tracking-widest text-ink-3 ${
+                  className={`${FROZEN_HEAD} ${HEAD_TOP} ${
+                    i === 0 ? "left-0" : i === 1 ? "left-10" : ""
+                  } border-b border-line px-3 py-2 text-[10px] font-normal tracking-widest text-ink-3 ${
                     i === 1 ? "text-left" : "text-right"
-                  }`}
+                  } ${i === lead.length - 1 ? "border-r border-line" : ""}`}
                 >
                   {h}
                 </th>
@@ -115,16 +161,19 @@ export default function AdvancedTable({
                           : "descending"
                         : undefined
                     }
-                    className={`sticky top-[25px] z-10 border-b border-line p-0 text-right ${
-                      on ? "bg-accent/15" : "bg-surface"
-                    }`}
+                    className={`${HEAD} ${HEAD_TOP} border-b border-line p-0 text-right`}
                   >
                     <button
                       type="button"
                       title={on ? `${c.title} — click to reverse` : c.title}
                       onClick={() => onSort(c)}
+                      /* The highlight rides on the button rather than the
+                         cell: the cell has to stay opaque or the rows scroll
+                         through the heading. */
                       className={`w-full px-3 py-2 text-right text-[10px] tracking-widest ${
-                        on ? "text-ink" : "text-ink-3 hover:text-ink"
+                        on
+                          ? "bg-accent/15 text-ink"
+                          : "text-ink-3 hover:text-ink"
                       }`}
                     >
                       {/* The marker hangs in the cell padding so the label
@@ -153,16 +202,17 @@ export default function AdvancedTable({
               </tr>
             )}
             {rows.map((r, i) => (
-              <tr
-                key={`${r.id}-${r.position}`}
-                className="border-b border-grid last:border-b-0 hover:bg-surface-2"
-              >
+              <tr key={`${r.id}-${r.position}`} className="group">
                 <td
-                  className={`${STUCK_RANK} px-3 py-1.5 text-right tabular-nums text-ink-3`}
+                  className={`${FROZEN} left-0 z-10 border-b border-grid px-3 py-1.5 text-right tabular-nums text-ink-3`}
                 >
                   {i + 1}
                 </td>
-                <td className={`${STUCK_NAME} px-3 py-1.5`}>
+                <td
+                  className={`${FROZEN} left-10 z-10 overflow-hidden border-b border-grid px-3 py-1.5 whitespace-nowrap ${
+                    pos ? "" : "border-r border-line"
+                  }`}
+                >
                   <span className="flex items-center gap-2">
                     {r.team ? (
                       <>
@@ -177,9 +227,10 @@ export default function AdvancedTable({
                             className="h-[18px] w-[18px] shrink-0"
                           />
                         )}
-                        <PlayerLink id={r.id} headshot={false}>
-                          {r.name}
-                        </PlayerLink>
+                        {/* Club mark and face both, the way a leader card
+                            reads — the mark says which team, the face is
+                            what the eye picks the row out by. */}
+                        <PlayerLink id={r.id}>{r.name}</PlayerLink>
                         <span className="text-[10px] tracking-wider text-ink-3">
                           <TeamLink id={r.teamId} name={r.team} logo={false} />
                         </span>
@@ -191,14 +242,14 @@ export default function AdvancedTable({
                   </span>
                 </td>
                 {pos && (
-                  <td className="px-3 py-1.5 text-right text-[10px] tracking-wider text-ink-3">
+                  <td className="border-r border-b border-line border-b-grid px-3 py-1.5 text-right text-[10px] tracking-wider text-ink-3 group-hover:bg-surface-2">
                     {r.position || "—"}
                   </td>
                 )}
                 {board.columns.map((c) => (
                   <td
                     key={c.key}
-                    className={`px-3 py-1.5 text-right tabular-nums ${
+                    className={`border-b border-grid px-3 py-1.5 text-right tabular-nums group-hover:bg-surface-2 ${
                       c.key === sort?.key ? "bg-accent/10 text-ink" : "text-ink-2"
                     }`}
                   >

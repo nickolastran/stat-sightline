@@ -1208,7 +1208,7 @@ export const catalogFor = (group: StatGroup): AdvCol[] =>
       : [...standardCols(STD_FIELDING), ...FIELD_TRACKED];
 
 /** What a board opens on before anyone picks — a readable line, not forty. */
-const CUSTOM_DEFAULTS: Record<StatGroup, string[]> = {
+export const CUSTOM_DEFAULTS: Record<StatGroup, string[]> = {
   hitting: [
     "season.age",
     "season.plateAppearances",
@@ -1334,10 +1334,16 @@ export function pickCustomQuery(
   const group: StatGroup =
     sp.group === "pitching" || sp.group === "fielding" ? sp.group : "hitting";
   const known = new Set(catalogFor(group).map((c) => c.key));
-  const chosen = (sp.cols ?? "").split("|").filter((k) => known.has(k));
-  /* An empty pick is the default line rather than a board of names and
-     nothing else — clearing every box should still show a table. */
-  const picked = chosen.length ? chosen : CUSTOM_DEFAULTS[group];
+  /*
+   * No `?cols=` at all is a first visit, which opens on a readable line.
+   * `?cols=` present and empty is a reader who cleared every box, which is a
+   * board with nothing on it — the two are different answers and the empty
+   * string is what tells them apart.
+   */
+  const picked =
+    sp.cols === undefined
+      ? CUSTOM_DEFAULTS[group]
+      : sp.cols.split("|").filter((k) => known.has(k));
   return {
     group,
     cols: picked,

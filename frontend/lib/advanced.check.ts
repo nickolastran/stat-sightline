@@ -138,8 +138,13 @@ const picked = pickCustomQuery(
   clubs,
 );
 assert.deepEqual(picked.cols, ["season.era", "saber.fip", "season.homeRuns"]);
-// Clearing every box falls back to the default rather than a board of names.
-assert.ok(pickCustomQuery({ cols: "nonsense" }, clubs).cols.length >= 8);
+// No `?cols=` at all is a first visit and opens on the default line; a
+// `?cols=` that is present and empty is a reader who cleared every box, and
+// that board stays blank rather than quietly refilling itself.
+assert.ok(pickCustomQuery({}, clubs).cols.length >= 8);
+assert.deepEqual(pickCustomQuery({ cols: "" }, clubs).cols, []);
+assert.deepEqual(pickCustomQuery({ cols: "nonsense" }, clubs).cols, []);
+assert.equal(pickCustomQuery({ cols: "" }, clubs).sort, undefined);
 // A batting column can't be smuggled onto a pitching board.
 assert.ok(!picked.cols.includes("bat.avg_bat_speed"));
 
