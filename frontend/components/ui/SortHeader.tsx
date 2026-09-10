@@ -45,7 +45,7 @@ export default function SortHeader({
         type="button"
         onClick={() => onSort(sortKey)}
         title={title ?? label}
-        className={`w-full px-2 py-1.5 text-[10px] tracking-widest ${
+        className={`w-full px-2.5 py-1.5 text-[10px] tracking-widest ${
           ALIGN[align]
         } ${active ? "text-ink" : "text-ink-3 hover:text-ink"}`}
       >
@@ -53,12 +53,14 @@ export default function SortHeader({
          * The sort marker hangs in the cell padding rather than taking width in
          * the flow, so the label lands on the numbers below it instead of
          * sitting a marker-width to their left — and doesn't shift on sort.
+         * It has to *fit* that padding, though: given any gap of its own it
+         * spills past the cell edge and reads as the next column's marker.
          * The negative margin cancels the trailing letter-space `tracking`
          * adds after the last character, which the numbers don't carry.
          */}
         <span className="relative inline-block -mr-[0.1em]">
           {label}
-          <span className="absolute left-full top-1/2 ml-1 w-2.5 -translate-y-1/2 text-center text-[11px] leading-none">
+          <span className="absolute left-full top-1/2 w-2.5 -translate-y-1/2 text-center text-[11px] leading-none">
             {active ? (sort!.dir === "desc" ? "▼" : "▲") : ""}
           </span>
         </span>
