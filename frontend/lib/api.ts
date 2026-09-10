@@ -90,6 +90,60 @@ export async function getProjections(
   return res.json();
 }
 
+/* ── Playoff odds ───────────────────────────────────────────────────── */
+
+/**
+ * One club's line on the odds table. The four odds are shares, 0-1, of the
+ * simulated seasons: `clinchWildCard` is a berth that wasn't the division, so
+ * it and `winDivision` add up to `makePlayoffs` — which is how the table
+ * reads across.
+ */
+export interface TeamOdds {
+  team_id: number;
+  name: string;
+  league_id: number;
+  division_id: number;
+  division: string;
+  wins: number;
+  losses: number;
+  win_pct: number;
+  games_back: number;
+  games_remaining: number;
+  projected_wins: number;
+  projected_losses: number;
+  ros_win_pct: number;
+  strength_of_schedule: number;
+  win_division: number;
+  clinch_bye: number;
+  clinch_wild_card: number;
+  make_playoffs: number;
+  win_world_series: number;
+}
+
+export interface PlayoffOdds {
+  season: number;
+  as_of: string | null;
+  /** Drawn seasons behind every share above. */
+  simulations: number;
+  model: ProjectionModel;
+  teams: TeamOdds[];
+}
+
+/**
+ * Playoff odds for a season.
+ *
+ * Thousands of simulated seasons behind one call, so this is cached for half
+ * an hour like the projection it sits beside — the answer only moves as games
+ * go final. Called from server components.
+ */
+export async function getPlayoffOdds(season: number): Promise<PlayoffOdds> {
+  const res = await fetch(`${API_URL}/api/standings/odds?season=${season}`, {
+    next: { revalidate: 1800 },
+  });
+  if (!res.ok) throw new Error(`getPlayoffOdds failed: ${res.status}`);
+  return res.json();
+}
+
 /** `revalidate` seconds turns the lookup into a cached read — for the fixed
  *  seed lists that don't need to be fresh, unlike the live typeahead. */
 export async function searchPitchers(

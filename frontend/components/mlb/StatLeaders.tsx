@@ -141,9 +141,7 @@ export default function StatLeaders({
                           : "descending"
                         : undefined
                     }
-                    className={`sticky top-0 z-10 border-b border-line p-0 text-right ${
-                      active ? "bg-accent/15" : "bg-surface"
-                    }`}
+                    className="sticky top-0 z-10 border-b border-line bg-surface p-0 text-right"
                   >
                     <button
                       type="button"
@@ -153,8 +151,13 @@ export default function StatLeaders({
                           : c.title
                       }
                       onClick={() => sortBy(c.key)}
+                      /* The highlight rides on the button, not the cell: a
+                         tint is not opaque, and the rows scrolling under a
+                         sticky heading show straight through one. */
                       className={`w-full px-3 py-2 text-right text-[10px] tracking-widest ${
-                        active ? "text-ink" : "text-ink-3 hover:text-ink"
+                        active
+                          ? "bg-accent/15 text-ink"
+                          : "text-ink-3 hover:text-ink"
                       }`}
                     >
                       {/* Marker hangs in the padding so the label stays over
