@@ -132,7 +132,11 @@ export const seasonOf = (isoDate: string) => Number(isoDate.slice(0, 4));
  */
 export const FIRST_SEASON = 1876;
 
-async function mlb(path: string, revalidate: number): Promise<any> {
+/**
+ * One Stats API call. Exported so lib/advanced.ts can reach the same feeds
+ * through the same cache rather than opening a second client onto them.
+ */
+export async function mlb(path: string, revalidate: number): Promise<any> {
   const res = await fetch(`${BASE}${path}`, { next: { revalidate } });
   if (!res.ok) throw new Error(`MLB API ${res.status}: ${path}`);
   return res.json();
