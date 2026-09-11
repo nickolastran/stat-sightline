@@ -33,10 +33,14 @@ import { colGroups, type AdvBoard, type ViewCol } from "@/lib/advanced";
  *    put. Separated borders behave, at the cost of every border being the
  *    cell's own: a `<tr>`'s border isn't painted at all in this mode, so the
  *    row rules live on the cells.
- *  - `table-fixed` and a colgroup. The frozen columns are offset by hand
- *    (`left-10` is the rank column's own width), so those widths have to be
- *    declared rather than left to whatever the longest name in the board
- *    happens to be.
+ *  - `table-fixed`, a colgroup, and a width that isn't `auto`. The frozen
+ *    columns are offset by the running total of the ones before them, so
+ *    those widths have to be what the browser actually uses. A fixed-layout
+ *    table whose width is `auto` quietly falls back to automatic layout and
+ *    sizes every column to its own longest cell instead — which is why this
+ *    one is `w-max`. Without it the offsets are guesses that happen to be
+ *    close, and the frozen player column creeps over the rank beside it as
+ *    soon as a board runs past a hundred rows.
  *  - Opaque backgrounds and a z-order, everywhere. A sticky cell has the
  *    table scrolling underneath it, so a tint over nothing shows the rows
  *    through the heading — which is why the sorted column's highlight sits on
@@ -47,18 +51,23 @@ import { colGroups, type AdvBoard, type ViewCol } from "@/lib/advanced";
 const bestFirst = (c: ViewCol): "asc" | "desc" => c.best ?? "desc";
 
 /*
- * The frozen columns. `left-10` is the rank column's declared width, so the
- * two meet exactly; the panel behind the table is white, so these are
- * `bg-surface` and not the page's own warm paper, which would print the
- * frozen pair as a grey block down the side of the board.
+ * The column widths, in pixels, and the offsets the frozen ones sit at —
+ * which are nothing but the running total, kept here as arithmetic so the
+ * two can't drift. A sticky `left` that disagrees with the width of the
+ * column before it doesn't misalign, it overlaps: the player column slides
+ * over the last digit of the rank.
  *
- * The z-order runs body < headings < frozen headings, so the corner where
- * the two freezes cross covers both.
+ * `stat` is sized to the longest heading rather than the longest figure —
+ * RA9WAR is wider than any number under it, and a heading is the one thing
+ * on the board that must not be allowed to wrap or spill into its neighbour.
+ *
+ * The panel behind the table is white, so the frozen cells are `bg-surface`
+ * and not the page's own warm paper, which would print them as a grey block
+ * down the side of the board. The z-order runs body < headings < frozen
+ * headings, so the corner where the two freezes cross covers both.
  */
-const RANK_W = "w-10";
-const NAME_W = "w-64";
-const POS_W = "w-12";
-const STAT_W = "w-16";
+const W = { rank: 48, name: 256, pos: 48, stat: 80 };
+const LEFT = { rank: 0, name: W.rank, pos: W.rank + W.name };
 
 const FROZEN = "sticky bg-surface group-hover:bg-surface-2";
 const FROZEN_HEAD = "sticky z-30 bg-surface";
@@ -97,6 +106,10 @@ export default function AdvancedTable({
   /* A club has no position, so that heading would be a column of dashes. */
   const pos = board.rows.some((r) => r.position);
   const lead = pos ? ["RK", "NAME", "POS"] : ["RK", "NAME"];
+  const LEAD_LEFT = [LEFT.rank, LEFT.name, LEFT.pos];
+  /* Where the frozen columns end, and so where anything that has to stay
+     readable while the board scrolls has to stop. */
+  const frozen = LEFT.pos + (pos ? W.pos : 0);
 
   return (
     <div className="space-y-2">
@@ -104,13 +117,13 @@ export default function AdvancedTable({
         className="overflow-auto border border-line"
         style={{ maxHeight: "42rem" }}
       >
-        <table className="min-w-full table-fixed border-separate border-spacing-0 text-xs">
+        <table className="w-max min-w-full table-fixed border-separate border-spacing-0 text-xs">
           <colgroup>
-            <col className={RANK_W} />
-            <col className={NAME_W} />
-            {pos && <col className={POS_W} />}
+            <col style={{ width: W.rank }} />
+            <col style={{ width: W.name }} />
+            {pos && <col style={{ width: W.pos }} />}
             {board.columns.map((c) => (
-              <col key={c.key} className={STAT_W} />
+              <col key={c.key} style={{ width: W.stat }} />
             ))}
           </colgroup>
           <thead>
@@ -130,7 +143,16 @@ export default function AdvancedTable({
                   scope="colgroup"
                   className={`${HEAD} ${BAND_H} top-0 border-r border-b border-line bg-surface-2 px-3 text-center text-[10px] font-normal tracking-[0.2em] text-ink-2 last:border-r-0`}
                 >
-                  {b.label}
+                  {/* Centred in its band until the band starts leaving, then
+                      pinned at the frozen edge: a band a reader is halfway
+                      through would otherwise slide its own name under the
+                      player column and leave an unlabelled grey strip. */}
+                  <span
+                    className="sticky inline-block whitespace-nowrap"
+                    style={{ left: frozen }}
+                  >
+                    {b.label}
+                  </span>
                 </th>
               ))}
             </tr>
@@ -139,9 +161,8 @@ export default function AdvancedTable({
                 <th
                   key={h}
                   scope="col"
-                  className={`${FROZEN_HEAD} ${HEAD_TOP} ${
-                    i === 0 ? "left-0" : i === 1 ? "left-10" : ""
-                  } border-b border-line px-3 py-2 text-[10px] font-normal tracking-widest text-ink-3 ${
+                  style={{ left: LEAD_LEFT[i] }}
+                  className={`${FROZEN_HEAD} ${HEAD_TOP} border-b border-line px-3 py-2 text-[10px] font-normal tracking-widest text-ink-3 ${
                     i === 1 ? "text-left" : "text-right"
                   } ${i === lead.length - 1 ? "border-r border-line" : ""}`}
                 >
@@ -170,7 +191,7 @@ export default function AdvancedTable({
                       /* The highlight rides on the button rather than the
                          cell: the cell has to stay opaque or the rows scroll
                          through the heading. */
-                      className={`w-full px-3 py-2 text-right text-[10px] tracking-widest ${
+                      className={`w-full px-3 py-2 text-right text-[10px] tracking-widest whitespace-nowrap ${
                         on
                           ? "bg-accent/15 text-ink"
                           : "text-ink-3 hover:text-ink"
@@ -204,12 +225,14 @@ export default function AdvancedTable({
             {rows.map((r, i) => (
               <tr key={`${r.id}-${r.position}`} className="group">
                 <td
-                  className={`${FROZEN} left-0 z-10 border-b border-grid px-3 py-1.5 text-right tabular-nums text-ink-3`}
+                  style={{ left: LEFT.rank }}
+                  className={`${FROZEN} z-10 border-b border-grid px-3 py-1.5 text-right tabular-nums text-ink-3`}
                 >
                   {i + 1}
                 </td>
                 <td
-                  className={`${FROZEN} left-10 z-10 overflow-hidden border-b border-grid px-3 py-1.5 whitespace-nowrap ${
+                  style={{ left: LEFT.name }}
+                  className={`${FROZEN} z-10 overflow-hidden border-b border-grid px-3 py-1.5 whitespace-nowrap ${
                     pos ? "" : "border-r border-line"
                   }`}
                 >
@@ -242,7 +265,10 @@ export default function AdvancedTable({
                   </span>
                 </td>
                 {pos && (
-                  <td className="border-r border-b border-line border-b-grid px-3 py-1.5 text-right text-[10px] tracking-wider text-ink-3 group-hover:bg-surface-2">
+                  <td
+                    style={{ left: LEFT.pos }}
+                    className={`${FROZEN} z-10 border-r border-b border-line border-b-grid px-3 py-1.5 text-right text-[10px] tracking-wider text-ink-3`}
+                  >
                     {r.position || "—"}
                   </td>
                 )}
