@@ -16,6 +16,7 @@ import StatLeaders from "@/components/mlb/StatLeaders";
 import { Glossary } from "@/components/mlb/TeamPanels";
 import WildCard from "@/components/mlb/WildCard";
 import AbsBoard from "@/components/mlb/AbsBoard";
+import GameFeed from "@/components/mlb/GameFeed";
 import StandingsViews from "@/components/mlb/StandingsViews";
 import {
   LEAGUE_SECTIONS,
@@ -50,6 +51,7 @@ import {
 } from "@/lib/mlb";
 import AbsFilterBar from "@/components/mlb/AbsFilterBar";
 import { getAbsLeaders, pickAbsQuery, type AbsQuery } from "@/lib/abs";
+import { getGameFeed } from "@/lib/gamefeed";
 import { getProjections, type StandingsProjection } from "@/lib/api";
 
 /*
@@ -163,6 +165,8 @@ async function SectionBody({
         return (
           <Leaderboards boards={await getLeaderboards(season)} season={season} />
         );
+      case "gamefeed":
+        return <GameFeed feed={await getGameFeed(date)} />;
       case "probables":
         return <ProbablePitchers games={await getSchedule(date)} />;
       case "standings": {
@@ -265,6 +269,9 @@ export default async function LeagueSectionPage({
      Probables is today's slate only, so it reads no searchParams at all and
      stays statically prerenderable. */
   const scoreboard = found.id === "scoreboard";
+  /* The feed is one day's play, so it picks a day rather than a season — the
+     same control the scoreboard carries, over the same `?date=`. */
+  const dated = scoreboard || found.id === "gamefeed";
   const playerBoard = found.id === "players";
   /* The ABS boards are this season's only — the challenge system has no
      earlier regular season to show — so they pick a board, not a year. */
@@ -278,9 +285,9 @@ export default async function LeagueSectionPage({
   /* Spring training has no wild-card race of its own, and the leader boards
      are regular-season figures. */
   const typed = found.id === "standings" || found.id === "teams";
-  const sp = seasonal || scoreboard || absBoard ? await searchParams : {};
+  const sp = seasonal || dated || absBoard ? await searchParams : {};
   const season = seasonal ? pickSeason(sp.season, current) : current;
-  const date = scoreboard ? pickDate(sp.date, today) : today;
+  const date = dated ? pickDate(sp.date, today) : today;
   const gameType = typed ? pickGameType(sp.type) : "R";
   const group = pickGroup(sp.group);
   const players: PlayerQuery = {
@@ -313,7 +320,7 @@ export default async function LeagueSectionPage({
       <Panel
         title={found.title}
         right={
-          scoreboard ? (
+          dated ? (
             <ScoreboardDate value={date} today={today} />
           ) : absBoard ? (
             <span className="text-[10px] text-ink-3">{season}</span>
