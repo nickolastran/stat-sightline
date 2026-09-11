@@ -10,6 +10,7 @@
 export const LEAGUE_SECTIONS = [
   { id: "scoreboard", tab: "SCOREBOARD", title: "SCOREBOARD" },
   { id: "leaders", tab: "STAT LEADERS", title: "STAT LEADERS" },
+  { id: "gamefeed", tab: "GAME FEED", title: "GAME FEED" },
   { id: "probables", tab: "PROBABLES", title: "PROBABLE PITCHERS — TODAY" },
   { id: "standings", tab: "STANDINGS", title: "STANDINGS" },
   { id: "wildcard", tab: "WILD CARD", title: "WILD CARD RACE", inBar: false },
@@ -34,13 +35,21 @@ export const STANDINGS_VIEWS = [
 ] as const;
 
 /*
- * How much room across a section gets. The three that lay their content out in
- * cards rather than a table — the day's slate twice over, and the six leader
- * boards — fit another column of them on a wide screen, where a table would
- * only stretch its whitespace. Both the page and its loading placeholder read
- * this, so the skeleton lands at the width the content arrives at.
+ * How much room across a section gets. The ones that lay their content out in
+ * cards rather than a table — the day's slate twice over, the six leader
+ * boards, the day's tracked figures — fit another column of them on a wide
+ * screen, where a table would only stretch its whitespace. Both the page and
+ * its loading placeholder read this, so the skeleton lands at the width the
+ * content arrives at.
  */
-const WIDE = new Set(["scoreboard", "leaders", "probables", "players", "abs"]);
+const WIDE = new Set([
+  "scoreboard",
+  "leaders",
+  "gamefeed",
+  "probables",
+  "players",
+  "abs",
+]);
 
 export const sectionWidth = (id: string) =>
   WIDE.has(id) ? "max-w-[88rem]" : "max-w-7xl";
