@@ -2961,6 +2961,13 @@ export interface PlayProb {
   /** "top" or "bottom". */
   half: string;
   description: string;
+  /** MLB's own name for what happened — "strikeout", "home_run", "single". */
+  event: string;
+  /** Who threw the at-bat, for the marks that belong to a pitcher. */
+  pitcher: { id: number; name: string } | null;
+  /** Pitches thrown in the at-bat; the timeouts and substitutions the log
+   *  carries alongside them don't count. */
+  pitches: number;
   awayScore: number;
   homeScore: number;
   /** The home club's chance after the play, 0–100. */
@@ -2992,7 +2999,8 @@ const PLAY_FIELDS =
 
 const PROB_FIELDS =
   "about,inning,halfInning,result,description,awayScore,homeScore," +
-  "homeTeamWinProbability,eventType,playEvents,hitData,totalDistance";
+  "homeTeamWinProbability,eventType,matchup,pitcher,id,fullName," +
+  "playEvents,isPitch,hitData,totalDistance";
 
 const livePerson = (p: any) =>
   p?.id ? { id: p.id, name: p.fullName ?? "—" } : null;
@@ -3071,6 +3079,10 @@ export async function getLive(pk: number): Promise<LiveGame> {
         inning: p.about?.inning ?? 0,
         half: p.about?.halfInning ?? "",
         description: p.result?.description ?? "",
+        event: p.result?.eventType ?? "",
+        pitcher: livePerson(p.matchup?.pitcher),
+        pitches: ((p.playEvents ?? []) as any[]).filter((e) => e.isPitch)
+          .length,
         awayScore: p.result?.awayScore ?? 0,
         homeScore: p.result?.homeScore ?? 0,
         homeProb: p.homeTeamWinProbability ?? 50,
@@ -3165,6 +3177,44 @@ export function halfInnings(plays: PlayProb[]): HalfInning[] {
       (p.homeScore - (before?.homeScore ?? 0));
     half.plays.push(p);
   });
+  return out;
+}
+
+/**
+ * The three strikeouts of an immaculate inning, each with the line to fly
+ * over it.
+ *
+ * Nine pitches, nine strikes, three strikeouts, one pitcher — which is the
+ * same thing as a half-inning of exactly three strikeouts that each took
+ * exactly three pitches, since a three-pitch strikeout has no ball in it to
+ * begin with. Read off the half-innings the log is already cut into, so a
+ * pitching change mid-inning breaks it the way the rulebook does.
+ */
+export function immaculatePlays(plays: PlayProb[]): Map<PlayProb, string> {
+  const out = new Map<PlayProb, string>();
+  for (const half of halfInnings(plays)) {
+    const who = half.plays[0]?.pitcher;
+    if (
+      !who ||
+      half.plays.length !== 3 ||
+      !half.plays.every(
+        (p) =>
+          p.event === "strikeout" &&
+          p.pitches === 3 &&
+          p.pitcher?.id === who.id,
+      )
+    )
+      continue;
+    for (const p of half.plays)
+      out.set(
+        p,
+        `${who.name} · Three-pitch immaculate inning strikeout ${
+          /* MLB writes the third strike three ways: taken, swung through, and
+             tipped into the mitt — only the first of them is looking. */
+          /called out on strikes/i.test(p.description) ? "looking" : "swinging"
+        }`,
+      );
+  }
   return out;
 }
 

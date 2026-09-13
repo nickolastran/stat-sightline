@@ -18,6 +18,7 @@ import {
   gameStatus,
   gamesBack,
   halfInnings,
+  immaculatePlays,
   headToHead,
   inProgress,
   notStarted,
@@ -252,6 +253,9 @@ const play = (awayScore: number, homeScore: number, description = "x") =>
     inning: 1,
     half: "top",
     description,
+    event: "",
+    pitcher: null,
+    pitches: 0,
     awayScore,
     homeScore,
     homeProb: 50,
@@ -1215,3 +1219,76 @@ assert.equal(
   "October has no league line to measure against",
 );
 console.log("fillPlusLine ok");
+
+/*
+ * Nine pitches, nine strikes, one pitcher. Justin Martinez, top of the sixth
+ * against Texas on 11 September 2026 — two strikeouts swinging, then a third,
+ * and the log has to find all three of them or none.
+ */
+const k = (
+  pitches: number,
+  pitcherId: number,
+  description = "A B strikes out swinging.",
+  event = "strikeout",
+) =>
+  ({
+    inning: 6,
+    half: "top",
+    description,
+    event,
+    pitcher: { id: pitcherId, name: "Justin Martinez" },
+    pitches,
+    awayScore: 1,
+    homeScore: 4,
+    homeProb: 90,
+  }) as PlayProb;
+
+const nine = immaculatePlays([k(3, 1), k(3, 1), k(3, 1)]);
+assert.deepEqual(
+  [...nine.values()],
+  Array(3).fill(
+    "Justin Martinez · Three-pitch immaculate inning strikeout swinging",
+  ),
+  "all three strikeouts carry the line, not just the last",
+);
+assert.equal(
+  immaculatePlays([
+    k(3, 1),
+    k(3, 1),
+    k(3, 1, "Jake Burger called out on strikes."),
+  ]).size,
+  3,
+  "a third strike taken is still the ninth pitch of the inning",
+);
+assert.equal(
+  [
+    ...immaculatePlays([
+      k(3, 1),
+      k(3, 1),
+      k(3, 1, "Jake Burger called out on strikes."),
+    ]).values(),
+  ].at(-1),
+  "Justin Martinez · Three-pitch immaculate inning strikeout looking",
+  "each strikeout says how it ended",
+);
+assert.equal(
+  immaculatePlays([k(4, 1), k(3, 1), k(3, 1)]).size,
+  0,
+  "a ball, a foul, anything — ten pitches is not immaculate",
+);
+assert.equal(
+  immaculatePlays([k(3, 1), k(3, 2), k(3, 1)]).size,
+  0,
+  "a pitching change mid-inning means nobody threw it",
+);
+assert.equal(
+  immaculatePlays([k(3, 1), k(3, 1), k(3, 1, "x", "field_out")]).size,
+  0,
+  "three up three down on three pitches each is not three strikeouts",
+);
+assert.equal(
+  immaculatePlays([k(3, 1), k(3, 1), k(3, 1), k(3, 1)]).size,
+  0,
+  "a fourth batter means the third strike didn't end the inning",
+);
+console.log("immaculatePlays ok");

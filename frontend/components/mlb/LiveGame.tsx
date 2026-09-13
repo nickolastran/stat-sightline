@@ -13,6 +13,7 @@ import {
   getStandings,
   getTeamSchedule,
   halfInnings,
+  immaculatePlays,
   headToHead,
   inProgress,
   scoringPlays,
@@ -680,6 +681,9 @@ export function PlayByPlay({
   tabs?: React.ReactNode;
 }) {
   const scored = new Set(scoringPlays(plays));
+  /* Read off the whole log, not the filtered one — an immaculate inning puts
+     nobody on the board, so the scoring view would never see one. */
+  const immaculate = immaculatePlays(plays);
   /* Dropping the plays that didn't score leaves the scores untouched — a play
      that scored nothing carried the same figures as the one before it — so the
      halves still count their runs right off the filtered log. */
@@ -720,6 +724,11 @@ export function PlayByPlay({
                       {/* The at-bat under way is in the log with nothing to
                           say about itself yet. */}
                       {p.description || "AT BAT"}
+                      {immaculate.has(p) && (
+                        <span className="mt-0.5 block text-[10px] tracking-widest text-accent">
+                          {immaculate.get(p)}
+                        </span>
+                      )}
                     </span>
                     <span className="shrink-0 tabular-nums text-ink-3">
                       {p.awayScore}-{p.homeScore}
