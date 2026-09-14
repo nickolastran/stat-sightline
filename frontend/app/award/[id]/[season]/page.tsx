@@ -12,6 +12,7 @@ import {
   getAwardTable,
   isMajorAward,
   teamStatText,
+  voteShare,
   STAT_GROUP_LABEL,
   type AwardWinner,
   type StatGroup,
@@ -21,10 +22,10 @@ import {
 /*
  * One award, one season: everyone who took it and the line they took it on.
  *
- * MLB publishes winners and nothing else — there is no ballot in the feed, so
- * this page cannot say who finished second or by how many points. It says
- * what it can say: every winner, with the season he won it on marked where it
- * led something, off the same leader boards the career table's marks use.
+ * Where the BBWAA published a ballot — MVP, Cy Young and Rookie of the Year
+ * since 2003 — the page is the whole vote: where each man finished, on how
+ * many points, and the season he did it on. MLB's own feed carries only the
+ * winner, so every other award is that one line.
  *
  * Hitters and pitchers are separate tables. A Gold Glove page carries both,
  * and one table with a batting header over a pitcher's line would be worse
@@ -47,19 +48,42 @@ export async function generateMetadata({
 function WinnerTable({
   group,
   winners,
+  voted,
 }: {
   group: StatGroup;
   winners: AwardWinner[];
+  /* Whether these rows came off a ballot — the vote columns are the first
+     thing read on an award page and nothing else on it needs them. */
+  voted: boolean;
 }) {
   const columns: TeamStatCol[] = careerCols(group);
-  const head = ["PLAYER", "POS", "TEAM", "LG", ...columns.map((c) => c.label)];
+  const head = [
+    ...(voted ? ["RK"] : []),
+    "PLAYER",
+    "POS",
+    "TEAM",
+    "LG",
+    ...(voted ? ["PTS", "SHARE", "1ST"] : []),
+    ...columns.map((c) => c.label),
+  ];
   const id = "px-1 py-1 text-[12px] whitespace-nowrap border-r border-grid";
+  const num = `${id} text-right tabular-nums`;
 
   return (
     <Panel title={STAT_GROUP_LABEL[group]}>
-      <Table head={head} maxHeight="none" align={"llll"} dense>
+      <Table
+        head={head}
+        maxHeight="none"
+        align={`${voted ? "c" : ""}llll${voted ? "rrr" : ""}`}
+        dense
+      >
         {winners.map((w) => (
           <Row key={w.id}>
+            {voted && (
+              <td className={`${id} text-center font-bold text-ink`}>
+                {w.vote?.rank ?? "—"}
+              </td>
+            )}
             <td className={`${id} text-ink`}>
               <PlayerLink id={w.id}>{w.name}</PlayerLink>
             </td>
@@ -72,6 +96,15 @@ function WinnerTable({
               )}
             </td>
             <td className={`${id} text-ink-3`}>{w.league || "—"}</td>
+            {voted && (
+              <>
+                <td className={`${num} text-ink`}>{w.vote?.points ?? "—"}</td>
+                <td className={`${num} text-ink-2`}>
+                  {w.vote ? voteShare(w.vote) : "—"}
+                </td>
+                <td className={`${num} text-ink-2`}>{w.vote?.first || "—"}</td>
+              </>
+            )}
             {columns.map((c) => {
               const mark = w.led[c.key];
               return (
@@ -128,8 +161,10 @@ export default async function AwardPage({
             {table.season} {table.label.toUpperCase()}
           </h1>
           <p className="mt-2 text-[10px] tracking-widest text-ink-3">
-            {table.winners.length} WINNER
-            {table.winners.length === 1 ? "" : "S"}
+            {table.winners.length}{" "}
+            {table.voted
+              ? `PLAYER${table.winners.length === 1 ? "" : "S"} RECEIVING VOTES`
+              : `WINNER${table.winners.length === 1 ? "" : "S"}`}
             {table.date && ` · AWARDED ${table.date}`}
           </p>
         </div>
@@ -148,6 +183,7 @@ export default async function AwardPage({
             <WinnerTable
               key={g}
               group={g}
+              voted={table.voted}
               winners={table.winners.filter((w) => w.group === g)}
             />
           ))
@@ -156,9 +192,10 @@ export default async function AwardPage({
         <p className="border border-line bg-bg px-3 py-2 text-[10px] leading-5 text-ink-3">
           <span className="font-bold text-ink">BOLD</span> figures led the
           league. <span className="font-bold italic text-ink">BOLD ITALIC</span>{" "}
-          led all major leagues. MLB publishes the winner of a vote and not the
-          ballot, so the players who received votes without winning are not on
-          record here.
+          led all major leagues.{" "}
+          {table.voted
+            ? "Voting results are the BBWAA's own, published each November."
+            : "MLB publishes the winner of a vote and not the ballot, so the players who received votes without winning are not on record here."}
         </p>
 
         <div className="mt-3">

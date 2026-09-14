@@ -10,6 +10,10 @@
  */
 import assert from "node:assert/strict";
 import {
+  awardBallot,
+  ballotAwards,
+  ballotIndex,
+  voteShare,
   boardDir,
   clinchMark,
   clinchPhase,
@@ -1150,7 +1154,7 @@ console.log("wholeSeasonRow ok");
 
 /* ── lineAwards ─────────────────────────────────────────────────────── */
 
-/* The career line carries five awards and writes them in a fixed order, so a
+/* The career line carries six awards and writes them in a fixed order, so a
    season that won three of them reads the same way every time. Everything
    else a player won is a highlight, and belongs to the bio instead. */
 const award = (id: string, season = "2024"): PlayerAward => ({
@@ -1170,7 +1174,7 @@ assert.deepEqual(
     award("ALMVP"),
   ]).map((a) => a.id),
   ["ALAS", "ALMVP", "ALSS"],
-  "the five are kept and ordered; a ring and an All-MLB team are not among them",
+  "the six are kept and ordered; a ring and an All-MLB team are not among them",
 );
 assert.deepEqual(
   lineAwards([award("NLGG"), award("NLCY"), award("NLAS")]).map((a) => a.id),
@@ -1178,7 +1182,12 @@ assert.deepEqual(
   "the National League ids order the same way as the American",
 );
 assert.deepEqual(
-  lineAwards([award("WSMVP"), award("ALROY"), award("ALPG")]),
+  lineAwards([award("ALPG"), award("ALROY"), award("ALCY")]).map((a) => a.id),
+  ["ALCY", "ALROY"],
+  "Rookie of the Year rides the line, between the Cy Young and the Slugger",
+);
+assert.deepEqual(
+  lineAwards([award("WSMVP"), award("ALPG"), award("MLBSECOND")]),
   [],
   "a season of nothing but highlights leaves the column empty",
 );
@@ -1292,3 +1301,35 @@ assert.equal(
   "a fourth batter means the third strike didn't end the inning",
 );
 console.log("immaculatePlays ok");
+
+/*
+ * The ballot. `award-votes.json` is scraped, so the checks worth having are the
+ * ones that catch a bad scrape rather than bad arithmetic: a ballot that lost
+ * its shape reads as a wrong finish on a real career line.
+ */
+const mvp21 = awardBallot("ALMVP", 2021);
+assert.equal(mvp21[0]?.name, "Shohei Ohtani", "2021 AL MVP, unanimous");
+assert.equal(mvp21[0]?.rank, 1);
+assert.equal(voteShare(mvp21[0]), "100%", "30 first-place votes of 30");
+assert.deepEqual(
+  mvp21.slice(0, 3).map((v) => v.rank),
+  [1, 2, 3],
+  "the ballot comes back in finishing order",
+);
+assert.ok(
+  mvp21.every((v) => v.id > 0 && v.points > 0 && v.points <= v.max),
+  "every line has a player behind it and points inside the maximum",
+);
+/* Aaron Judge: ROY and second in the MVP vote in one season, which is the
+   case the career line exists to print — a win and a placement together. */
+const judge = ballotAwards(592450).filter((a) => a.season === "2017");
+assert.deepEqual(
+  judge.map((a) => a.short).sort(),
+  ["MVP-2", "ROY-1"],
+  "a placement reads as MVP-2, a win as ROY-1",
+);
+assert.ok(
+  ballotIndex()[0].season >= 2025 && ballotIndex().at(-1)?.season === 2003,
+  "the index runs newest first, back to the first season scraped",
+);
+console.log("awardBallot ok");

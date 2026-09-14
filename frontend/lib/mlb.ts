@@ -4,6 +4,8 @@
  * CORS or key concern. Everything here normalizes the raw payloads into the
  * small shapes the dashboard/games pages actually render.
  */
+import awardVotes from "@/data/award-votes.json";
+
 const BASE = "https://statsapi.mlb.com/api/v1";
 
 /** Division id → short name. These ids are fixed; no lookup needed. */
@@ -4405,10 +4407,19 @@ export async function getPlayerCareer(
      it goes on the line that is the whole season — the combined line where a
      trade split one, and the lone club's line otherwise. October's table is
      the same seasons over again and would say each award a second time. */
+  /* The ballot says the same thing the win does and more — where he finished
+     and on how many points — so a placement replaces the won award it covers,
+     and stands on its own for the seasons he polled without winning. */
+  const votes = ballotAwards(id);
+  const covered = new Set(votes.map((v) => `${v.id}:${v.season}`));
+  const all = [
+    ...awards.filter((a) => !covered.has(`${a.id}:${a.season}`)),
+    ...votes,
+  ];
   if (!postseason)
     for (const r of rows)
       if (!isSplitPart(rows, r))
-        r.awards = lineAwards(awards.filter((a) => a.season === r.season));
+        r.awards = lineAwards(all.filter((a) => a.season === r.season));
 
   /* The marks on the line. Only a regular season has leader boards, and a
      fielding line is not one anybody leads. */
@@ -5125,10 +5136,12 @@ const LINE_AWARDS: Record<string, number> = {
   NLMVP: 1,
   ALCY: 2,
   NLCY: 2,
-  ALSS: 3,
-  NLSS: 3,
-  ALGG: 4,
-  NLGG: 4,
+  ALROY: 3,
+  NLROY: 3,
+  ALSS: 4,
+  NLSS: 4,
+  ALGG: 5,
+  NLGG: 5,
 };
 
 /** The awards a career line carries, in the order it writes them. */
@@ -5176,6 +5189,98 @@ export async function getPlayerAwards(id: number): Promise<PlayerAward[]> {
   );
 }
 
+/* ── The ballot ─────────────────────────────────────────────────────── */
+
+/**
+ * One line of one award's voting: who, where he finished, and on how many
+ * points out of the most anyone could have had.
+ *
+ * MLB's feed names the winner and stops, so these come from the BBWAA's own
+ * published results, scraped into `data/award-votes.json` by
+ * `scripts/scrape_award_votes.py` — MVP, Cy Young and Rookie of the Year,
+ * both leagues, 2003 through 2025. Re-run it when a November's results post.
+ */
+export interface AwardVote {
+  /** MLB's award id, so a ballot line and a win are the same key — "ALMVP". */
+  award: string;
+  season: number;
+  /** Where he finished. Ties share a place, and the next man down skips one. */
+  rank: number;
+  id: number;
+  name: string;
+  /** The club as the ballot printed it — "Blue Jays". */
+  club: string;
+  points: number;
+  /** Every point on offer: the voters times what a first-place vote is worth. */
+  max: number;
+  /** First-place votes. */
+  first: number;
+}
+
+const VOTES = awardVotes as AwardVote[];
+
+/* Indexed once, the two ways it gets read: a whole ballot for an award page,
+   and one player's placements for his career line. A few thousand rows, so
+   this is a map build at first use rather than anything cleverer. */
+const ballots = new Map<string, AwardVote[]>();
+const byVoter = new Map<number, AwardVote[]>();
+for (const v of VOTES) {
+  push(ballots, `${v.award}:${v.season}`, v);
+  push(byVoter, v.id, v);
+}
+function push<K>(m: Map<K, AwardVote[]>, k: K, v: AwardVote) {
+  const at = m.get(k);
+  if (at) at.push(v);
+  else m.set(k, [v]);
+}
+
+/**
+ * Every season with a ballot on record and which awards it has — what the
+ * awards index is a list of. Newest first; a season missing an award is a page
+ * the BBWAA never posted under the slug the scraper knows.
+ */
+export const ballotIndex = (): { season: number; awards: string[] }[] => {
+  const by = new Map<number, string[]>();
+  for (const v of VOTES) {
+    const at = by.get(v.season) ?? [];
+    if (!at.includes(v.award)) at.push(v.award);
+    by.set(v.season, at);
+  }
+  return [...by]
+    .sort((a, b) => b[0] - a[0])
+    .map(([season, awards]) => ({
+      season,
+      awards: awards.sort(
+        (a, b) => (MAJOR_AWARDS[a]?.rank ?? 99) - (MAJOR_AWARDS[b]?.rank ?? 99) || a.localeCompare(b),
+      ),
+    }));
+};
+
+/** One award's whole ballot, best finish first. Empty where none was scraped. */
+export const awardBallot = (awardId: string, season: number): AwardVote[] =>
+  ballots.get(`${awardId}:${season}`) ?? [];
+
+/** "64%" — the share of the points on offer, the way a ballot prints it. */
+export const voteShare = (v: AwardVote): string =>
+  v.max > 0 ? `${Math.round((v.points / v.max) * 100)}%` : "—";
+
+/**
+ * A player's ballot placements as career-line awards — "MVP-2", "CY-4" — so a
+ * season he finished second in reads on the line beside the ones he won.
+ *
+ * A placement supersedes the won award of the same name: both say he took the
+ * 2022 MVP, but only the ballot line knows he did it on 410 of 420 points.
+ */
+export function ballotAwards(playerId: number): PlayerAward[] {
+  return (byVoter.get(playerId) ?? []).map((v) => ({
+    id: v.award,
+    season: String(v.season),
+    label: `${awardLabel(v.award)} — ${ordinal(v.rank)}, ${v.points} pts (${voteShare(v)})`,
+    short: `${v.award.slice(2)}-${v.rank}`,
+    rank: MAJOR_AWARDS[v.award]?.rank ?? 99,
+  }));
+}
+
 /** One player on an award's page: who he is, and the line he won it on. */
 export interface AwardWinner {
   id: number;
@@ -5188,6 +5293,8 @@ export interface AwardWinner {
   group: StatGroup;
   led: Record<string, LedScope>;
   values: Record<string, TeamStatValue>;
+  /** His line on the ballot, where one was published for this award. */
+  vote?: AwardVote;
 }
 
 export interface AwardTable {
@@ -5197,6 +5304,8 @@ export interface AwardTable {
   /** The date MLB recorded it, "" where it has none. */
   date: string;
   winners: AwardWinner[];
+  /** Whether the rows are a whole ballot or only the winners MLB publishes. */
+  voted: boolean;
 }
 
 /**
@@ -5221,16 +5330,24 @@ export async function getAwardTable(
     86400,
   ).catch(() => null);
   const given = (data?.awards ?? []) as any[];
+  /* Where the BBWAA published a ballot, the page is the ballot: everyone who
+     drew a vote, not the one man who won. */
+  const ballot = awardBallot(awardId, season);
   const base: AwardTable = {
     id: awardId,
     label: awardLabel(awardId),
     season: String(season),
     date: given[0]?.date ?? "",
     winners: [],
+    voted: ballot.length > 0,
   };
-  if (given.length === 0) return base;
+  if (given.length === 0 && ballot.length === 0) return base;
 
-  const ids = [...new Set(given.map((a) => a.player?.id).filter(Boolean))];
+  const votes = new Map(ballot.map((v) => [v.id, v]));
+  const ids =
+    ballot.length > 0
+      ? ballot.map((v) => v.id)
+      : [...new Set(given.map((a) => a.player?.id).filter(Boolean))];
   const people = await mlb(
     `/people?personIds=${ids.join(",")}&hydrate=` +
       encodeURIComponent(
@@ -5266,6 +5383,7 @@ export async function getAwardTable(
       group,
       led: {},
       values: Object.fromEntries(keys.map((k) => [k, split.stat?.[k] ?? null])),
+      vote: votes.get(p.id),
     });
   }
 
@@ -5298,12 +5416,16 @@ export async function getAwardTable(
 
   return {
     ...base,
-    /* A club's whole World Series roster comes back in no order at all; the
-       busiest line first is the one a reader wants at the top. */
-    winners: winners.sort(
-      (a, b) =>
-        (teamStatNum(b.values.plateAppearances ?? b.values.battersFaced) ?? 0) -
-        (teamStatNum(a.values.plateAppearances ?? a.values.battersFaced) ?? 0),
+    /* A ballot has its own order and it is the point of the page. Without one,
+       a club's whole World Series roster comes back in no order at all, and
+       the busiest line first is what a reader wants at the top. */
+    winners: winners.sort((a, b) =>
+      a.vote && b.vote
+        ? a.vote.rank - b.vote.rank
+        : (teamStatNum(b.values.plateAppearances ?? b.values.battersFaced) ??
+            0) -
+          (teamStatNum(a.values.plateAppearances ?? a.values.battersFaced) ??
+            0),
     ),
   };
 }
