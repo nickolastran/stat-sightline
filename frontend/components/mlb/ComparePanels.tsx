@@ -193,7 +193,7 @@ export function CompareTable({
                 <td
                   key={c.key}
                   title={c.title}
-                  className="border-r border-grid px-0.5 py-1 text-right text-[12px] tabular-nums text-ink-2 last:border-r-0"
+                  className="border-r border-grid pl-0.5 pr-2 py-1 text-right text-[12px] tabular-nums text-ink-2 last:border-r-0"
                 >
                   {values[e.id] ? teamStatText(values[e.id]![c.key]) : "—"}
                 </td>

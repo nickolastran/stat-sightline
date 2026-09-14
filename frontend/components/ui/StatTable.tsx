@@ -54,9 +54,19 @@ export function Table({
                 <th
                   key={i}
                   scope="col"
-                  className={`sticky top-0 z-10 border-b border-line bg-surface text-[10px] font-normal text-ink-3 ${
+                  className={`sticky top-0 z-10 border-b border-line bg-surface text-[10px] ${
+                    /* A dense table's heads carry the weight — twenty-odd
+                       columns need a line the eye can come back to. */
+                    dense ? "font-bold text-ink" : "font-normal text-ink-3"
+                  } ${
                     dense
-                      ? "px-0.5 py-1.5 text-[12px] tracking-wide border-r border-grid last:border-r-0"
+                      ? `py-1.5 text-[12px] tracking-wide border-r border-grid last:border-r-0 ${
+                          headAlign(align, i) === "text-right"
+                            ? /* Figures sit in off the right rule rather than
+                                 against it; the head follows them. */
+                              "pl-0.5 pr-2"
+                            : "px-1"
+                        }`
                       : "px-3 py-2 tracking-widest"
                   } ${headAlign(align, i)}`}
                 >
