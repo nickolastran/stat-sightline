@@ -4,9 +4,9 @@ import Panel from "@/components/ui/Panel";
 import { awardLabel, ballotIndex } from "@/lib/mlb";
 
 /*
- * The awards index: every season the BBWAA's voting is on record for, and the
- * six ballots inside it. The award pages themselves carry the vote; this is
- * the way into a year of them.
+ * The awards index: every season the BBWAA's voting is on record for, and
+ * which of the eight ballots that season has. A season is one page, so this
+ * is the way into a year rather than into an award.
  */
 
 export const metadata: Metadata = {
@@ -39,14 +39,17 @@ export default function AwardIndexPage() {
                 key={season}
                 className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2 hover:bg-surface-2"
               >
-                <span className="w-12 shrink-0 text-[13px] font-bold tabular-nums text-ink">
+                <Link
+                  href={`/award/${season}`}
+                  className="w-12 shrink-0 text-[13px] font-bold tabular-nums text-accent hover:underline"
+                >
                   {season}
-                </span>
+                </Link>
                 {awards.map((id) => (
                   <Link
                     key={id}
-                    href={`/award/${id}/${season}`}
-                    className="text-[12px] tracking-wide text-accent hover:underline"
+                    href={`/award/${season}#${id}`}
+                    className="text-[12px] tracking-wide text-ink-3 hover:text-accent hover:underline"
                   >
                     {awardLabel(id).toUpperCase()}
                   </Link>
@@ -58,7 +61,7 @@ export default function AwardIndexPage() {
 
         <p className="border border-line bg-bg px-3 py-2 text-[10px] leading-5 text-ink-3">
           Voting results are the BBWAA&apos;s own. MLB&apos;s feed publishes the
-          winner of a vote and not the ballot, so awards outside these six —
+          winner of a vote and not the ballot, so awards outside these eight —
           Gold Gloves, Silver Sluggers, the postseason awards — have a page per
           season but list winners only.
         </p>

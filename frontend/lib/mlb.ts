@@ -5105,6 +5105,8 @@ const MAJOR_AWARDS: Record<
   NLCY: { label: "NL Cy Young", short: "CY-1", rank: 4 },
   ALROY: { label: "AL Rookie of the Year", short: "ROY-1", rank: 5 },
   NLROY: { label: "NL Rookie of the Year", short: "ROY-1", rank: 5 },
+  ALMOY: { label: "AL Manager of the Year", short: "MOY-1", rank: 5.5 },
+  NLMOY: { label: "NL Manager of the Year", short: "MOY-1", rank: 5.5 },
   ALPG: { label: "AL Platinum Glove", short: "PG", rank: 6, pos: true },
   NLPG: { label: "NL Platinum Glove", short: "PG", rank: 6, pos: true },
   ALSS: { label: "AL Silver Slugger", short: "SS", rank: 7, pos: true },
@@ -5206,7 +5208,8 @@ export interface AwardVote {
   season: number;
   /** Where he finished. Ties share a place, and the next man down skips one. */
   rank: number;
-  id: number;
+  /** The player behind the name. Null on a manager, who has no player page. */
+  id: number | null;
   name: string;
   /** The club as the ballot printed it — "Blue Jays". */
   club: string;
@@ -5215,6 +5218,16 @@ export interface AwardVote {
   max: number;
   /** First-place votes. */
   first: number;
+  /* A manager is his club, so his row is the club's season instead of a stat
+     line: these are set on Manager of the Year ballots and nowhere else. */
+  teamId?: number;
+  team?: string;
+  w?: number;
+  l?: number;
+  ties?: number;
+  g?: number;
+  pct?: string;
+  finish?: number | null;
 }
 
 const VOTES = awardVotes as AwardVote[];
@@ -5226,7 +5239,7 @@ const ballots = new Map<string, AwardVote[]>();
 const byVoter = new Map<number, AwardVote[]>();
 for (const v of VOTES) {
   push(ballots, `${v.award}:${v.season}`, v);
-  push(byVoter, v.id, v);
+  if (v.id !== null) push(byVoter, v.id, v);
 }
 function push<K>(m: Map<K, AwardVote[]>, k: K, v: AwardVote) {
   const at = m.get(k);
@@ -5281,6 +5294,274 @@ export function ballotAwards(playerId: number): PlayerAward[] {
   }));
 }
 
+/* ── A season's ballots ─────────────────────────────────────────────── */
+
+/* What the voting tables print beside the votes. A ballot mixes hitters and
+   arms, so an MVP or Rookie row carries both lines and leaves the half the
+   player doesn't have blank — the reduced sets here are what a voting table
+   shows rather than the whole career line, which would run off the page twice
+   over. The Cy Young is arms only and takes the full pitching line. */
+const pick = (cols: TeamStatCol[], keys: string[]): TeamStatCol[] =>
+  keys.map((k) => cols.find((c) => c.key === k)!).filter(Boolean);
+
+export const BALLOT_HITTING_COLS = pick(CAREER_HITTING_COLS, [
+  "war",
+  "gamesPlayed",
+  "atBats",
+  "runs",
+  "hits",
+  "homeRuns",
+  "rbi",
+  "stolenBases",
+  "baseOnBalls",
+  "avg",
+  "obp",
+  "slg",
+  "ops",
+]);
+
+/** The Cy Young line: the whole arm, without the per-nine rates a vote is
+    never argued on and which would push the table off the page. */
+export const BALLOT_CY_COLS = pick(CAREER_PITCHING_COLS, [
+  "war",
+  "wins",
+  "losses",
+  "winPercentage",
+  "era",
+  "gamesPlayed",
+  "gamesStarted",
+  "gamesFinished",
+  "completeGames",
+  "shutouts",
+  "saves",
+  "inningsPitched",
+  "hits",
+  "runs",
+  "earnedRuns",
+  "homeRuns",
+  "baseOnBalls",
+  "intentionalWalks",
+  "strikeOuts",
+  "hitBatsmen",
+  "balks",
+  "wildPitches",
+  "battersFaced",
+  "whip",
+  "eraPlus",
+]);
+
+export const BALLOT_PITCHING_COLS = pick(CAREER_PITCHING_COLS, [
+  "wins",
+  "losses",
+  "era",
+  "whip",
+  "gamesPlayed",
+  "gamesStarted",
+  "saves",
+  "inningsPitched",
+  "hits",
+  "homeRuns",
+  "baseOnBalls",
+  "strikeOuts",
+]);
+
+/** A manager's row: not a stat line at all, but his club's season. */
+export const BALLOT_MANAGER_COLS: TeamStatCol[] = [
+  { key: "w", label: "W", title: "Club wins" },
+  { key: "l", label: "L", title: "Club losses" },
+  { key: "pct", label: "W-L%", title: "Club winning percentage" },
+  { key: "ties", label: "TIES", title: "Games that ended tied" },
+  { key: "g", label: "G", title: "Games played" },
+  { key: "finish", label: "FINISH", title: "Where the club finished in its division" },
+];
+
+/** One line of one voting table: the vote, and the season behind it. */
+export interface BallotRow {
+  vote: AwardVote;
+  /** "—" until the player is resolved; a manager keeps his club's. */
+  pos: string;
+  team: string;
+  teamId: number | null;
+  league: string;
+  /** Both lines, so one table can carry hitters and pitchers side by side. */
+  hitting: Record<string, TeamStatValue> | null;
+  pitching: Record<string, TeamStatValue> | null;
+  /** Keyed "<group>:<stat>", since both halves have a G and an H. */
+  led: Record<string, LedScope>;
+}
+
+export interface Ballot {
+  award: string;
+  label: string;
+  /** Which columns the table carries beside the votes. */
+  kind: "player" | "pitcher" | "manager";
+  rows: BallotRow[];
+}
+
+/* The order a season's awards are read in — the two leagues of each award
+   together, the way the vote is announced. */
+const BALLOT_ORDER = [
+  "ALMVP",
+  "NLMVP",
+  "ALCY",
+  "NLCY",
+  "ALROY",
+  "NLROY",
+  "ALMOY",
+  "NLMOY",
+];
+
+/**
+ * Every ballot of one season, with the line each man polled on.
+ *
+ * The whole year is one page, so the season lines are fetched once for all
+ * eight ballots rather than per award: one `personIds` call for everyone who
+ * drew a vote anywhere, one sabermetrics board per group for their WAR, and
+ * the leader boards the bold marks come off. A manager needs none of it — his
+ * club's record was scraped alongside his votes.
+ */
+export async function getSeasonBallots(season: number): Promise<Ballot[]> {
+  const found = BALLOT_ORDER.map((award) => ({
+    award,
+    votes: awardBallot(award, season),
+  })).filter((b) => b.votes.length > 0);
+  if (found.length === 0) return [];
+
+  const ids = [
+    ...new Set(
+      found.flatMap((b) => b.votes.map((v) => v.id).filter((i) => i !== null)),
+    ),
+  ] as number[];
+
+  const [people, hitWar, pitchWar] = await Promise.all([
+    ids.length > 0
+      ? mlb(
+          `/people?personIds=${ids.join(",")}&hydrate=` +
+            encodeURIComponent(
+              `stats(group=[hitting,pitching],type=[season],season=${season})`,
+            ),
+          86400,
+        ).catch(() => null)
+      : null,
+    seasonWar(season, "hitting"),
+    seasonWar(season, "pitching"),
+  ]);
+
+  const hitKeys = statLineKeys("hitting");
+  const pitchKeys = statLineKeys("pitching");
+  const line = (split: any, keys: string[]) =>
+    Object.fromEntries(keys.map((k) => [k, split.stat?.[k] ?? null]));
+
+  /* A season split names its club but not always in three letters, and the
+     column has room for nothing else. */
+  const abbr = new Map(
+    (await mlbTeams().catch(() => [])).map((t: any) => [t.id, t.abbreviation]),
+  );
+
+  const seen = new Map<number, BallotRow>();
+  for (const p of (people?.people ?? []) as any[]) {
+    const lines = (p.stats ?? []) as any[];
+    const at = (name: string) =>
+      lines.find((s) => s.group?.displayName === name)?.splits?.[0];
+    const hit = at("hitting");
+    const pitch = at("pitching");
+    const where = hit ?? pitch;
+    seen.set(p.id, {
+      vote: null as unknown as AwardVote,
+      pos: p.primaryPosition?.abbreviation ?? "",
+      team:
+        abbr.get(where?.team?.id) ??
+        where?.team?.abbreviation ??
+        where?.team?.name ??
+        "—",
+      teamId: where?.team?.id ?? null,
+      league: leagueAbbr(where?.league?.id),
+      /* A pitcher's own at-bats are not what he polled on, and a hitter's odd
+         mop-up inning isn't either — a line is kept only where it is the
+         reason he is on the ballot at all. */
+      hitting: hit && !isArm(p, hit, pitch) ? line(hit, hitKeys) : null,
+      pitching: pitch ? line(pitch, pitchKeys) : null,
+      led: {},
+    });
+    /* WAR comes off the season's own board rather than a request per player —
+       eight ballots is a hundred names, and the board is two calls. */
+    const arm = isArm(p, hit, pitch);
+    const war = (arm ? pitchWar : hitWar).player.get(p.id);
+    const target = arm ? seen.get(p.id)!.pitching : seen.get(p.id)!.hitting;
+    if (target && war !== undefined) target.war = SABER_FORMAT.war(war);
+  }
+
+  /* ERA+ is figured here off the season's league line, the way the career
+     table figures it — the feed carries no such column.
+     ponytail: unparked, so a figure is a few points off a park-adjusted one;
+     weight it by parkFactor() if the difference ever matters. */
+  const arms = await leagueRates(season, "pitching").catch(() => null);
+  if (arms)
+    for (const r of seen.values())
+      if (r.pitching)
+        r.pitching.eraPlus = eraPlus(r.pitching, arms.get(leagueIdOf(r.league)));
+
+  /* One board per group and league actually on the page, for the marks that
+     say a figure led something. */
+  const leagues = [
+    ...new Set(
+      [...seen.values()]
+        .map((r) => leagueIdOf(r.league))
+        .filter((id): id is number => id !== null),
+    ),
+  ];
+  const boards = new Map(
+    await Promise.all(
+      (["hitting", "pitching"] as const).map(
+        async (g) =>
+          [g, await seasonLeaders(season, g, leagues).catch(() => new Map())] as const,
+      ),
+    ),
+  );
+  for (const r of seen.values()) {
+    const lg = leagueIdOf(r.league);
+    if (r.hitting)
+      for (const [k, v] of Object.entries(
+        ledMarks("hitting", r.hitting, boards.get("hitting")!, lg),
+      ))
+        r.led[`hitting:${k}`] = v;
+    if (r.pitching)
+      for (const [k, v] of Object.entries(
+        ledMarks("pitching", r.pitching, boards.get("pitching")!, lg),
+      ))
+        r.led[`pitching:${k}`] = v;
+  }
+
+  return found.map(({ award, votes }) => ({
+    award,
+    label: awardLabel(award),
+    kind: award.endsWith("MOY")
+      ? ("manager" as const)
+      : award.endsWith("CY")
+        ? ("pitcher" as const)
+        : ("player" as const),
+    rows: votes.map((vote) => {
+      const found = vote.id === null ? undefined : seen.get(vote.id);
+      return found
+        ? { ...found, vote }
+        : {
+            vote,
+            pos: "",
+            team: vote.team ?? vote.club,
+            teamId: vote.teamId ?? null,
+            league: "",
+            hitting: null,
+            pitching: null,
+            led: {},
+          };
+    }),
+  }));
+}
+
+/** Whether the line he polled on is the one he threw. */
+const isArm = (p: any, hit: any, pitch: any): boolean =>
+  !!pitch && (p.primaryPosition?.abbreviation === "P" || !hit);
+
 /** One player on an award's page: who he is, and the line he won it on. */
 export interface AwardWinner {
   id: number;
@@ -5293,8 +5574,6 @@ export interface AwardWinner {
   group: StatGroup;
   led: Record<string, LedScope>;
   values: Record<string, TeamStatValue>;
-  /** His line on the ballot, where one was published for this award. */
-  vote?: AwardVote;
 }
 
 export interface AwardTable {
@@ -5304,8 +5583,6 @@ export interface AwardTable {
   /** The date MLB recorded it, "" where it has none. */
   date: string;
   winners: AwardWinner[];
-  /** Whether the rows are a whole ballot or only the winners MLB publishes. */
-  voted: boolean;
 }
 
 /**
@@ -5330,24 +5607,16 @@ export async function getAwardTable(
     86400,
   ).catch(() => null);
   const given = (data?.awards ?? []) as any[];
-  /* Where the BBWAA published a ballot, the page is the ballot: everyone who
-     drew a vote, not the one man who won. */
-  const ballot = awardBallot(awardId, season);
   const base: AwardTable = {
     id: awardId,
     label: awardLabel(awardId),
     season: String(season),
     date: given[0]?.date ?? "",
     winners: [],
-    voted: ballot.length > 0,
   };
-  if (given.length === 0 && ballot.length === 0) return base;
+  if (given.length === 0) return base;
 
-  const votes = new Map(ballot.map((v) => [v.id, v]));
-  const ids =
-    ballot.length > 0
-      ? ballot.map((v) => v.id)
-      : [...new Set(given.map((a) => a.player?.id).filter(Boolean))];
+  const ids = [...new Set(given.map((a) => a.player?.id).filter(Boolean))];
   const people = await mlb(
     `/people?personIds=${ids.join(",")}&hydrate=` +
       encodeURIComponent(
@@ -5383,7 +5652,6 @@ export async function getAwardTable(
       group,
       led: {},
       values: Object.fromEntries(keys.map((k) => [k, split.stat?.[k] ?? null])),
-      vote: votes.get(p.id),
     });
   }
 
@@ -5416,16 +5684,12 @@ export async function getAwardTable(
 
   return {
     ...base,
-    /* A ballot has its own order and it is the point of the page. Without one,
-       a club's whole World Series roster comes back in no order at all, and
-       the busiest line first is what a reader wants at the top. */
-    winners: winners.sort((a, b) =>
-      a.vote && b.vote
-        ? a.vote.rank - b.vote.rank
-        : (teamStatNum(b.values.plateAppearances ?? b.values.battersFaced) ??
-            0) -
-          (teamStatNum(a.values.plateAppearances ?? a.values.battersFaced) ??
-            0),
+    /* A club's whole World Series roster comes back in no order at all; the
+       busiest line first is the one a reader wants at the top. */
+    winners: winners.sort(
+      (a, b) =>
+        (teamStatNum(b.values.plateAppearances ?? b.values.battersFaced) ?? 0) -
+        (teamStatNum(a.values.plateAppearances ?? a.values.battersFaced) ?? 0),
     ),
   };
 }

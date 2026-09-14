@@ -1317,7 +1317,7 @@ assert.deepEqual(
   "the ballot comes back in finishing order",
 );
 assert.ok(
-  mvp21.every((v) => v.id > 0 && v.points > 0 && v.points <= v.max),
+  mvp21.every((v) => (v.id ?? 0) > 0 && v.points > 0 && v.points <= v.max),
   "every line has a player behind it and points inside the maximum",
 );
 /* Aaron Judge: ROY and second in the MVP vote in one season, which is the
@@ -1331,5 +1331,19 @@ assert.deepEqual(
 assert.ok(
   ballotIndex()[0].season >= 2025 && ballotIndex().at(-1)?.season === 2003,
   "the index runs newest first, back to the first season scraped",
+);
+/* A manager has no player page and no stat line — his row is his club's
+   season, which is the whole reason it carries different fields. */
+const moy24 = awardBallot("ALMOY", 2024);
+assert.equal(moy24[0]?.name, "Stephen Vogt");
+assert.equal(moy24[0]?.id, null, "there is no player behind a manager's name");
+assert.deepEqual(
+  [moy24[0]?.team, moy24[0]?.w, moy24[0]?.l, moy24[0]?.finish],
+  ["CLE", 92, 69, 1],
+  "the club's record rides on the vote",
+);
+assert.ok(
+  ballotAwards(592450).every((a) => !a.id.endsWith("MOY")),
+  "a manager's ballot never lands on a player's career line",
 );
 console.log("awardBallot ok");

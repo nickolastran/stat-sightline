@@ -109,6 +109,18 @@ const careerCells = (
  * The row underneath is selectable, so a click here must not also pick a span;
  * the row's own handler ignores anything inside a link, which these are.
  */
+/** The awards with a published ballot, which live on their season's page. */
+const VOTED = new Set([
+  "ALMVP",
+  "NLMVP",
+  "ALCY",
+  "NLCY",
+  "ALROY",
+  "NLROY",
+  "ALMOY",
+  "NLMOY",
+]);
+
 function AwardMarks({ awards }: { awards: PlayerAward[] }) {
   if (awards.length === 0) return null;
   return (
@@ -116,7 +128,13 @@ function AwardMarks({ awards }: { awards: PlayerAward[] }) {
       {awards.map((a, i) => (
         <Link
           key={`${a.id}-${a.season}`}
-          href={`/award/${a.id}/${a.season}`}
+          href={
+            /* A vote is read as part of its season — the ballot he placed on
+               sits on that year's page, beside the seven others. */
+            VOTED.has(a.id)
+              ? `/award/${a.season}#${a.id}`
+              : `/award/${a.id}/${a.season}`
+          }
           title={a.label}
           className="text-accent hover:underline"
         >
