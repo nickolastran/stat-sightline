@@ -22,9 +22,10 @@ import {
  * One award, one season: everyone who took it and the line they took it on.
  *
  * MLB publishes winners and nothing else — there is no ballot in the feed, so
- * this page cannot say who finished second or by how many points. It says
- * what it can say: every winner, with the season he won it on marked where it
- * led something, off the same leader boards the career table's marks use.
+ * this page cannot say who finished second or by how many points. The eight
+ * awards that are voted on carry their whole ballot on the season's own page,
+ * /award/<year>; this is every other award, and says what it can: each winner,
+ * with the season he won it on marked where it led something.
  *
  * Hitters and pitchers are separate tables. A Gold Glove page carries both,
  * and one table with a batting header over a pitcher's line would be worse
@@ -157,8 +158,8 @@ export default async function AwardPage({
           <span className="font-bold text-ink">BOLD</span> figures led the
           league. <span className="font-bold italic text-ink">BOLD ITALIC</span>{" "}
           led all major leagues. MLB publishes the winner of a vote and not the
-          ballot, so the players who received votes without winning are not on
-          record here.
+          ballot; the awards that are voted on carry their whole ballot on the
+          season&apos;s own page.
         </p>
 
         <div className="mt-3">

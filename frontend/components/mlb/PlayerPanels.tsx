@@ -88,7 +88,7 @@ const careerCells = (
       <td
         key={c.key}
         title={c.title}
-        className={`px-0.5 py-1 text-right text-[12px] tabular-nums ${RULE} ${
+        className={`pl-0.5 pr-2 py-1 text-right text-[12px] tabular-nums ${RULE} ${
           mark
             ? `font-bold text-ink${mark === "mlb" ? " italic" : ""}`
             : strong
@@ -109,18 +109,37 @@ const careerCells = (
  * The row underneath is selectable, so a click here must not also pick a span;
  * the row's own handler ignores anything inside a link, which these are.
  */
+/** The awards with a published ballot, which live on their season's page. */
+const VOTED = new Set([
+  "ALMVP",
+  "NLMVP",
+  "ALCY",
+  "NLCY",
+  "ALROY",
+  "NLROY",
+  "ALMOY",
+  "NLMOY",
+]);
+
 function AwardMarks({ awards }: { awards: PlayerAward[] }) {
-  if (awards.length === 0) return <span className="text-ink-3">—</span>;
+  if (awards.length === 0) return null;
   return (
-    <span className="flex flex-wrap gap-x-1.5 gap-y-0.5">
-      {awards.map((a) => (
+    <span className="flex flex-wrap justify-center gap-x-1 gap-y-0.5">
+      {awards.map((a, i) => (
         <Link
           key={`${a.id}-${a.season}`}
-          href={`/award/${a.id}/${a.season}`}
+          href={
+            /* A vote is read as part of its season — the ballot he placed on
+               sits on that year's page, beside the seven others. */
+            VOTED.has(a.id)
+              ? `/award/${a.season}#${a.id}`
+              : `/award/${a.id}/${a.season}`
+          }
           title={a.label}
           className="text-accent hover:underline"
         >
           {a.short}
+          {i < awards.length - 1 && ","}
         </Link>
       ))}
     </span>
@@ -309,6 +328,9 @@ function CareerTableBody({
   /* The label of a summary line runs across the four identity columns. */
   const LEAD = 4;
   const id = `px-1 py-1 text-[12px] whitespace-nowrap ${RULE}`;
+  /* Season, age, club and league are what a row is, not what it did — centred
+     under their heads rather than run up against the figures beside them. */
+  const IDENT = "text-center";
 
   /* A span of seasons, added the way the career line under the table is —
      the halves of a season a trade split are left out of the sum, since the
@@ -332,7 +354,14 @@ function CareerTableBody({
 
   return (
     <>
-      <Table head={head} maxHeight="none" align={"llll"} dense>
+      <Table
+        head={head}
+        maxHeight="none"
+        /* Identity either side, figures right: the awards column is the one
+           thing after the numbers, and reads under its own head, not off it. */
+        align={`cclc${"r".repeat(columns.length)}c`}
+        dense
+      >
         {table.rows.length === 0 && table.summaries.length === 0 && (
           <Empty what="NO SEASONS ON RECORD" cols={head.length} />
         )}
@@ -343,7 +372,8 @@ function CareerTableBody({
           /* The whole season reads in ink; the clubs it was split over sit
              under it a shade back — and on the same left edge as every other
              row, so the season column reads as one list. */
-          const cell = `${id} ${part ? "text-ink-3" : "text-ink"}`;
+          const tone = part ? "text-ink-3" : "text-ink";
+          const cell = `${id} ${IDENT} ${tone}`;
           return (
             <Row
               key={`${r.season}-${r.teamId ?? r.teams}-${i}`}
@@ -352,7 +382,10 @@ function CareerTableBody({
             >
               <td className={`${cell} tabular-nums`}>{r.season}</td>
               <td className={`${cell} tabular-nums`}>{r.age ?? "—"}</td>
-              <td className={cell}>
+              {/* The club reads from the left edge whatever it is: a linked
+                  club is a flex box that fills the cell, and a bare "2TM"
+                  centred beside it would sit out of the column. */}
+              <td className={`${id} ${tone}`}>
                 {r.teamId === null ? (
                   <span>{r.team}</span>
                 ) : (
@@ -408,6 +441,11 @@ function CareerTableBody({
   );
 }
 
+/* WAR and OPS+ are measured against a full season of the league — neither
+   means anything over a nine-game October, so the post-season line drops them. */
+const postseasonCols = (columns: TeamStatCol[]) =>
+  columns.filter((c) => c.key !== "war" && c.key !== "opsPlus");
+
 /** One group's career line, plus October's if the player has one. */
 export interface CareerSection {
   group: StatGroup;
@@ -452,7 +490,7 @@ export function CareerPanel({ sections }: { sections: CareerSection[] }) {
                 <CareerTableBody
                   table={postseason}
                   group={group}
-                  columns={columns}
+                  columns={postseasonCols(columns)}
                 />
               </Panel>
             )}

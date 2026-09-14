@@ -18,6 +18,7 @@ export function Table({
   maxHeight = "36rem",
   align,
   widths,
+  groups,
   dense = false,
 }: {
   /** Column labels; anything after the first is right-aligned. Empty for a
@@ -31,6 +32,10 @@ export function Table({
   /** Fixed column widths — for a section split over several tables, which
       otherwise size their columns to their own longest name and wander. */
   widths?: string[];
+  /** A band of spanning labels above the heads, where one table carries
+      columns from more than one place — a ballot's votes, then its batting
+      line, then its pitching. Spans must add up to the head count. */
+  groups?: { label: string; span: number }[];
   /** Tighter padding and letter-spacing, for a table with enough columns that
       the ordinary chrome would push it off the page — the career line. */
   dense?: boolean;
@@ -49,14 +54,38 @@ export function Table({
         )}
         {head.length > 0 && (
           <thead>
+            {groups && (
+              <tr>
+                {groups.map((g, i) => (
+                  <th
+                    key={i}
+                    scope="colgroup"
+                    colSpan={g.span}
+                    className="sticky top-0 z-10 border-b border-line border-r border-grid bg-surface px-1 py-1 text-center text-[10px] tracking-widest text-ink last:border-r-0"
+                  >
+                    {g.label}
+                  </th>
+                ))}
+              </tr>
+            )}
             <tr>
               {head.map((h, i) => (
                 <th
                   key={i}
                   scope="col"
-                  className={`sticky top-0 z-10 border-b border-line bg-surface text-[10px] font-normal text-ink-3 ${
+                  className={`sticky ${groups ? "top-[25px]" : "top-0"} z-10 border-b border-line bg-surface text-[10px] ${
+                    /* A dense table's heads carry the weight — twenty-odd
+                       columns need a line the eye can come back to. */
+                    dense ? "font-bold text-ink" : "font-normal text-ink-3"
+                  } ${
                     dense
-                      ? "px-0.5 py-1.5 text-[12px] tracking-wide border-r border-grid last:border-r-0"
+                      ? `py-1.5 text-[12px] tracking-wide border-r border-grid last:border-r-0 ${
+                          headAlign(align, i) === "text-right"
+                            ? /* Figures sit in off the right rule rather than
+                                 against it; the head follows them. */
+                              "pl-0.5 pr-2"
+                            : "px-1"
+                        }`
                       : "px-3 py-2 tracking-widest"
                   } ${headAlign(align, i)}`}
                 >

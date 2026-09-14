@@ -40,6 +40,9 @@ export default function LeagueBar() {
         <Link href="/playoffs" className={TAB}>
           PLAYOFFS
         </Link>
+        <Link href="/award" className={TAB}>
+          AWARDS
+        </Link>
         <Link href="/compare" className={TAB}>
           COMPARE
         </Link>
