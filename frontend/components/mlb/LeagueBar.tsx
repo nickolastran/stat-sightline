@@ -4,29 +4,75 @@ import { LEAGUE_SECTIONS } from "@/lib/leagueSections";
 import { seasonOf, todayPT } from "@/lib/mlb";
 
 /*
- * League bar — the dashboard's reference sections, and the three places you
- * bring your own question to rather than read a table off. Pinned under the
- * header so they stay reachable from any page; navigating in place, so the
- * bar itself carries you back out to another section.
+ * League bar — the dashboard's reference sections, and the places you bring
+ * your own question to rather than read a table off. Pinned under the header
+ * so they stay reachable from any page; navigating in place, so the bar
+ * itself carries you back out to another section.
  *
- * PLAYOFFS, COMPARE and STATISTICS follow the sections in the same row even
- * though none of them is a `/league/` route, because from a reader's side
- * they are the same kind of thing: one strip of everywhere the site goes.
+ * PLAYOFFS and STATISTICS follow the sections in the same row even though
+ * neither is a `/league/` route, because from a reader's side they are the
+ * same kind of thing: one strip of everywhere the site goes. The two that
+ * aren't a league-wide board at all — a pair of players or clubs held up
+ * against each other, and the season's hardware — sit behind the grid at the
+ * end instead, out of the run of sections without being any harder to reach.
  *
  * The strip scrolls sideways on a narrow screen and wraps on a wide one,
- * which is not only about width. STATISTICS opens a box under itself, and an
- * absolutely-positioned box inside an `overflow-x` ancestor is clipped by it —
- * so the overflow is dropped at the size where that box can actually be
- * opened. Below it there is no hover to open one with, and the tab is a plain
- * link through to the first board.
+ * which is not only about width. The last two tabs open a box under
+ * themselves, and an absolutely-positioned box inside an `overflow-x`
+ * ancestor is clipped by it — so the overflow is dropped at the size where
+ * those boxes can actually be opened. Below it there is no hover to open one
+ * with, and each is a plain link through to its first page.
  *
  * COMPARE lands on the player page; that page carries its own link across to
- * the club one, so the bar doesn't need a second tab for it.
+ * the club one, so the bar doesn't need a second entry for it.
  */
 
-/** One tab, so the three at the end can't drift from the sections' chrome. */
+/** One tab, so the ones at the end can't drift from the sections' chrome. */
 const TAB =
   "flex h-7 shrink-0 items-center border border-line px-2 text-[10px] tracking-wider text-ink-2 hover:border-accent hover:text-ink";
+
+/*
+ * The grid at the end, and the box that drops out of it. Same hover /
+ * focus-within opening as STATISTICS beside it, for the same reason: no
+ * state, so no client bundle. Anchored to its right edge, where it sits.
+ */
+function MoreMenu() {
+  return (
+    <div className="group relative ml-auto shrink-0">
+      <Link
+        href="/compare"
+        aria-label="More"
+        className="flex h-7 items-center px-2 text-ink-2 group-focus-within:text-accent group-hover:text-accent"
+      >
+        <svg aria-hidden viewBox="0 0 10 10" className="h-3.5 w-3.5">
+          {[0, 4, 8].map((y) =>
+            [0, 4, 8].map((x) => (
+              <rect key={`${x}-${y}`} x={x} y={y} width="2" height="2" fill="currentColor" />
+            )),
+          )}
+        </svg>
+      </Link>
+      {/* `invisible` rather than `hidden`, so the links inside stay in the tab
+          order and focus-within can open the box for a keyboard reader. */}
+      <div className="invisible absolute top-full right-0 z-50 -translate-y-1 border border-line bg-bg p-3 opacity-0 shadow-lg transition group-focus-within:visible group-focus-within:translate-y-0 group-focus-within:opacity-100 group-hover:visible group-hover:translate-y-0 group-hover:opacity-100">
+        <div className="space-y-1.5">
+          {[
+            { href: "/compare", label: "COMPARE" },
+            { href: "/award", label: "AWARDS" },
+          ].map((l) => (
+            <Link
+              key={l.href}
+              href={l.href}
+              className="block whitespace-nowrap text-[11px] tracking-[0.2em] text-accent hover:underline"
+            >
+              {l.label}
+            </Link>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function LeagueBar() {
   return (
@@ -40,13 +86,8 @@ export default function LeagueBar() {
         <Link href="/playoffs" className={TAB}>
           PLAYOFFS
         </Link>
-        <Link href="/award" className={TAB}>
-          AWARDS
-        </Link>
-        <Link href="/compare" className={TAB}>
-          COMPARE
-        </Link>
         <StatsMenu current={seasonOf(todayPT())} />
+        <MoreMenu />
       </div>
     </div>
   );
