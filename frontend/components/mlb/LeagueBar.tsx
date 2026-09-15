@@ -23,8 +23,9 @@ import { seasonOf, todayPT } from "@/lib/mlb";
  * those boxes can actually be opened. Below it there is no hover to open one
  * with, and each is a plain link through to its first page.
  *
- * COMPARE lands on the player page; that page carries its own link across to
- * the club one, so the bar doesn't need a second entry for it.
+ * The grid's box is where both comparisons are reached from — the pages
+ * themselves no longer cross-link, so the bar is the one place that switch
+ * is made.
  */
 
 /** One tab, so the ones at the end can't drift from the sections' chrome. */
@@ -57,7 +58,8 @@ function MoreMenu() {
       <div className="invisible absolute top-full right-0 z-50 -translate-y-1 border border-line bg-bg p-3 opacity-0 shadow-lg transition group-focus-within:visible group-focus-within:translate-y-0 group-focus-within:opacity-100 group-hover:visible group-hover:translate-y-0 group-hover:opacity-100">
         <div className="space-y-1.5">
           {[
-            { href: "/compare", label: "COMPARE" },
+            { href: "/compare", label: "COMPARE PLAYERS" },
+            { href: "/compare/teams", label: "COMPARE TEAMS" },
             { href: "/award", label: "AWARDS" },
           ].map((l) => (
             <Link

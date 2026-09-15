@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import ParamTabs from "@/components/mlb/ParamTabs";
 import SeasonSelect from "@/components/mlb/SeasonSelect";
 import ComparePicker from "@/components/mlb/ComparePicker";
@@ -75,12 +74,7 @@ export default async function CompareTeamsPage({
 
   return (
     <div className="mx-auto max-w-[96rem] space-y-3 p-3">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h1 className="text-base font-bold tracking-wider text-ink">COMPARE TEAMS</h1>
-        <Link href="/compare" className="text-[10px] tracking-[0.2em] text-ink-3 hover:text-accent">
-          ← COMPARE PLAYERS
-        </Link>
-      </div>
+      <h1 className="text-base font-bold tracking-wider text-ink">COMPARE TEAMS</h1>
 
       <ComparePicker kind="team" slots={entities} max={MAX} />
 
