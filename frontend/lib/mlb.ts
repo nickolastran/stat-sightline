@@ -6008,6 +6008,199 @@ export async function getAwardHistory(
   };
 }
 
+/* ── The awards handed out monthly ──────────────────────────────────── */
+
+/*
+ * A monthly award is really one award given twice, and it is read as a pair:
+ * who took the National League's April, who took the American League's. So
+ * the two ids share a page, with a column each and the month between them,
+ * rather than each getting a list of names with no month against them.
+ */
+const MONTHLY_PAIRS: { al: string; nl: string; label: string }[] = [
+  { al: "ALPOM", nl: "NLPOM", label: "Players of the Month" },
+  { al: "ALPITOM", nl: "NLPITOM", label: "Pitchers of the Month" },
+  { al: "ALROM", nl: "NLROM", label: "Rookies of the Month" },
+  { al: "ALRRELMON", nl: "NLRRELMON", label: "Relievers of the Month" },
+];
+
+/** The pair one monthly award id belongs to, or null for everything else. */
+export const monthlyPair = (id: string) =>
+  MONTHLY_PAIRS.find((p) => p.al === id || p.nl === id) ?? null;
+
+export interface MonthlyWinner {
+  id: number;
+  name: string;
+  team: string;
+  teamId: number | null;
+  /** Both, so a two-way winner reads the way he won it. Null where the month
+      has no line of that kind — or no line at all, before MLB split them. */
+  hitting: Record<string, TeamStatValue> | null;
+  pitching: Record<string, TeamStatValue> | null;
+}
+
+export interface MonthlyRow {
+  season: number;
+  /** 4 through 9 — the month the award is for, not the date it was given. */
+  month: number;
+  al: MonthlyWinner | null;
+  nl: MonthlyWinner | null;
+}
+
+export interface MonthlyAward {
+  id: string;
+  label: string;
+  decades: { decade: number; rows: MonthlyRow[] }[];
+}
+
+export const MONTH_NAME = [
+  "",
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
+];
+
+/*
+ * March belongs to April's award and October to September's — MLB's own
+ * splits cut at the calendar, the award doesn't. Merging them is the same
+ * arithmetic a season total is, so it is the same function.
+ */
+const MONTH_SPILL: Record<number, number> = { 3: 4, 10: 9 };
+
+/**
+ * One monthly award, both leagues, month by month back as far as it was
+ * given — the two recipient lists, then the winners' month lines a season at
+ * a time, which is the only grain MLB publishes them at.
+ */
+export async function getMonthlyAward(
+  id: string,
+): Promise<MonthlyAward | null> {
+  const pair = monthlyPair(id);
+  if (!pair) return null;
+
+  const [alData, nlData, teams] = await Promise.all([
+    mlb(`/awards/${pair.al}/recipients`, 86400).catch(() => null),
+    mlb(`/awards/${pair.nl}/recipients`, 86400).catch(() => null),
+    mlbTeams().catch(() => []),
+  ]);
+  const abbr = new Map(teams.map((t: any) => [t.id, t.abbreviation as string]));
+
+  type Given = {
+    season: number;
+    month: number;
+    side: "al" | "nl";
+    id: number;
+    name: string;
+    teamId: number | null;
+  };
+  const given: Given[] = [];
+  for (const [side, data] of [
+    ["al", alData],
+    ["nl", nlData],
+  ] as const)
+    for (const a of (data?.awards ?? []) as any[]) {
+      /* The award is dated the last day of its month, so the date is the
+         month — the season alone would put six winners on one row. */
+      const month = Number(String(a.date ?? "").slice(5, 7));
+      if (!a.player?.id || !a.season || !month) continue;
+      given.push({
+        season: Number(a.season),
+        month: MONTH_SPILL[month] ?? month,
+        side,
+        id: a.player.id,
+        name: a.player.nameFirstLast ?? "",
+        teamId: a.team?.id ?? null,
+      });
+    }
+  if (given.length === 0) return null;
+
+  /* One request a season, a dozen seasons at a time: a month line only comes
+     back season-scoped, and fifty of them at once is a rude way to ask. */
+  const seasons = [...new Set(given.map((g) => g.season))].sort((a, b) => b - a);
+  const lines = new Map<string, Record<string, TeamStatValue>>();
+  const hitKeys = statLineKeys("hitting");
+  const pitchKeys = statLineKeys("pitching");
+
+  for (let i = 0; i < seasons.length; i += 12) {
+    await Promise.all(
+      seasons.slice(i, i + 12).map(async (season) => {
+        const ids = [
+          ...new Set(
+            given.filter((g) => g.season === season).map((g) => g.id),
+          ),
+        ];
+        const data = await mlb(
+          `/people?personIds=${ids.join(",")}&hydrate=` +
+            encodeURIComponent(
+              `stats(group=[hitting,pitching],type=[byMonth],season=${season})`,
+            ),
+          86400,
+        ).catch(() => null);
+        for (const p of (data?.people ?? []) as any[])
+          for (const st of (p.stats ?? []) as any[]) {
+            const group = st.group?.displayName;
+            if (group !== "hitting" && group !== "pitching") continue;
+            const keys = group === "hitting" ? hitKeys : pitchKeys;
+            /* Two calendar months can land on one award month, so a line is
+               collected and then added rather than written straight in. */
+            const at = new Map<number, Record<string, TeamStatValue>[]>();
+            for (const sp of (st.splits ?? []) as any[]) {
+              const m = MONTH_SPILL[sp.month] ?? sp.month;
+              push(
+                at,
+                m,
+                Object.fromEntries(keys.map((k) => [k, sp.stat?.[k] ?? null])),
+              );
+            }
+            for (const [m, list] of at)
+              lines.set(
+                `${p.id}:${season}:${m}:${group}`,
+                list.length === 1 ? list[0] : sumStatLines(group, list),
+              );
+          }
+      }),
+    );
+  }
+
+  const rows = new Map<string, MonthlyRow>();
+  for (const g of given) {
+    const key = `${g.season}:${g.month}`;
+    const row: MonthlyRow =
+      rows.get(key) ?? { season: g.season, month: g.month, al: null, nl: null };
+    row[g.side] = {
+      id: g.id,
+      name: g.name,
+      team: abbr.get(g.teamId ?? -1) ?? "—",
+      teamId: g.teamId,
+      hitting: lines.get(`${g.id}:${g.season}:${g.month}:hitting`) ?? null,
+      pitching: lines.get(`${g.id}:${g.season}:${g.month}:pitching`) ?? null,
+    };
+    rows.set(key, row);
+  }
+
+  const byDecade = new Map<number, MonthlyRow[]>();
+  for (const row of [...rows.values()].sort(
+    (a, b) => b.season - a.season || b.month - a.month,
+  ))
+    push(byDecade, Math.floor(row.season / 10) * 10, row);
+
+  return {
+    id,
+    label: pair.label,
+    decades: [...byDecade]
+      .sort((a, b) => b[0] - a[0])
+      .map(([decade, rows]) => ({ decade, rows })),
+  };
+}
+
 /** The 30 clubs' ids — what separates a major-league award from an A-ball one. */
 async function mlbTeamIds(): Promise<Set<number>> {
   return new Set((await mlbTeams()).map((t) => t.id as number));

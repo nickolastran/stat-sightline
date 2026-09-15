@@ -6,6 +6,7 @@ import Glossary from "@/components/mlb/Glossary";
 import PlayerLink from "@/components/mlb/PlayerLink";
 import TeamLink from "@/components/mlb/TeamLink";
 import AwardHistory from "@/components/mlb/AwardHistory";
+import MonthlyAward from "@/components/mlb/MonthlyAward";
 import { Table, Row } from "@/components/ui/StatTable";
 import {
   BALLOT_CY_COLS,
@@ -16,6 +17,7 @@ import {
   ballotIndex,
   getSeasonBallots,
   hasAwardPage,
+  monthlyPair,
   teamStatText,
   voteShare,
   type Ballot,
@@ -51,6 +53,12 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { id } = await params;
   if (!isSeason(id)) {
+    const pair = monthlyPair(id);
+    if (pair)
+      return {
+        title: `MLB ${pair.label.toUpperCase()} — STAT//SIGHTLINE`,
+        description: `Every ${pair.label.replace(/s of the Month$/, " of the Month")} winner, both leagues, with the month line each won it on.`,
+      };
     const label = awardLabel(id);
     return {
       title: `${label.toUpperCase()} WINNERS — STAT//SIGHTLINE`,
@@ -174,7 +182,11 @@ export default async function AwardSeasonPage({
   const { id } = await params;
   if (!isSeason(id)) {
     if (!hasAwardPage(id)) notFound();
-    return <AwardHistory id={id} />;
+    return monthlyPair(id) ? (
+      <MonthlyAward id={id} />
+    ) : (
+      <AwardHistory id={id} />
+    );
   }
   const season = Number(id);
 
