@@ -60,7 +60,7 @@ function MoreMenu() {
           {[
             { href: "/compare", label: "COMPARE PLAYERS" },
             { href: "/compare/teams", label: "COMPARE TEAMS" },
-            { href: "/award", label: "AWARDS" },
+            { href: "/award", label: "AWARDS INDEX" },
           ].map((l) => (
             <Link
               key={l.href}

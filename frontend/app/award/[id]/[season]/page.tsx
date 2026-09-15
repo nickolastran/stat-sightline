@@ -10,7 +10,7 @@ import {
   awardLabel,
   careerCols,
   getAwardTable,
-  isMajorAward,
+  hasAwardPage,
   teamStatText,
   STAT_GROUP_LABEL,
   type AwardWinner,
@@ -103,7 +103,7 @@ export default async function AwardPage({
 }) {
   const { id, season } = await params;
   const year = Number(season);
-  if (!isMajorAward(id) || !Number.isInteger(year)) notFound();
+  if (!hasAwardPage(id) || !Number.isInteger(year)) notFound();
 
   const table = await getAwardTable(id, year).catch(() => null);
   if (!table) notFound();

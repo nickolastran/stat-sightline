@@ -5,14 +5,17 @@ import Panel from "@/components/ui/Panel";
 import Glossary from "@/components/mlb/Glossary";
 import PlayerLink from "@/components/mlb/PlayerLink";
 import TeamLink from "@/components/mlb/TeamLink";
+import AwardHistory from "@/components/mlb/AwardHistory";
 import { Table, Row } from "@/components/ui/StatTable";
 import {
   BALLOT_CY_COLS,
   BALLOT_HITTING_COLS,
   BALLOT_MANAGER_COLS,
   BALLOT_PITCHING_COLS,
+  awardLabel,
   ballotIndex,
   getSeasonBallots,
+  hasAwardPage,
   teamStatText,
   voteShare,
   type Ballot,
@@ -32,9 +35,11 @@ import {
  * only and takes the whole pitching line; a manager has no line at all and
  * takes his club's record instead.
  *
- * The URL is the season — /award/2024. A path with an award id and a season
- * under it (/award/ALGG/2024) is still one award's winners, which is all MLB
- * publishes for the awards nobody votes on.
+ * The URL is the season — /award/2024. The same segment also takes an award
+ * id — /award/ALMVP — which is that award from its first season to its last,
+ * a decade at a time; and with a season under it (/award/ALGG/2024) it is one
+ * award in one year, which is all MLB publishes for the awards nobody votes
+ * on.
  */
 
 const isSeason = (id: string) => /^\d{4}$/.test(id);
@@ -45,6 +50,13 @@ export async function generateMetadata({
   params: Promise<{ id: string }>;
 }): Promise<Metadata> {
   const { id } = await params;
+  if (!isSeason(id)) {
+    const label = awardLabel(id);
+    return {
+      title: `${label.toUpperCase()} WINNERS — STAT//SIGHTLINE`,
+      description: `Every ${label} winner, decade by decade, with the season line each won it on.`,
+    };
+  }
   return {
     title: `${id} AWARDS VOTING — STAT//SIGHTLINE`,
     description: `Every BBWAA ballot of the ${id} season — MVP, Cy Young, Rookie of the Year and Manager of the Year, both leagues, with the line each man polled on.`,
@@ -160,7 +172,10 @@ export default async function AwardSeasonPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  if (!isSeason(id)) notFound();
+  if (!isSeason(id)) {
+    if (!hasAwardPage(id)) notFound();
+    return <AwardHistory id={id} />;
+  }
   const season = Number(id);
 
   const ballots = await getSeasonBallots(season).catch(() => []);
