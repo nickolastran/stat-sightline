@@ -2278,14 +2278,14 @@ export async function getTeamLeaders(
   id: number,
   season: number,
   gameType: PlayerGameType = "R",
-  /** Leave off anyone the club has since moved on from — a pre-game page is
-   *  asking who is available tonight, not who led the season's ledger. */
+  /** Leave off anyone the club has since moved on from — traded, released —
+   *  while keeping the ones on the injured list, who are still its players. */
   activeOnly = false,
 ): Promise<TeamLeaderBoard[]> {
   const [hitting, pitching, active] = await Promise.all([
     getTeamPlayerStats(id, season, "hitting", gameType),
     getTeamPlayerStats(id, season, "pitching", gameType),
-    activeOnly ? getTeamRoster(id, season, "active") : [],
+    activeOnly ? getTeamRoster(id, season, "40Man") : [],
   ]);
   const onRoster = activeOnly ? new Set(active.map((r) => r.id)) : null;
   const rostered = (rows: PlayerStatRow[]) =>
