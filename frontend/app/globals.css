@@ -109,6 +109,15 @@ body {
   color: #ffffff;
 }
 
+/* An in-page jump — a decade on an award page, an award on a season's —
+   travels rather than teleports, so it is clear which way the page moved.
+   Not for a reader who has asked the system for less of it. */
+@media (prefers-reduced-motion: no-preference) {
+  html {
+    scroll-behavior: smooth;
+  }
+}
+
 /* Hairline scrollbars to match the chrome. */
 * {
   scrollbar-width: thin;

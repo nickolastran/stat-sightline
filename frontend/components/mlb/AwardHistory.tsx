@@ -162,7 +162,6 @@ export default async function AwardHistory({ id }: { id: string }) {
   const history = await getAwardHistory(id).catch(() => null);
   if (!history || history.decades.length === 0) notFound();
 
-  const seasons = history.decades.flatMap((d) => d.seasons.map((s) => s.season));
   const seen = new Set<string>();
   const legend = BANDS.flatMap((b) => b.cols).filter(
     (c) => !seen.has(c.label) && seen.add(c.label),
@@ -171,15 +170,9 @@ export default async function AwardHistory({ id }: { id: string }) {
   return (
     <div className="mx-auto max-w-[110rem] px-4">
       <section className="space-y-3 border-x border-line px-4 py-8 sm:px-8">
-        <div>
-          <p className="text-xs tracking-[0.3em] text-ink-3">AWARD</p>
-          <h1 className="mt-2 text-2xl tracking-[0.15em] text-ink">
-            {history.label.toUpperCase()} WINNERS
-          </h1>
-          <p className="mt-2 text-[10px] tracking-widest text-ink-3">
-            {history.count} WINNERS · {seasons[seasons.length - 1]}–{seasons[0]}
-          </p>
-        </div>
+        <h1 className="text-2xl tracking-[0.15em] text-ink">
+          {history.label.toUpperCase()} WINNERS
+        </h1>
 
         <nav className="flex flex-wrap items-center gap-2 text-xs">
           <Link
