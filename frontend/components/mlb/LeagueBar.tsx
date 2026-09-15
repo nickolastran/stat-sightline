@@ -17,7 +17,7 @@ import { seasonOf, todayPT } from "@/lib/mlb";
  * end instead, out of the run of sections without being any harder to reach.
  *
  * The strip scrolls sideways on a narrow screen and wraps on a wide one,
- * which is not only about width. The last two tabs open a box under
+ * which is not only about width. The last two open a box under
  * themselves, and an absolutely-positioned box inside an `overflow-x`
  * ancestor is clipped by it — so the overflow is dropped at the size where
  * those boxes can actually be opened. Below it there is no hover to open one
@@ -33,17 +33,39 @@ const TAB =
   "flex h-7 shrink-0 items-center border border-line px-2 text-[10px] tracking-wider text-ink-2 hover:border-accent hover:text-ink";
 
 /*
- * The grid at the end, and the box that drops out of it. Same hover /
- * focus-within opening as STATISTICS beside it, for the same reason: no
- * state, so no client bundle. Anchored to its right edge, where it sits.
+ * The grid at the end, and the box that drops out of it.
+ *
+ * Two ways in, and they mean different things. A hover opens the box and
+ * letting go closes it — a reader passing over sees what is there. A click
+ * pins it open and it stays until something else is clicked, the box or the
+ * page; a reader who meant to go there gets to read down it.
+ *
+ * Both are a checkbox and CSS rather than state: `group-hover` is the
+ * passing look, `peer-checked` the pin, and a fixed transparent sheet under
+ * the box while it is pinned is what a click off it lands on. No client
+ * bundle for a menu of three links.
+ *
+ * Anchored to its right edge, which is where the grid sits.
  */
 function MoreMenu() {
   return (
     <div className="group relative ml-auto shrink-0">
-      <Link
-        href="/compare"
+      <input
+        id="more-menu"
+        type="checkbox"
         aria-label="More"
-        className="flex h-7 items-center px-2 text-ink-2 group-focus-within:text-accent group-hover:text-accent"
+        className="peer sr-only"
+      />
+      {/* The click-off. Only under the pinned box, and under the box itself —
+          anything the box is over stays clickable through the menu's own z. */}
+      <label
+        htmlFor="more-menu"
+        aria-hidden
+        className="fixed inset-0 z-40 hidden cursor-default peer-checked:block"
+      />
+      <label
+        htmlFor="more-menu"
+        className="relative z-50 flex h-7 cursor-pointer items-center px-2 text-ink-2 peer-checked:text-accent peer-focus-visible:text-accent group-hover:text-accent"
       >
         <svg aria-hidden viewBox="0 0 10 10" className="h-3.5 w-3.5">
           {[0, 4, 8].map((y) =>
@@ -52,10 +74,10 @@ function MoreMenu() {
             )),
           )}
         </svg>
-      </Link>
+      </label>
       {/* `invisible` rather than `hidden`, so the links inside stay in the tab
           order and focus-within can open the box for a keyboard reader. */}
-      <div className="invisible absolute top-full right-0 z-50 -translate-y-1 border border-line bg-bg p-3 opacity-0 shadow-lg transition group-focus-within:visible group-focus-within:translate-y-0 group-focus-within:opacity-100 group-hover:visible group-hover:translate-y-0 group-hover:opacity-100">
+      <div className="invisible absolute top-full right-0 z-50 -translate-y-1 border border-line bg-bg p-3 opacity-0 shadow-lg transition peer-checked:visible peer-checked:translate-y-0 peer-checked:opacity-100 group-focus-within:visible group-focus-within:translate-y-0 group-focus-within:opacity-100 group-hover:visible group-hover:translate-y-0 group-hover:opacity-100">
         <div className="space-y-1.5">
           {[
             { href: "/compare", label: "COMPARE PLAYERS" },
