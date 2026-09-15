@@ -8,14 +8,14 @@
  * the two are the same table read two ways.
  */
 export const LEAGUE_SECTIONS = [
-  { id: "scoreboard", tab: "SCOREBOARD", title: "SCOREBOARD" },
-  { id: "leaders", tab: "STAT LEADERS", title: "STAT LEADERS" },
   { id: "gamefeed", tab: "GAME FEED", title: "GAME FEED" },
+  { id: "scoreboard", tab: "SCOREBOARD", title: "SCOREBOARD" },
   { id: "probables", tab: "PROBABLES", title: "PROBABLE PITCHERS — TODAY" },
   { id: "standings", tab: "STANDINGS", title: "STANDINGS" },
   { id: "wildcard", tab: "WILD CARD", title: "WILD CARD RACE", inBar: false },
-  { id: "teams", tab: "TEAM STATS", title: "TEAM STATISTICS" },
+  { id: "leaders", tab: "STAT LEADERS", title: "STAT LEADERS" },
   { id: "players", tab: "PLAYER STATS", title: "PLAYER STATISTICS" },
+  { id: "teams", tab: "TEAM STATS", title: "TEAM STATISTICS" },
   { id: "abs", tab: "ABS", title: "ABS CHALLENGES" },
 ] as const;
 

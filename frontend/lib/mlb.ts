@@ -2278,14 +2278,14 @@ export async function getTeamLeaders(
   id: number,
   season: number,
   gameType: PlayerGameType = "R",
-  /** Leave off anyone the club has since moved on from — a pre-game page is
-   *  asking who is available tonight, not who led the season's ledger. */
+  /** Leave off anyone the club has since moved on from — traded, released —
+   *  while keeping the ones on the injured list, who are still its players. */
   activeOnly = false,
 ): Promise<TeamLeaderBoard[]> {
   const [hitting, pitching, active] = await Promise.all([
     getTeamPlayerStats(id, season, "hitting", gameType),
     getTeamPlayerStats(id, season, "pitching", gameType),
-    activeOnly ? getTeamRoster(id, season, "active") : [],
+    activeOnly ? getTeamRoster(id, season, "40Man") : [],
   ]);
   const onRoster = activeOnly ? new Set(active.map((r) => r.id)) : null;
   const rostered = (rows: PlayerStatRow[]) =>
@@ -5156,7 +5156,8 @@ export const lineAwards = (awards: PlayerAward[]): PlayerAward[] =>
 export const isMajorAward = (id: string) => id in MAJOR_AWARDS;
 
 /** "AL MVP" — the award's own name, for a page title or a bio line. */
-export const awardLabel = (id: string) => MAJOR_AWARDS[id]?.label ?? id;
+export const awardLabel = (id: string) =>
+  MAJOR_AWARDS[id]?.label ?? AWARD_PAGE_LABEL[id] ?? id;
 
 /** One major award a player won, in one season. */
 export interface PlayerAward {
@@ -5241,7 +5242,7 @@ for (const v of VOTES) {
   push(ballots, `${v.award}:${v.season}`, v);
   if (v.id !== null) push(byVoter, v.id, v);
 }
-function push<K>(m: Map<K, AwardVote[]>, k: K, v: AwardVote) {
+function push<K, V>(m: Map<K, V[]>, k: K, v: V) {
   const at = m.get(k);
   if (at) at.push(v);
   else m.set(k, [v]);
@@ -5601,7 +5602,7 @@ export async function getAwardTable(
   awardId: string,
   season: number,
 ): Promise<AwardTable | null> {
-  if (!isMajorAward(awardId)) return null;
+  if (!hasAwardPage(awardId)) return null;
   const data = await mlb(
     `/awards/${awardId}/recipients?season=${season}`,
     86400,
@@ -5691,6 +5692,512 @@ export async function getAwardTable(
         (teamStatNum(b.values.plateAppearances ?? b.values.battersFaced) ?? 0) -
         (teamStatNum(a.values.plateAppearances ?? a.values.battersFaced) ?? 0),
     ),
+  };
+}
+
+/* ── One award, all time ────────────────────────────────────────────── */
+
+/*
+ * Every award the feed will answer for, in the order the index lists them:
+ * the season votes first, then the relief and postseason awards, the ones
+ * handed out through the year, the gloves and the bats, the named awards,
+ * and at the foot the honours that are a career rather than a season.
+ *
+ * Deliberately wider than MAJOR_AWARDS above, which is what a career bio is
+ * read by: the Chalmers Award ran four years and belongs on nobody's line,
+ * but it is where the MVP starts and so it belongs in the index. Labels are
+ * MLB's own, since these are the names the awards are announced under.
+ */
+export const AWARD_PAGES: { id: string; label: string }[] = [
+  { id: "ALMVP", label: "AL MVP" },
+  { id: "NLMVP", label: "NL MVP" },
+  { id: "ALCHALM", label: "The Chalmers Award (AL)" },
+  { id: "NLCHALM", label: "The Chalmers Award (NL)" },
+  { id: "ALAWARD", label: "The American League Award" },
+  { id: "NLAWARD", label: "The National League Award" },
+  { id: "ALCY", label: "AL Cy Young" },
+  { id: "NLCY", label: "NL Cy Young" },
+  { id: "MLBCY", label: "MLB Cy Young" },
+  { id: "ALROY", label: "Jackie Robinson AL Rookie of the Year" },
+  { id: "NLROY", label: "Jackie Robinson NL Rookie of the Year" },
+  { id: "MLBROY", label: "MLB Rookie of the Year" },
+  { id: "ALREL", label: "Mariano Rivera AL Reliever of the Year" },
+  { id: "NLREL", label: "Trevor Hoffman NL Reliever of the Year" },
+  { id: "ALRM", label: "AL Relief Man Award" },
+  { id: "NLRM", label: "NL Relief Man Award" },
+  { id: "WSMVP", label: "Willie Mays World Series MVP" },
+  { id: "ALCSMVP", label: "ALCS MVP" },
+  { id: "NLCSMVP", label: "NLCS MVP" },
+  { id: "ASMVP", label: "Ted Williams All-Star MVP" },
+  { id: "ALPOM", label: "AL Player of the Month" },
+  { id: "NLPOM", label: "NL Player of the Month" },
+  { id: "ALPOW", label: "AL Player of the Week" },
+  { id: "NLPOW", label: "NL Player of the Week" },
+  { id: "ALPITOM", label: "AL Pitcher of the Month" },
+  { id: "NLPITOM", label: "NL Pitcher of the Month" },
+  { id: "ALROM", label: "AL Rookie of the Month" },
+  { id: "NLROM", label: "NL Rookie of the Month" },
+  { id: "ALRRELMON", label: "AL Reliever of the Month" },
+  { id: "NLRRELMON", label: "NL Reliever of the Month" },
+  { id: "ALMOY", label: "AL Manager of the Year" },
+  { id: "NLMOY", label: "NL Manager of the Year" },
+  { id: "MLBEXECOY", label: "MLB Executive of the Year" },
+  { id: "DHLDMOY", label: "DHL Delivery Man of the Year" },
+  { id: "DHLDMOM", label: "DHL Delivery Man of the Month" },
+  { id: "ALCPOY", label: "AL Comeback Player of the Year" },
+  { id: "NLCPOY", label: "NL Comeback Player of the Year" },
+  { id: "DHOY", label: "Edgar Martinez Outstanding DH Award" },
+  { id: "ALGG", label: "Rawlings AL Gold Glove" },
+  { id: "NLGG", label: "Rawlings NL Gold Glove" },
+  { id: "MLGG", label: "Rawlings MLB Gold Glove" },
+  { id: "MLAGG", label: "Rawlings All-Time Gold Glove" },
+  { id: "ALPG", label: "Rawlings AL Platinum Glove" },
+  { id: "NLPG", label: "Rawlings NL Platinum Glove" },
+  { id: "ALSS", label: "AL Silver Slugger" },
+  { id: "NLSS", label: "NL Silver Slugger" },
+  { id: "MLBAFIRST", label: "All-MLB First Team" },
+  { id: "MLBSECOND", label: "All-MLB Second Team" },
+  { id: "BAMLART", label: "Baseball America All-Rookie Team" },
+  { id: "ALHAA", label: "AL Hank Aaron Award" },
+  { id: "NLHAA", label: "NL Hank Aaron Award" },
+  { id: "HUTCH", label: "The Hutch Award" },
+  { id: "LOUGEHRIG", label: "Lou Gehrig Award" },
+  { id: "BABERUTH", label: "Babe Ruth Award" },
+  { id: "MLBRC", label: "Roberto Clemente Award" },
+  { id: "LOUBROCK", label: "Lou Brock Award" },
+  { id: "WARRENSPAHN", label: "Warren Spahn Award" },
+  { id: "TONYCONIGLIARO", label: "Tony Conigliaro Award" },
+  { id: "BOBFELLER", label: "Bob Feller Act of Valor Award" },
+  { id: "WDPOY", label: "Wilson Defensive Player of the Year" },
+  { id: "WMLBDPOY", label: "Wilson MLB Defensive Player of the Year" },
+  { id: "WALDPOY", label: "Wilson AL Defensive Player of the Year" },
+  { id: "WNLDPOY", label: "Wilson NL Defensive Player of the Year" },
+  { id: "WTDPOY", label: "Wilson Team Defensive Player of the Year" },
+  { id: "HEARTANDHUSTLE", label: "MLBPAA Heart and Hustle Award" },
+  { id: "MLBPPHIL", label: "Players Trust Philanthropist of the Year" },
+  { id: "MLBPCCFA", label: "Players Choice Curt Flood Award" },
+  { id: "MLBCOMHA", label: "Commissioner's Historic Achievement Award" },
+  { id: "MLBLEGEND", label: "MLB Legendary Moments Award" },
+  { id: "MLBPCPOY", label: "Players Choice Player of the Year" },
+  { id: "MLBPCMOY", label: "Players Choice Man of the Year" },
+  { id: "MLBPCALOP", label: "Players Choice AL Outstanding Player" },
+  { id: "MLBPCNLOP", label: "Players Choice NL Outstanding Player" },
+  { id: "MLBPCALPIT", label: "Players Choice AL Outstanding Pitcher" },
+  { id: "MLBPCNLPIT", label: "Players Choice NL Outstanding Pitcher" },
+  { id: "MLBPCALOR", label: "Players Choice AL Outstanding Rookie" },
+  { id: "MLBPCNLOR", label: "Players Choice NL Outstanding Rookie" },
+  { id: "MLBPCALCOM", label: "Players Choice AL Comeback Player" },
+  { id: "MLBPCNLCOM", label: "Players Choice NL Comeback Player" },
+  { id: "BAMLPOY", label: "Baseball America Player of the Year" },
+  { id: "BAMLROY", label: "Baseball America Rookie of the Year" },
+  { id: "BAMLMOY", label: "Baseball America Manager of the Year" },
+  { id: "SISPORTSMAN", label: "SI Sportsman of the Year" },
+  { id: "APATHLETE", label: "AP Male Athlete of the Year" },
+  { id: "MLBHOF", label: "Hall of Fame" },
+  { id: "WSCHAMP", label: "World Series Championship" },
+  { id: "WSCHAMPMGR", label: "World Series Champion Manager" },
+  { id: "ALAS", label: "AL All-Star" },
+  { id: "NLAS", label: "NL All-Star" },
+  { id: "HRDERBYWIN", label: "Home Run Derby Winner" },
+];
+
+const AWARD_PAGE_LABEL: Record<string, string> = Object.fromEntries(
+  AWARD_PAGES.map((a) => [a.id, a.label]),
+);
+
+/** Whether the app will draw a page for this award id. */
+export const hasAwardPage = (id: string) =>
+  id in MAJOR_AWARDS || id in AWARD_PAGE_LABEL;
+
+/*
+ * The ones handed out more than once a season. A season line beside a Player
+ * of the Month is the wrong line — he won it on one April, not on the year —
+ * so these are listed by season and left to each year's own page, which is
+ * where the month is actually named.
+ */
+const PERIODIC_AWARDS = new Set([
+  "ALPOM",
+  "NLPOM",
+  "ALPITOM",
+  "NLPITOM",
+  "ALROM",
+  "NLROM",
+  "ALRRELMON",
+  "NLRRELMON",
+  "DHLDMOM",
+  "ALPOW",
+  "NLPOW",
+]);
+
+/** One winner on the all-time page. Both lines rather than one, the way a
+    ballot row carries them — a two-way winner won it on the pair. */
+export interface AwardHistoryRow {
+  id: number;
+  name: string;
+  pos: string;
+  team: string;
+  teamId: number | null;
+  league: string;
+  hitting: Record<string, TeamStatValue> | null;
+  pitching: Record<string, TeamStatValue> | null;
+}
+
+/** Winners of one award in one season, as the all-time page stacks them. */
+export interface AwardSeason {
+  season: number;
+  winners: AwardHistoryRow[];
+  /** Whether a ballot was scraped for this one — an extra link if so. */
+  ballot: boolean;
+}
+
+export interface AwardHistory {
+  id: string;
+  label: string;
+  count: number;
+  /** Newest first, and newest season first inside each. */
+  decades: { decade: number; seasons: AwardSeason[] }[];
+  /** False where the award has too many winners to name on one page — the
+      decades are then lists of seasons rather than of players. */
+  lines: boolean;
+}
+
+/*
+ * Above this many names the page is a list rather than a table of lines.
+ * Every All-Star since 1933 is over a thousand players and every World Series
+ * winner nearly two, and a career apiece is thirty requests for columns that
+ * a roster list was never going to be read across anyway.
+ */
+const AWARD_LINE_CAP = 400;
+
+/** The columns the all-time page prints — the ballot's, less WAR, which is a
+    board per season and ninety-odd of them for one page. */
+export const awardHistoryCols = (group: StatGroup): TeamStatCol[] =>
+  (group === "hitting" ? BALLOT_HITTING_COLS : BALLOT_PITCHING_COLS).filter(
+    (c) => c.key !== "war",
+  );
+
+type YearSplit = { season?: string; team?: any; league?: any; stat?: any };
+
+/** Every winner's season-by-season lines, both groups, in chunks small enough
+    to stay inside the fetch cache's own limit. */
+async function yearByYear(
+  ids: number[],
+): Promise<Map<number, { hitting: YearSplit[]; pitching: YearSplit[] }>> {
+  const chunks: number[][] = [];
+  for (let i = 0; i < ids.length; i += 60) chunks.push(ids.slice(i, i + 60));
+  const pages = await Promise.all(
+    chunks.map((c) =>
+      mlb(
+        `/people?personIds=${c.join(",")}&hydrate=` +
+          encodeURIComponent(
+            "stats(group=[hitting,pitching],type=[yearByYear])",
+          ),
+        86400,
+      ).catch(() => null),
+    ),
+  );
+  const out = new Map<number, { hitting: YearSplit[]; pitching: YearSplit[] }>();
+  for (const page of pages)
+    for (const p of (page?.people ?? []) as any[]) {
+      const at = { hitting: [] as YearSplit[], pitching: [] as YearSplit[] };
+      for (const s of (p.stats ?? []) as any[]) {
+        const g = s.group?.displayName;
+        if (g === "hitting" || g === "pitching")
+          at[g as "hitting" | "pitching"].push(...((s.splits ?? []) as YearSplit[]));
+      }
+      out.set(p.id, at);
+    }
+  return out;
+}
+
+/** The line he had that season — his own club's half of it where he was
+    traded mid-year, since that is the club the award names. */
+const splitAt = (
+  list: YearSplit[],
+  season: number,
+  teamId: number | null,
+): YearSplit | null => {
+  const rows = list.filter((s) => Number(s.season) === season);
+  return rows.find((s) => s.team?.id === teamId) ?? rows[0] ?? null;
+};
+
+/**
+ * One award from its first season to its last — every winner, with the line
+ * he won it on, grouped by decade.
+ *
+ * Two kinds of request however long the award has been given: the recipients
+ * in one, then the winners' careers in chunks. The bold league-leading marks
+ * the season pages carry are left off, since those are a leader board per
+ * season and this page spans ninety of them.
+ */
+export async function getAwardHistory(
+  awardId: string,
+): Promise<AwardHistory | null> {
+  if (!hasAwardPage(awardId)) return null;
+  const data = await mlb(`/awards/${awardId}/recipients`, 86400).catch(
+    () => null,
+  );
+  const given = ((data?.awards ?? []) as any[]).filter(
+    (a) => a.player?.id && a.season,
+  );
+  const ids = [...new Set(given.map((a) => a.player.id as number))];
+  const lines =
+    ids.length > 0 &&
+    ids.length <= AWARD_LINE_CAP &&
+    !PERIODIC_AWARDS.has(awardId);
+
+  const [careers, teams] = await Promise.all([
+    lines
+      ? yearByYear(ids)
+      : new Map<number, { hitting: YearSplit[]; pitching: YearSplit[] }>(),
+    mlbTeams().catch(() => []),
+  ]);
+  const abbr = new Map(teams.map((t: any) => [t.id, t.abbreviation as string]));
+
+  const hitKeys = statLineKeys("hitting");
+  const pitchKeys = statLineKeys("pitching");
+  const bySeason = new Map<number, AwardHistoryRow[]>();
+  const line = (split: YearSplit | null, keys: string[]) =>
+    split ? Object.fromEntries(keys.map((k) => [k, split.stat?.[k] ?? null])) : null;
+
+  for (const a of given) {
+    const season = Number(a.season);
+    /* An award given to whole rosters is a season list, not a name list: one
+       decade of All-Stars is three hundred rows that say nothing a year's own
+       page doesn't say better. */
+    if (!lines) {
+      if (!bySeason.has(season)) bySeason.set(season, []);
+      continue;
+    }
+    const teamId: number | null = a.team?.id ?? null;
+    const career = careers.get(a.player.id);
+    /* Both halves, where he has both — a two-way winner's row is the pair,
+       and a hitter's pitching half is simply blank. */
+    const pitching = career ? splitAt(career.pitching, season, teamId) : null;
+    const hitting = career ? splitAt(career.hitting, season, teamId) : null;
+    const split = hitting ?? pitching;
+
+    push(bySeason, season, {
+      id: a.player.id,
+      name: a.player.nameFirstLast ?? "",
+      pos: a.player.primaryPosition?.abbreviation ?? "",
+      team: split?.team?.abbreviation ?? abbr.get(teamId ?? -1) ?? "—",
+      teamId: split?.team?.id ?? teamId,
+      league: leagueAbbr(split?.league?.id),
+      hitting: line(hitting, hitKeys),
+      pitching: line(pitching, pitchKeys),
+    });
+  }
+
+  const byDecade = new Map<number, AwardSeason[]>();
+  for (const [season, winners] of [...bySeason].sort((a, b) => b[0] - a[0]))
+    push(byDecade, Math.floor(season / 10) * 10, {
+      season,
+      winners,
+      ballot: awardBallot(awardId, season).length > 0,
+    });
+
+  return {
+    id: awardId,
+    label: awardLabel(awardId),
+    count: given.length,
+    decades: [...byDecade]
+      .sort((a, b) => b[0] - a[0])
+      .map(([decade, seasons]) => ({ decade, seasons })),
+    lines,
+  };
+}
+
+/* ── The awards handed out monthly ──────────────────────────────────── */
+
+/*
+ * A monthly award is really one award given twice, and it is read as a pair:
+ * who took the National League's April, who took the American League's. So
+ * the two ids share a page, with a column each and the month between them,
+ * rather than each getting a list of names with no month against them.
+ */
+const MONTHLY_PAIRS: { al: string; nl: string; label: string }[] = [
+  { al: "ALPOM", nl: "NLPOM", label: "Players of the Month" },
+  { al: "ALPITOM", nl: "NLPITOM", label: "Pitchers of the Month" },
+  { al: "ALROM", nl: "NLROM", label: "Rookies of the Month" },
+  { al: "ALRRELMON", nl: "NLRRELMON", label: "Relievers of the Month" },
+];
+
+/** The pair one monthly award id belongs to, or null for everything else. */
+export const monthlyPair = (id: string) =>
+  MONTHLY_PAIRS.find((p) => p.al === id || p.nl === id) ?? null;
+
+export interface MonthlyWinner {
+  id: number;
+  name: string;
+  team: string;
+  teamId: number | null;
+  /** Both, so a two-way winner reads the way he won it. Null where the month
+      has no line of that kind — or no line at all, before MLB split them. */
+  hitting: Record<string, TeamStatValue> | null;
+  pitching: Record<string, TeamStatValue> | null;
+}
+
+export interface MonthlyRow {
+  season: number;
+  /** 4 through 9 — the month the award is for, not the date it was given. */
+  month: number;
+  al: MonthlyWinner | null;
+  nl: MonthlyWinner | null;
+}
+
+export interface MonthlyAward {
+  id: string;
+  label: string;
+  decades: { decade: number; rows: MonthlyRow[] }[];
+}
+
+export const MONTH_NAME = [
+  "",
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
+];
+
+/*
+ * March belongs to April's award and October to September's — MLB's own
+ * splits cut at the calendar, the award doesn't. Merging them is the same
+ * arithmetic a season total is, so it is the same function.
+ */
+const MONTH_SPILL: Record<number, number> = { 3: 4, 10: 9 };
+
+/**
+ * One monthly award, both leagues, month by month back as far as it was
+ * given — the two recipient lists, then the winners' month lines a season at
+ * a time, which is the only grain MLB publishes them at.
+ */
+export async function getMonthlyAward(
+  id: string,
+): Promise<MonthlyAward | null> {
+  const pair = monthlyPair(id);
+  if (!pair) return null;
+
+  const [alData, nlData, teams] = await Promise.all([
+    mlb(`/awards/${pair.al}/recipients`, 86400).catch(() => null),
+    mlb(`/awards/${pair.nl}/recipients`, 86400).catch(() => null),
+    mlbTeams().catch(() => []),
+  ]);
+  const abbr = new Map(teams.map((t: any) => [t.id, t.abbreviation as string]));
+
+  type Given = {
+    season: number;
+    month: number;
+    side: "al" | "nl";
+    id: number;
+    name: string;
+    teamId: number | null;
+  };
+  const given: Given[] = [];
+  for (const [side, data] of [
+    ["al", alData],
+    ["nl", nlData],
+  ] as const)
+    for (const a of (data?.awards ?? []) as any[]) {
+      /* The award is dated the last day of its month, so the date is the
+         month — the season alone would put six winners on one row. */
+      const month = Number(String(a.date ?? "").slice(5, 7));
+      if (!a.player?.id || !a.season || !month) continue;
+      given.push({
+        season: Number(a.season),
+        month: MONTH_SPILL[month] ?? month,
+        side,
+        id: a.player.id,
+        name: a.player.nameFirstLast ?? "",
+        teamId: a.team?.id ?? null,
+      });
+    }
+  if (given.length === 0) return null;
+
+  /* One request a season, a dozen seasons at a time: a month line only comes
+     back season-scoped, and fifty of them at once is a rude way to ask. */
+  const seasons = [...new Set(given.map((g) => g.season))].sort((a, b) => b - a);
+  const lines = new Map<string, Record<string, TeamStatValue>>();
+  const hitKeys = statLineKeys("hitting");
+  const pitchKeys = statLineKeys("pitching");
+
+  for (let i = 0; i < seasons.length; i += 12) {
+    await Promise.all(
+      seasons.slice(i, i + 12).map(async (season) => {
+        const ids = [
+          ...new Set(
+            given.filter((g) => g.season === season).map((g) => g.id),
+          ),
+        ];
+        const data = await mlb(
+          `/people?personIds=${ids.join(",")}&hydrate=` +
+            encodeURIComponent(
+              `stats(group=[hitting,pitching],type=[byMonth],season=${season})`,
+            ),
+          86400,
+        ).catch(() => null);
+        for (const p of (data?.people ?? []) as any[])
+          for (const st of (p.stats ?? []) as any[]) {
+            const group = st.group?.displayName;
+            if (group !== "hitting" && group !== "pitching") continue;
+            const keys = group === "hitting" ? hitKeys : pitchKeys;
+            /* Two calendar months can land on one award month, so a line is
+               collected and then added rather than written straight in. */
+            const at = new Map<number, Record<string, TeamStatValue>[]>();
+            for (const sp of (st.splits ?? []) as any[]) {
+              const m = MONTH_SPILL[sp.month] ?? sp.month;
+              push(
+                at,
+                m,
+                Object.fromEntries(keys.map((k) => [k, sp.stat?.[k] ?? null])),
+              );
+            }
+            for (const [m, list] of at)
+              lines.set(
+                `${p.id}:${season}:${m}:${group}`,
+                list.length === 1 ? list[0] : sumStatLines(group, list),
+              );
+          }
+      }),
+    );
+  }
+
+  const rows = new Map<string, MonthlyRow>();
+  for (const g of given) {
+    const key = `${g.season}:${g.month}`;
+    const row: MonthlyRow =
+      rows.get(key) ?? { season: g.season, month: g.month, al: null, nl: null };
+    row[g.side] = {
+      id: g.id,
+      name: g.name,
+      team: abbr.get(g.teamId ?? -1) ?? "—",
+      teamId: g.teamId,
+      hitting: lines.get(`${g.id}:${g.season}:${g.month}:hitting`) ?? null,
+      pitching: lines.get(`${g.id}:${g.season}:${g.month}:pitching`) ?? null,
+    };
+    rows.set(key, row);
+  }
+
+  const byDecade = new Map<number, MonthlyRow[]>();
+  for (const row of [...rows.values()].sort(
+    (a, b) => b.season - a.season || b.month - a.month,
+  ))
+    push(byDecade, Math.floor(row.season / 10) * 10, row);
+
+  return {
+    id,
+    label: pair.label,
+    decades: [...byDecade]
+      .sort((a, b) => b[0] - a[0])
+      .map(([decade, rows]) => ({ decade, rows })),
   };
 }
 

@@ -1,18 +1,26 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import Panel from "@/components/ui/Panel";
-import { awardLabel, ballotIndex } from "@/lib/mlb";
+import { AWARD_PAGES, ballotIndex } from "@/lib/mlb";
 
 /*
- * The awards index: every season the BBWAA's voting is on record for, and
- * which of the eight ballots that season has. A season is one page, so this
- * is the way into a year rather than into an award.
+ * The awards index — the way into an award rather than into a year.
+ *
+ * Every award the feed will answer for, in one box — the Chalmers Award of
+ * 1911 through this week's Player of the Week. Each links to its own page,
+ * which is every winner it has ever had, a decade at a time. One award to a
+ * line, in the order the awards are read in rather than alphabetically — the
+ * two leagues of each one together, the way the vote is announced.
+ *
+ * Under it the seasons whose BBWAA ballots are on record: a ballot is one
+ * page per season for all eight votes at once, so it is a different kind of
+ * link and gets its own panel rather than a column beside the awards.
  */
 
 export const metadata: Metadata = {
-  title: "AWARDS VOTING — STAT//SIGHTLINE",
+  title: "AWARDS INDEX — STAT//SIGHTLINE",
   description:
-    "BBWAA voting results by season — MVP, Cy Young and Rookie of the Year, both leagues, with every player who drew a vote.",
+    "Every MLB award — MVP, Cy Young, Rookie and Manager of the Year, the postseason and monthly awards, Gold Gloves and Silver Sluggers, back to the Chalmers Award of 1911 — with every winner by decade, and the BBWAA's ballots season by season.",
 };
 
 export default function AwardIndexPage() {
@@ -21,49 +29,44 @@ export default function AwardIndexPage() {
   return (
     <div className="mx-auto max-w-[110rem] px-4">
       <section className="space-y-3 border-x border-line px-4 py-8 sm:px-8">
-        <div>
-          <p className="text-xs tracking-[0.3em] text-ink-3">INDEX</p>
-          <h1 className="mt-2 text-2xl tracking-[0.15em] text-ink">
-            AWARDS VOTING
-          </h1>
-          <p className="mt-2 text-[10px] tracking-widest text-ink-3">
-            {years.length} SEASONS · {years[years.length - 1]?.season}–
-            {years[0]?.season}
-          </p>
-        </div>
+        <h1 className="text-2xl tracking-[0.15em] text-ink">
+          MLB AWARDS AND HONORS
+        </h1>
 
-        <Panel title="BY SEASON">
-          <ul className="divide-y divide-grid border border-line">
-            {years.map(({ season, awards }) => (
-              <li
-                key={season}
-                className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2 hover:bg-surface-2"
-              >
+        <Panel title="AWARDS">
+          <ul className="border border-line px-3 py-2">
+            {AWARD_PAGES.map((a) => (
+              <li key={a.id}>
                 <Link
-                  href={`/award/${season}`}
-                  className="w-12 shrink-0 text-[13px] font-bold tabular-nums text-accent hover:underline"
+                  href={`/award/${a.id}`}
+                  className="block py-0.5 text-[12px] tracking-wide text-accent hover:underline"
                 >
-                  {season}
+                  {a.label} Winners
                 </Link>
-                {awards.map((id) => (
-                  <Link
-                    key={id}
-                    href={`/award/${season}#${id}`}
-                    className="text-[12px] tracking-wide text-ink-3 hover:text-accent hover:underline"
-                  >
-                    {awardLabel(id).toUpperCase()}
-                  </Link>
-                ))}
               </li>
             ))}
           </ul>
         </Panel>
 
+        <Panel title="AWARD VOTING SUMMARIES">
+          <div className="flex flex-wrap gap-x-3 gap-y-1.5 border border-line px-3 py-2.5">
+            {years.map(({ season }) => (
+              <Link
+                key={season}
+                href={`/award/${season}`}
+                className="text-[13px] tabular-nums text-accent hover:underline"
+              >
+                {season}
+              </Link>
+            ))}
+          </div>
+        </Panel>
+
         <p className="border border-line bg-bg px-3 py-2 text-[10px] leading-5 text-ink-3">
-          Voting results are the BBWAA&apos;s own. MLB&apos;s feed publishes the
-          winner of a vote and not the ballot, so awards outside these eight —
-          Gold Gloves, Silver Sluggers, the postseason awards — have a page per
-          season but list winners only.
+          A season above is the whole ballot — every player who drew a vote in
+          the eight the BBWAA polls, with the line he polled on. The awards
+          nobody votes on have winners only, which is all MLB&apos;s feed
+          publishes for them.
         </p>
 
         <Link
