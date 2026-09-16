@@ -671,16 +671,29 @@ const dayText = (iso: string) =>
     .toUpperCase();
 
 /** "W 5-4" in the colour of the result, so a log skims — and, like the date
- *  beside it, a way into the game it is the summary of. */
+ *  beside it, a way into the game it is the summary of. A game still being
+ *  played says so instead, the same mark the club's schedule carries. */
 function Result({
   text,
   win,
   gamePk,
+  live = false,
 }: {
   text: string;
   win: boolean | null;
   gamePk: number;
+  live?: boolean;
 }) {
+  if (live)
+    return (
+      <Link
+        href={`/game/${gamePk}`}
+        className="whitespace-nowrap text-[10px] tracking-widest text-crit hover:underline"
+      >
+        <span className="mr-1 inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-crit align-middle" />
+        LIVE
+      </Link>
+    );
   if (!text) return <span className="text-ink-3">—</span>;
   return (
     <Link
@@ -792,7 +805,7 @@ export function GameLogPanel({
                       </span>
                     </td>
                     <td className="px-3 py-1.5 text-center whitespace-nowrap">
-                      <Result text={r.result} win={r.win} gamePk={r.gamePk} />
+                      <Result text={r.result} win={r.win} gamePk={r.gamePk} live={r.live} />
                     </td>
                     {cells(columns, r.values)}
                     {cells(running, r.running, true)}
@@ -1031,7 +1044,7 @@ export function RecentGamesPanel({
               </span>
             </td>
             <td className="px-3 py-1.5 text-center whitespace-nowrap">
-              <Result text={r.result} win={r.win} gamePk={r.gamePk} />
+              <Result text={r.result} win={r.win} gamePk={r.gamePk} live={r.live} />
             </td>
             {cells(columns, r.values)}
           </Row>

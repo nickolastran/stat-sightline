@@ -5114,6 +5114,8 @@ export interface GameLogRow {
   home: boolean;
   /** "W 5-4", "L 13-12", "W 5-4 F/10" — blank if the score never arrived. */
   result: string;
+  /** Being played right now, which is why it has no result to print yet. */
+  live: boolean;
   win: boolean | null;
   /** Which round of October this was — "" in a regular-season log. */
   series: SeriesCode | "";
@@ -5268,6 +5270,9 @@ export async function getPlayerGameLog(
         : null,
       home: !!s.isHome,
       result: gameResult(g, s.team?.id),
+      /* A game still being played has a line but no result — the log says so
+         the way the schedule does rather than printing an empty cell. */
+      live: !!g && gameStatus(g).tone === "live",
       win: typeof s.isWin === "boolean" ? s.isWin : null,
       series: career ? (s.gameType ?? "") : "",
       values: lines[i],
