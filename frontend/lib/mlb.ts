@@ -1640,9 +1640,11 @@ export function latestByGame(games: Game[]): Game[] {
 export async function getTeamSchedule(
   id: number,
   season: number,
+  /** Narrowed to "R" where October would only muddy a count. */
+  gameTypes: string = "R,F,D,L,W",
 ): Promise<Game[]> {
   const data = await mlb(
-    `/schedule?sportId=1&teamId=${id}&season=${season}&gameType=R,F,D,L,W&hydrate=${SCHEDULE_HYDRATE}`,
+    `/schedule?sportId=1&teamId=${id}&season=${season}&gameType=${gameTypes}&hydrate=${SCHEDULE_HYDRATE}`,
     300,
   );
   return latestByGame(
@@ -5053,6 +5055,63 @@ export function lastSevenDays(
 
 /** The synthetic code the vs-club line is filed under — MLB has none. */
 export const VS_TEAM_CODE = "vsteam";
+
+/**
+ * How much of a club's season is still to be played, as a multiplier on a
+ * line: 162/151 in the middle of September, 1 once the schedule has run out.
+ * Only the regular season is counted, so October's bracket never reads as
+ * games a batting line still has coming.
+ *
+ * A season that isn't the one being played has nothing left to project, and
+ * answers 1 rather than a figure that would only restate the line.
+ */
+export async function seasonPace(
+  teamId: number | null,
+  season: number,
+  today: string = todayPT(),
+): Promise<number> {
+  if (!teamId || season !== seasonOf(today)) return 1;
+  const games = await getTeamSchedule(teamId, season, "R").catch(
+    () => [] as Game[],
+  );
+  const played = games.filter((g) => g.state === "Final").length;
+  return played > 0 && games.length > played ? games.length / played : 1;
+}
+
+/**
+ * A season line carried to the end of the schedule at the pace it was set —
+ * "on pace for", the way a counting column is read in September.
+ *
+ * Only the counts are scaled; every rate is worked out again from them, so
+ * the projected line adds up the way the real one does. The pace is the
+ * club's, not the player's: a line is projected over the games his club has
+ * left, which is what a reader means by "if he keeps this up".
+ */
+export function projectStatLine(
+  group: StatGroup,
+  values: Record<string, TeamStatValue>,
+  pace: number,
+): Record<string, TeamStatValue> {
+  const rates = new Set(RATE_KEYS[group]);
+  const innKey =
+    group === "pitching"
+      ? "inningsPitched"
+      : group === "fielding"
+        ? "innings"
+        : "";
+  const scaled: Record<string, TeamStatValue> = {};
+  for (const k of statLineKeys(group)) {
+    if (rates.has(k) || k === innKey) continue;
+    const n = teamStatNum(values[k]);
+    if (n === null) continue;
+    /* WAR is a counting stat that is written to a tenth; everything else a
+       line counts is a whole thing that happened. */
+    scaled[k] =
+      k === "war" ? Math.round(n * pace * 10) / 10 : Math.round(n * pace);
+  }
+  if (innKey) scaled[innKey] = inningsOf(Math.round(outsOf(values[innKey]) * pace));
+  return sumStatLines(group, [scaled]);
+}
 
 /**
  * A player's season against one club. MLB reports this under a stat type of

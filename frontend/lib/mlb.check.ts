@@ -25,6 +25,7 @@ import {
   immaculatePlays,
   inRotation,
   lastSevenDays,
+  projectStatLine,
   overviewSplitCodes,
   headToHead,
   inProgress,
@@ -1434,3 +1435,38 @@ console.log("overviewSplitCodes ok");
   );
 }
 console.log("lastSevenDays ok");
+
+/*
+ * A line carried out at the pace it was set. The counts scale and the rates
+ * are worked out again from them, so the projected row adds up the way the
+ * real one does — a scaled average taken at face value would drift off its
+ * own hits and at-bats, and innings are thirds, not decimals.
+ */
+{
+  const bat = projectStatLine(
+    "hitting",
+    { gamesPlayed: 81, atBats: 300, hits: 90, homeRuns: 20, avg: ".300" },
+    2,
+  );
+  assert.equal(bat.gamesPlayed, 162, "a half season doubles");
+  assert.equal(bat.homeRuns, 40);
+  assert.equal(bat.avg, ".300", "the rate is the same line, not a doubled one");
+
+  const arm = projectStatLine(
+    "pitching",
+    { inningsPitched: "100.1", earnedRuns: 30, era: "2.69" },
+    1.5,
+  );
+  /* 100.1 IP is 301 outs; half again is 451.5, which lands on 452 — 150 and
+     two thirds, not the 150.1 a decimal would have given. */
+  assert.equal(arm.inningsPitched, "150.2", "innings are counted in outs");
+  assert.equal(arm.earnedRuns, 45);
+  assert.equal(arm.era, "2.69", "the same rate over half again the work");
+
+  assert.equal(
+    projectStatLine("hitting", { homeRuns: 20 }, 1).homeRuns,
+    20,
+    "a season with nothing left to play projects to itself",
+  );
+}
+console.log("projectStatLine ok");

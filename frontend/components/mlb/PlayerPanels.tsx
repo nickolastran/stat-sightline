@@ -947,13 +947,15 @@ export function SplitsSummaryPanel({
 }
 
 /**
- * The season against what it is a part of: this year's line, October's if
- * there is one, and the career under both.
+ * The season against what it is a part of: this year's line, where it is
+ * headed at the pace it has been set, October's if there is one, and the
+ * career under all of it.
  */
 export function SeasonSummaryPanel({
   group,
   season,
   seasonRows,
+  projected,
   postRows,
   career,
   href,
@@ -961,6 +963,9 @@ export function SeasonSummaryPanel({
   group: StatGroup;
   season: number;
   seasonRows: CareerRow[];
+  /** The season line carried to the end of the schedule — null once there is
+   *  nothing left to play, when it would only restate the row above it. */
+  projected?: Record<string, TeamStatValue> | null;
   postRows: CareerRow[];
   career: Record<string, TeamStatValue> | null;
   href: string;
@@ -972,6 +977,12 @@ export function SeasonSummaryPanel({
       seasonRows.length > 1 ? `REGULAR SEASON · ${r.team}` : "REGULAR SEASON",
       r.values,
     ]),
+    ...(projected
+      ? ([["PROJECTED", projected]] as [
+          string,
+          Record<string, TeamStatValue>,
+        ][])
+      : []),
     ...postRows.map((r): [string, Record<string, TeamStatValue>] => [
       "POSTSEASON",
       r.values,
@@ -986,7 +997,13 @@ export function SeasonSummaryPanel({
         )}
         {rows.map(([name, values], i) => (
           <Row key={`${name}-${i}`}>
-            <td className="px-3 py-1.5 whitespace-nowrap text-ink-2">{name}</td>
+            <td
+              className={`px-3 py-1.5 whitespace-nowrap ${
+                name === "PROJECTED" ? "text-ink-3 italic" : "text-ink-2"
+              }`}
+            >
+              {name}
+            </td>
             {cells(columns, values)}
           </Row>
         ))}

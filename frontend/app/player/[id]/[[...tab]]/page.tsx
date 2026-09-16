@@ -34,6 +34,9 @@ import {
   getPlayerSplits,
   getVsTeamSplit,
   lastSevenDays,
+  projectStatLine,
+  seasonPace,
+  sumStatLines,
   overviewSplitCodes,
   getClubs,
   type Club,
@@ -180,15 +183,30 @@ async function Overview({
      to the batting slices the rest of the page is being read with. */
   const splitGroup = group === "pitching" ? "pitching" : "hitting";
   const query = `?season=${season}&group=${group}`;
-  const [game, career, post, splits, log] = await Promise.all([
+  const [game, career, post, splits, log, pace] = await Promise.all([
     nextGame(player.teamId, season),
     getPlayerCareer(player.id, group).catch(() => EMPTY_CAREER),
     getPlayerCareer(player.id, group, true).catch(() => EMPTY_CAREER),
     getPlayerSplits(player.id, season, splitGroup).catch(() => []),
     getPlayerGameLog(player.id, season, group).catch(() => []),
+    seasonPace(player.teamId, season).catch(() => 1),
   ]);
   const line = player.lines.find((l) => l.group === group);
   const year = String(season);
+  const seasonRows = career.rows.filter((r) => r.season === year);
+  /* A season split by a trade arrives as a combined line and one per club, so
+     the pace is set against the whole of it — added up only where MLB didn't
+     already, which is never for a player who stayed put. */
+  const whole =
+    seasonRows.find((r) => r.teams > 1)?.values ??
+    (seasonRows.length > 0
+      ? sumStatLines(
+          group,
+          seasonRows.map((r) => r.values),
+        )
+      : null);
+  const projected =
+    pace > 1 && whole ? projectStatLine(group, whole, pace) : null;
   /* The next opponent decides which league and club lines are worth leading
      with, so it is read off the game the panel above is already showing. */
   const next = await nextUp(player.teamId, game);
@@ -228,7 +246,8 @@ async function Overview({
       <SeasonSummaryPanel
         group={group}
         season={season}
-        seasonRows={career.rows.filter((r) => r.season === year)}
+        seasonRows={seasonRows}
+        projected={projected}
         postRows={post.rows.filter((r) => r.season === year)}
         career={career.total}
         href={`${href}/stats?group=${group}`}
