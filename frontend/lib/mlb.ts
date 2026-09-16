@@ -890,6 +890,45 @@ async function seasonWar(
   return { player, team };
 }
 
+/**
+ * Quality starts for the whole league, keyed by player. One read of the
+ * advanced line, cached for the day like the sabermetrics one — the standard
+ * season feed has no such column and won't sort by it either.
+ */
+interface QsLine {
+  id: number;
+  name: string;
+  team: string;
+  qs: number;
+}
+
+async function seasonQualityStarts(
+  season: number,
+  gameType: string = "R",
+): Promise<QsLine[]> {
+  const data = await mlb(
+    `/stats?stats=seasonAdvanced&group=pitching&season=${season}&sportId=1` +
+      `&gameType=${gameType}&playerPool=All&limit=2000`,
+    86400,
+  ).catch(() => null);
+
+  return ((data?.stats?.[0]?.splits ?? []) as any[]).flatMap(
+    (split): QsLine[] => {
+      const qs = teamStatNum(split.stat?.qualityStarts);
+      return qs === null || typeof split.player?.id !== "number"
+        ? []
+        : [
+            {
+              id: split.player.id,
+              name: split.player.fullName ?? "—",
+              team: split.team?.name ?? "",
+              qs,
+            },
+          ];
+    },
+  );
+}
+
 /** WAR as a table prints it, or blank where the feed has no line. */
 const warText = (war: number | undefined): TeamStatValue =>
   war === undefined ? null : SABER_FORMAT.war(war);
@@ -1311,6 +1350,31 @@ async function warBoard(
   };
 }
 
+/**
+ * The quality starts card. MLB publishes no such leader category — the same
+ * gap WAR has — so this ranks the advanced line itself. Ties share a rank,
+ * the way every other card's do, which is what the "T-" mark reads off.
+ */
+async function qsBoard(season: number, limit: number): Promise<Leaderboard> {
+  const lines = (await seasonQualityStarts(season)).sort((a, b) => b.qs - a.qs);
+  const top = lines.slice(0, limit);
+  return {
+    code: "pitching.qualityStarts",
+    label: "QUALITY STARTS",
+    group: "pitching",
+    stat: "qualityStarts",
+    leaders: top.map(
+      (l): LeaderRow => ({
+        rank: lines.findIndex((x) => x.qs === l.qs) + 1,
+        personId: l.id,
+        name: l.name,
+        team: l.team,
+        value: String(l.qs),
+      }),
+    ),
+  };
+}
+
 export async function getLeaderboards(
   season: number,
   limit = 20,
@@ -1321,6 +1385,9 @@ export async function getLeaderboards(
     warBoard("hitting", season, limit),
     warBoard("pitching", season, limit),
     ...LEADER_SPECS.map((s) => oneBoard(s, season, limit)),
+    /* Last of the pitching cards rather than in the spec list — it is ranked
+       here rather than by MLB, so it isn't one of them. */
+    qsBoard(season, limit),
   ]);
 }
 
@@ -1919,11 +1986,30 @@ export const WAR_COL: TeamStatCol = {
 };
 
 /**
- * The player board's columns: WAR ahead of the standard line. Fielding has no
- * sabermetric line at all, so it has no column.
+ * Quality starts, which the standard season line doesn't count — six innings
+ * or more on three earned runs or fewer. The advanced line is the only feed
+ * that carries it, so the board joins it on the way it joins WAR.
+ */
+export const QS_COL: TeamStatCol = {
+  key: "qualityStarts",
+  label: "QS",
+  title: "Starts of six innings or more on three earned runs or fewer",
+};
+
+/**
+ * The player board's columns: WAR ahead of the standard line, and quality
+ * starts beside the starts they are counted from. Fielding has no
+ * sabermetric line at all, so it has neither column.
  */
 export const leaderCols = (group: StatGroup): TeamStatCol[] =>
-  group === "fielding" ? playerCols(group) : [WAR_COL, ...playerCols(group)];
+  group === "fielding"
+    ? playerCols(group)
+    : [
+        WAR_COL,
+        ...playerCols(group).flatMap((c) =>
+          c.key === "gamesStarted" ? [c, QS_COL] : [c],
+        ),
+      ];
 
 export const pickLeaderStat = (
   raw: string | undefined,
@@ -2020,15 +2106,16 @@ export async function getStatLeaders({
   order?: "asc" | "desc";
 }): Promise<StatLeaderPage> {
   /*
-   * WAR is the one column MLB can't rank: it lives on a feed of its own, and
-   * the stats endpoint silently ignores `sortStat=war` rather than refusing
-   * it, which would leave the board in somebody else's order under WAR's
-   * heading. So a WAR sort asks for the whole qualified pool in one request
-   * and does the ordering here. That pool is a couple of hundred players —
-   * MLB's qualifier is what keeps it small — so this is one request either
-   * way, not a page's worth more.
+   * WAR and quality starts are the two columns MLB can't rank: both live on
+   * feeds of their own, and the stats endpoint silently ignores a `sortStat`
+   * it doesn't know rather than refusing it, which would leave the board in
+   * somebody else's order under the heading that was clicked. So a sort on
+   * either asks for the whole qualified pool in one request and does the
+   * ordering here. That pool is a couple of hundred players — MLB's
+   * qualifier is what keeps it small — so this is one request either way,
+   * not a page's worth more.
    */
-  const byWar = stat === "war";
+  const ranked = stat === "war" || stat === "qualityStarts";
   /*
    * The other column MLB can't answer: every arm is filed under position "P",
    * so `position=SP` comes back as the whole pitching board rather than the
@@ -2042,21 +2129,23 @@ export async function getStatLeaders({
      board with nobody on it, so the bullpen is drawn from every arm and given
      a bar of its own below. */
   const relief = position === "RP";
-  const whole = byWar || byRole;
-  const [data, war] = await Promise.all([
+  const whole = ranked || byRole;
+  const [data, war, qs] = await Promise.all([
     mlb(
       `/stats?stats=season&group=${group}&season=${season}&sportId=1` +
         `&gameType=${gameType}&hydrate=team` +
         `&playerPool=${relief ? "all" : "qualified"}` +
-        `&sortStat=${byWar ? defaultLeaderStat(group) : stat}` +
+        `&sortStat=${ranked ? defaultLeaderStat(group) : stat}` +
         `&limit=${whole ? WHOLE_BOARD : limit}&offset=${whole ? 0 : offset}` +
-        (order && !byWar ? `&order=${order}` : "") +
+        (order && !ranked ? `&order=${order}` : "") +
         (league === "all" ? "" : `&leagueId=${league}`) +
         (position === "all" || byRole ? "" : `&position=${position}`),
       1800,
     ),
     seasonWar(season, group, gameType),
+    group === "pitching" ? seasonQualityStarts(season, gameType) : [],
   ]);
+  const qsBy = new Map(qs.map((l) => [l.id, l.qs]));
   const columns = playerCols(group);
   const board = data.stats?.[0];
   const splits = (board?.splits ?? []) as any[];
@@ -2075,9 +2164,10 @@ export async function getStatLeaders({
         ...Object.fromEntries(
           columns.map((c) => [c.key, s.stat?.[c.key] ?? null]),
         ),
-        /* WAR comes from a feed of its own, so it is joined on by player id
-           rather than read off this split. */
+        /* WAR and quality starts come from feeds of their own, so they are
+           joined on by player id rather than read off this split. */
         war: warText(war.player.get(s.player?.id)),
+        qualityStarts: qsBy.get(s.player?.id) ?? null,
       },
     }),
   );
@@ -2105,14 +2195,14 @@ export async function getStatLeaders({
     rows = rows.filter((r) => apps(r) >= bar);
   }
 
-  if (byWar) {
+  if (ranked) {
     /* Best first, like every other column's first click. A player the feed
-       has no WAR for sinks to the bottom in both directions rather than
+       has no figure for sinks to the bottom in both directions rather than
        reading as the worst season in the league. */
     const sign = order === "asc" ? 1 : -1;
     rows = rows.sort((a, b) => {
-      const va = teamStatNum(a.values.war);
-      const vb = teamStatNum(b.values.war);
+      const va = teamStatNum(a.values[stat]);
+      const vb = teamStatNum(b.values[stat]);
       if (va === null) return vb === null ? 0 : 1;
       if (vb === null) return -1;
       return (va - vb) * sign;
