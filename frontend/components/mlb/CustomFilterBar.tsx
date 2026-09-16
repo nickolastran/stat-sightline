@@ -89,6 +89,24 @@ const yearOptions = (first: number, last: number) =>
     label: String(last - i),
   }));
 
+/*
+ * The board on screen, as the file route asks for it. Built from what was
+ * applied rather than from the draft beside it: the link downloads the board
+ * being read, not the one half-picked in the bar above it.
+ */
+const csvHref = (q: CustomQuery, season: number) =>
+  `/stats/custom/csv?${new URLSearchParams({
+    group: q.group,
+    season: String(season),
+    min: q.min,
+    league: q.league,
+    div: q.division,
+    team: q.team,
+    pos: q.position,
+    rookies: q.rookies ? "1" : "",
+    cols: q.cols.join("|"),
+  })}`;
+
 /** What the draft is: the applied query, plus the season it was read at. */
 type Draft = CustomQuery & { season: number };
 
@@ -222,6 +240,18 @@ export default function CustomFilterBar({
         >
           ROOKIES
         </button>
+        {/* Sits over UPDATE, which is the other thing on this form that isn't
+            a control: one applies the board, one takes it away with you. A
+            plain link, so it can be copied, and empty columns are a board
+            with nothing to write. */}
+        {query.cols.length > 0 && (
+          <a
+            href={csvHref(query, season)}
+            className="ml-auto border border-line px-2 py-0.5 text-[10px] tracking-[0.2em] text-ink-3 hover:border-accent hover:text-ink"
+          >
+            DOWNLOAD CSV
+          </a>
+        )}
       </div>
 
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border border-line bg-bg px-3 py-2">

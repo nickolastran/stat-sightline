@@ -119,6 +119,37 @@ export function parseCsv(text: string): Record<string, string>[] {
   return rows.map((r) => Object.fromEntries(head.map((h, i) => [h, r[i] ?? ""])));
 }
 
+/*
+ * The board as a file. A cell is written as it is stored rather than as it is
+ * printed — no thousands separator, and an untracked figure left empty rather
+ * than an em dash — because the thing opening this is a spreadsheet, which
+ * would read both as text and refuse to add them up.
+ */
+const cell = (v: TeamStatValue): string =>
+  v === null || v === undefined ? "" : String(v);
+
+/** RFC 4180: a field carrying a comma, a quote or a newline is quoted. */
+const field = (s: string): string =>
+  /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+
+export const csvOf = (
+  columns: ViewCol[],
+  rows: AdvRow[],
+  pos: boolean,
+): string =>
+  [
+    ["RK", "NAME", "TEAM", ...(pos ? ["POS"] : []), ...columns.map((c) => c.label)],
+    ...rows.map((r, i) => [
+      String(i + 1),
+      r.name,
+      r.team,
+      ...(pos ? [r.position] : []),
+      ...columns.map((c) => cell(r.values[c.key])),
+    ]),
+  ]
+    .map((line) => line.map(field).join(","))
+    .join("\n");
+
 const SAVANT = "https://baseballsavant.mlb.com/leaderboard";
 
 /**

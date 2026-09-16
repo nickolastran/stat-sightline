@@ -16,6 +16,7 @@ import {
   advCols,
   catalogFor,
   colGroups,
+  csvOf,
   CUSTOM_DIVISIONS,
   CUSTOM_MINS,
   findAdvView,
@@ -24,6 +25,7 @@ import {
   parseCsv,
   pickAdvSeason,
   pickCustomQuery,
+  type AdvRow,
 } from "./advanced";
 
 /* ── A quoted name doesn't shift the row ─────────────────────────────── */
@@ -192,5 +194,51 @@ for (const g of ["hitting", "pitching", "fielding"] as const) {
 // The floors are numbers the board can compare against, bar the two words.
 for (const m of CUSTOM_MINS)
   assert.ok(m.value === "q" || Number.isInteger(Number(m.value)));
+
+/* ── A downloaded board survives a trip back through the reader ─────── */
+{
+  const columns = [
+    { key: "a", label: "AVG", title: "Batting average", group: "STANDARD" },
+    { key: "b", label: "WAR", title: "Wins above replacement", group: "SABER" },
+  ];
+  const rows: AdvRow[] = [
+    {
+      id: 1,
+      name: 'Jr., "Junior" Guerrero',
+      team: "SF",
+      teamId: 137,
+      position: "CF",
+      values: { a: ".311", b: 6.4 },
+    },
+    /* A figure this season doesn't track, which is a blank cell and not a
+       dash — a spreadsheet would read an em dash as text. */
+    { id: 2, name: "Foo Bar", team: "LAD", teamId: 119, position: "1B", values: { a: null } },
+  ];
+  const text = csvOf(columns, rows, true);
+  assert.deepEqual(text.split("\n")[0].split(","), [
+    "RK",
+    "NAME",
+    "TEAM",
+    "POS",
+    "AVG",
+    "WAR",
+  ]);
+  /* The reader is the one already in this file, so a name carrying both a
+     comma and a quote proves the two halves agree. */
+  const back = parseCsv(text);
+  assert.equal(back.length, 2);
+  assert.deepEqual(back[0], {
+    RK: "1",
+    NAME: 'Jr., "Junior" Guerrero',
+    TEAM: "SF",
+    POS: "CF",
+    AVG: ".311",
+    WAR: "6.4",
+  });
+  assert.equal(back[1].AVG, "");
+  assert.equal(back[1].WAR, "");
+  /* A club board has no position, so it has no column for one either. */
+  assert.equal(csvOf(columns, rows, false).split("\n")[0], "RK,NAME,TEAM,AVG,WAR");
+}
 
 console.log("advanced.check.ts custom OK");
