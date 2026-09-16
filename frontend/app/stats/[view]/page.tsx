@@ -158,6 +158,7 @@ export default async function AdvancedPage({
     team?: string;
     pos?: string;
     min?: string;
+    rookies?: string;
   }>;
 }) {
   const { view } = await params;

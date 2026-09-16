@@ -135,6 +135,7 @@ export default function CustomFilterBar({
     draft.division !== query.division ||
     draft.team !== query.team ||
     draft.position !== query.position ||
+    draft.rookies !== query.rookies ||
     draft.cols.join("|") !== query.cols.join("|");
 
   const update = (e: React.FormEvent) => {
@@ -147,6 +148,7 @@ export default function CustomFilterBar({
       div: draft.division === "all" ? null : draft.division,
       team: draft.team === "all" ? null : draft.team,
       pos: draft.position === "all" ? null : draft.position,
+      rookies: draft.rookies ? "1" : null,
       /* Always written, even empty: an absent `cols` is a first visit and
          opens on the default line, where an empty one is a reader who
          cleared every box and means it. */
@@ -206,6 +208,20 @@ export default function CustomFilterBar({
           options={LEADER_POSITIONS}
           onChange={(v) => set("position", v)}
         />
+        {/* A pool rather than a filter — MLB decides who is a rookie, so this
+            is one press, not a service-time box a reader has to fill in. */}
+        <button
+          type="button"
+          aria-pressed={draft.rookies}
+          onClick={() => set("rookies", !draft.rookies)}
+          className={`border px-2 py-0.5 text-[10px] tracking-[0.2em] ${
+            draft.rookies
+              ? "border-accent bg-accent font-bold text-white"
+              : "border-line text-ink-3 hover:border-accent hover:text-ink"
+          }`}
+        >
+          ROOKIES
+        </button>
       </div>
 
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border border-line bg-bg px-3 py-2">
