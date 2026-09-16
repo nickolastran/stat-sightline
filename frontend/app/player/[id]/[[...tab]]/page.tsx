@@ -32,6 +32,15 @@ import {
   getPlayerGroups,
   getPlayerSeasons,
   getPlayerSplits,
+  getVsTeamSplit,
+  lastSevenDays,
+  projectStatLine,
+  seasonPace,
+  sumStatLines,
+  overviewSplitCodes,
+  getClubs,
+  type Club,
+  type SplitLine,
   getTeamSchedule,
   groupOptions,
   pickPlayerGameType,
@@ -138,6 +147,22 @@ async function nextGame(teamId: number | null, season: number): Promise<Game | n
 }
 
 /**
+ * Who the player is up against next and where — what the overview's splits
+ * are chosen for. A club with nothing on the schedule leaves them generic.
+ */
+async function nextUp(teamId: number | null, game: Game | null) {
+  if (!teamId || !game) return null;
+  const home = game.home.id === teamId;
+  const opponent = home ? game.away : game.home;
+  const clubs = await getClubs().catch(() => [] as Club[]);
+  return {
+    home,
+    opponent: { id: opponent.id, abbr: opponent.abbr },
+    leagueId: clubs.find((c) => c.id === opponent.id)?.leagueId ?? 0,
+  };
+}
+
+/**
  * A little of every other tab: what's next, how the season has gone in the
  * slices anyone checks first, the season against the career, and the last few
  * games. Every block links through to the tab it is a preview of.
@@ -158,15 +183,39 @@ async function Overview({
      to the batting slices the rest of the page is being read with. */
   const splitGroup = group === "pitching" ? "pitching" : "hitting";
   const query = `?season=${season}&group=${group}`;
-  const [game, career, post, splits, log] = await Promise.all([
+  const [game, career, post, splits, log, pace] = await Promise.all([
     nextGame(player.teamId, season),
     getPlayerCareer(player.id, group).catch(() => EMPTY_CAREER),
     getPlayerCareer(player.id, group, true).catch(() => EMPTY_CAREER),
     getPlayerSplits(player.id, season, splitGroup).catch(() => []),
     getPlayerGameLog(player.id, season, group).catch(() => []),
+    seasonPace(player.teamId, season).catch(() => 1),
   ]);
   const line = player.lines.find((l) => l.group === group);
   const year = String(season);
+  const seasonRows = career.rows.filter((r) => r.season === year);
+  /* A season split by a trade arrives as a combined line and one per club, so
+     the pace is set against the whole of it — added up only where MLB didn't
+     already, which is never for a player who stayed put. */
+  const whole =
+    seasonRows.find((r) => r.teams > 1)?.values ??
+    (seasonRows.length > 0
+      ? sumStatLines(
+          group,
+          seasonRows.map((r) => r.values),
+        )
+      : null);
+  const projected =
+    pace > 1 && whole ? projectStatLine(group, whole, pace) : null;
+  /* The next opponent decides which league and club lines are worth leading
+     with, so it is read off the game the panel above is already showing. */
+  const next = await nextUp(player.teamId, game);
+  const vsClub =
+    next && splitGroup === "hitting"
+      ? await getVsTeamSplit(player.id, season, splitGroup, next.opponent).catch(
+          () => null,
+        )
+      : null;
 
   return (
     <div className="space-y-3">
@@ -179,14 +228,26 @@ async function Overview({
       />
       <SplitsSummaryPanel
         sections={splits}
-        columns={playerCols(splitGroup)}
+        extra={[lastSevenDays(splitGroup, log), vsClub].filter(
+          (l): l is SplitLine => l !== null,
+        )}
+        codes={overviewSplitCodes(splitGroup, next)}
+        columns={playerCols(splitGroup).filter(
+          /* The overview's slice is read across at a glance, so a bat's line
+             drops the two columns a split says least about. The full set is
+             one click away on the splits tab. */
+          (c) =>
+            splitGroup !== "hitting" ||
+            (c.key !== "runs" && c.key !== "stolenBases"),
+        )}
         href={`${href}/splits${query}`}
         season={season}
       />
       <SeasonSummaryPanel
         group={group}
         season={season}
-        seasonRows={career.rows.filter((r) => r.season === year)}
+        seasonRows={seasonRows}
+        projected={projected}
         postRows={post.rows.filter((r) => r.season === year)}
         career={career.total}
         href={`${href}/stats?group=${group}`}

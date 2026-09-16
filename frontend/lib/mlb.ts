@@ -890,6 +890,45 @@ async function seasonWar(
   return { player, team };
 }
 
+/**
+ * Quality starts for the whole league, keyed by player. One read of the
+ * advanced line, cached for the day like the sabermetrics one — the standard
+ * season feed has no such column and won't sort by it either.
+ */
+interface QsLine {
+  id: number;
+  name: string;
+  team: string;
+  qs: number;
+}
+
+async function seasonQualityStarts(
+  season: number,
+  gameType: string = "R",
+): Promise<QsLine[]> {
+  const data = await mlb(
+    `/stats?stats=seasonAdvanced&group=pitching&season=${season}&sportId=1` +
+      `&gameType=${gameType}&playerPool=All&limit=2000`,
+    86400,
+  ).catch(() => null);
+
+  return ((data?.stats?.[0]?.splits ?? []) as any[]).flatMap(
+    (split): QsLine[] => {
+      const qs = teamStatNum(split.stat?.qualityStarts);
+      return qs === null || typeof split.player?.id !== "number"
+        ? []
+        : [
+            {
+              id: split.player.id,
+              name: split.player.fullName ?? "—",
+              team: split.team?.name ?? "",
+              qs,
+            },
+          ];
+    },
+  );
+}
+
 /** WAR as a table prints it, or blank where the feed has no line. */
 const warText = (war: number | undefined): TeamStatValue =>
   war === undefined ? null : SABER_FORMAT.war(war);
@@ -1311,6 +1350,31 @@ async function warBoard(
   };
 }
 
+/**
+ * The quality starts card. MLB publishes no such leader category — the same
+ * gap WAR has — so this ranks the advanced line itself. Ties share a rank,
+ * the way every other card's do, which is what the "T-" mark reads off.
+ */
+async function qsBoard(season: number, limit: number): Promise<Leaderboard> {
+  const lines = (await seasonQualityStarts(season)).sort((a, b) => b.qs - a.qs);
+  const top = lines.slice(0, limit);
+  return {
+    code: "pitching.qualityStarts",
+    label: "QUALITY STARTS",
+    group: "pitching",
+    stat: "qualityStarts",
+    leaders: top.map(
+      (l): LeaderRow => ({
+        rank: lines.findIndex((x) => x.qs === l.qs) + 1,
+        personId: l.id,
+        name: l.name,
+        team: l.team,
+        value: String(l.qs),
+      }),
+    ),
+  };
+}
+
 export async function getLeaderboards(
   season: number,
   limit = 20,
@@ -1321,6 +1385,9 @@ export async function getLeaderboards(
     warBoard("hitting", season, limit),
     warBoard("pitching", season, limit),
     ...LEADER_SPECS.map((s) => oneBoard(s, season, limit)),
+    /* Last of the pitching cards rather than in the spec list — it is ranked
+       here rather than by MLB, so it isn't one of them. */
+    qsBoard(season, limit),
   ]);
 }
 
@@ -1573,9 +1640,11 @@ export function latestByGame(games: Game[]): Game[] {
 export async function getTeamSchedule(
   id: number,
   season: number,
+  /** Narrowed to "R" where October would only muddy a count. */
+  gameTypes: string = "R,F,D,L,W",
 ): Promise<Game[]> {
   const data = await mlb(
-    `/schedule?sportId=1&teamId=${id}&season=${season}&gameType=R,F,D,L,W&hydrate=${SCHEDULE_HYDRATE}`,
+    `/schedule?sportId=1&teamId=${id}&season=${season}&gameType=${gameTypes}&hydrate=${SCHEDULE_HYDRATE}`,
     300,
   );
   return latestByGame(
@@ -1838,6 +1907,7 @@ export const LEADER_LEAGUES = [
   { value: "104", label: "NATIONAL LEAGUE" },
 ];
 
+/** Every position MLB files a player under — what a fielding board reads by. */
 export const LEADER_POSITIONS = [
   { value: "all", label: "ALL POSITIONS" },
   { value: "P", label: "PITCHER" },
@@ -1846,12 +1916,40 @@ export const LEADER_POSITIONS = [
   { value: "2B", label: "SECOND BASE" },
   { value: "3B", label: "THIRD BASE" },
   { value: "SS", label: "SHORTSTOP" },
+  { value: "IF", label: "INFIELD" },
   { value: "LF", label: "LEFT FIELD" },
   { value: "CF", label: "CENTER FIELD" },
   { value: "RF", label: "RIGHT FIELD" },
   { value: "OF", label: "OUTFIELD" },
   { value: "DH", label: "DESIGNATED HITTER" },
 ];
+
+/* A hitting board has no pitchers on it, so it doesn't offer them; a pitching
+   board is all pitchers, so what it offers is the two jobs an arm has. */
+const BATTER_POSITIONS = LEADER_POSITIONS.filter((p) => p.value !== "P");
+
+const PITCHER_POSITIONS = [
+  { value: "all", label: "ALL PITCHERS" },
+  { value: "SP", label: "STARTING PITCHERS" },
+  { value: "RP", label: "RELIEF PITCHERS" },
+];
+
+/**
+ * Rotation or bullpen, read off the season line — MLB files every arm under
+ * position "P", so this is the only thing that says which job a pitcher has.
+ * Half his appearances as a start puts him in the rotation; nobody with no
+ * line yet has started a game, which leaves him in the bullpen, where a fresh
+ * arm in fact is.
+ */
+export const inRotation = (gs: number, g: number) => gs > 0 && gs * 2 >= g;
+
+/** The POS choices a board of this group can be read by. */
+export const leaderPositions = (group: StatGroup) =>
+  group === "hitting"
+    ? BATTER_POSITIONS
+    : group === "pitching"
+      ? PITCHER_POSITIONS
+      : LEADER_POSITIONS;
 
 /** What each group is ranked by until the reader picks a column. */
 export const defaultLeaderStat = (group: StatGroup): string =>
@@ -1890,11 +1988,30 @@ export const WAR_COL: TeamStatCol = {
 };
 
 /**
- * The player board's columns: WAR ahead of the standard line. Fielding has no
- * sabermetric line at all, so it has no column.
+ * Quality starts, which the standard season line doesn't count — six innings
+ * or more on three earned runs or fewer. The advanced line is the only feed
+ * that carries it, so the board joins it on the way it joins WAR.
+ */
+export const QS_COL: TeamStatCol = {
+  key: "qualityStarts",
+  label: "QS",
+  title: "Starts of six innings or more on three earned runs or fewer",
+};
+
+/**
+ * The player board's columns: WAR ahead of the standard line, and quality
+ * starts beside the starts they are counted from. Fielding has no
+ * sabermetric line at all, so it has neither column.
  */
 export const leaderCols = (group: StatGroup): TeamStatCol[] =>
-  group === "fielding" ? playerCols(group) : [WAR_COL, ...playerCols(group)];
+  group === "fielding"
+    ? playerCols(group)
+    : [
+        WAR_COL,
+        ...playerCols(group).flatMap((c) =>
+          c.key === "gamesStarted" ? [c, QS_COL] : [c],
+        ),
+      ];
 
 export const pickLeaderStat = (
   raw: string | undefined,
@@ -1913,6 +2030,12 @@ export const QUALIFIER_NOTE: Record<StatGroup, string> = {
   pitching: "To qualify, a pitcher must have at least 1 IP/game",
   fielding: "Qualified fielders only — MLB's own pool at each position",
 };
+
+/** The same, for a board that sets its own bar — the bullpen's. */
+export const qualifierNote = (group: StatGroup, position: string): string =>
+  position === "RP"
+    ? "Relievers only, from half the appearances of the league's busiest arm — MLB's 1 IP/game qualifier admits no reliever"
+    : QUALIFIER_NOTE[group];
 
 /**
  * Every club a season a trade split was played for — "MIN/HOU", the one the
@@ -1985,28 +2108,46 @@ export async function getStatLeaders({
   order?: "asc" | "desc";
 }): Promise<StatLeaderPage> {
   /*
-   * WAR is the one column MLB can't rank: it lives on a feed of its own, and
-   * the stats endpoint silently ignores `sortStat=war` rather than refusing
-   * it, which would leave the board in somebody else's order under WAR's
-   * heading. So a WAR sort asks for the whole qualified pool in one request
-   * and does the ordering here. That pool is a couple of hundred players —
-   * MLB's qualifier is what keeps it small — so this is one request either
-   * way, not a page's worth more.
+   * WAR and quality starts are the two columns MLB can't rank: both live on
+   * feeds of their own, and the stats endpoint silently ignores a `sortStat`
+   * it doesn't know rather than refusing it, which would leave the board in
+   * somebody else's order under the heading that was clicked. So a sort on
+   * either asks for the whole qualified pool in one request and does the
+   * ordering here. That pool is a couple of hundred players — MLB's
+   * qualifier is what keeps it small — so this is one request either way,
+   * not a page's worth more.
    */
-  const byWar = stat === "war";
-  const [data, war] = await Promise.all([
+  const ranked = stat === "war" || stat === "qualityStarts";
+  /*
+   * The other column MLB can't answer: every arm is filed under position "P",
+   * so `position=SP` comes back as the whole pitching board rather than the
+   * rotation. Starter or reliever is read off the line instead — the same
+   * reading a roster page uses — which again means the whole pool arrives and
+   * is filtered and paged here.
+   */
+  const byRole = position === "SP" || position === "RP";
+  /* MLB's pitching qualifier is an inning per team game, which no reliever
+     has ever thrown — asking for the qualified pool would answer a bullpen
+     board with nobody on it, so the bullpen is drawn from every arm and given
+     a bar of its own below. */
+  const relief = position === "RP";
+  const whole = ranked || byRole;
+  const [data, war, qs] = await Promise.all([
     mlb(
       `/stats?stats=season&group=${group}&season=${season}&sportId=1` +
-        `&gameType=${gameType}&playerPool=qualified&hydrate=team` +
-        `&sortStat=${byWar ? defaultLeaderStat(group) : stat}` +
-        `&limit=${byWar ? WHOLE_BOARD : limit}&offset=${byWar ? 0 : offset}` +
-        (order && !byWar ? `&order=${order}` : "") +
+        `&gameType=${gameType}&hydrate=team` +
+        `&playerPool=${relief ? "all" : "qualified"}` +
+        `&sortStat=${ranked ? defaultLeaderStat(group) : stat}` +
+        `&limit=${whole ? WHOLE_BOARD : limit}&offset=${whole ? 0 : offset}` +
+        (order && !ranked ? `&order=${order}` : "") +
         (league === "all" ? "" : `&leagueId=${league}`) +
-        (position === "all" ? "" : `&position=${position}`),
+        (position === "all" || byRole ? "" : `&position=${position}`),
       1800,
     ),
     seasonWar(season, group, gameType),
+    group === "pitching" ? seasonQualityStarts(season, gameType) : [],
   ]);
+  const qsBy = new Map(qs.map((l) => [l.id, l.qs]));
   const columns = playerCols(group);
   const board = data.stats?.[0];
   const splits = (board?.splits ?? []) as any[];
@@ -2025,26 +2166,56 @@ export async function getStatLeaders({
         ...Object.fromEntries(
           columns.map((c) => [c.key, s.stat?.[c.key] ?? null]),
         ),
-        /* WAR comes from a feed of its own, so it is joined on by player id
-           rather than read off this split. */
+        /* WAR and quality starts come from feeds of their own, so they are
+           joined on by player id rather than read off this split. */
         war: warText(war.player.get(s.player?.id)),
+        qualityStarts: qsBy.get(s.player?.id) ?? null,
       },
     }),
   );
 
-  if (byWar) {
+  if (byRole) {
+    const starter = (r: StatLeaderRow) =>
+      inRotation(
+        teamStatNum(r.values.gamesStarted) ?? 0,
+        teamStatNum(r.values.gamesPlayed) ?? 0,
+      );
+    rows = rows.filter((r) => starter(r) === (position === "SP"));
+  }
+
+  if (relief) {
+    /* A bullpen board has to keep the September call-up's two scoreless
+       innings from leading the league in ERA, and MLB publishes no bar to
+       use — so the board sets one off itself: half the work the busiest arm
+       in the league has been given, which is around 35 appearances over a
+       full season and scales down to what a bullpen has actually thrown in
+       April.
+       ponytail: a self-scaled bar, not MLB's — a published reliever
+       qualifier would replace it if one ever existed. */
+    const apps = (r: StatLeaderRow) => teamStatNum(r.values.gamesPlayed) ?? 0;
+    const bar = Math.max(0, ...rows.map(apps)) / 2;
+    rows = rows.filter((r) => apps(r) >= bar);
+  }
+
+  if (ranked) {
     /* Best first, like every other column's first click. A player the feed
-       has no WAR for sinks to the bottom in both directions rather than
+       has no figure for sinks to the bottom in both directions rather than
        reading as the worst season in the league. */
     const sign = order === "asc" ? 1 : -1;
+    rows = rows.sort((a, b) => {
+      const va = teamStatNum(a.values[stat]);
+      const vb = teamStatNum(b.values[stat]);
+      if (va === null) return vb === null ? 0 : 1;
+      if (vb === null) return -1;
+      return (va - vb) * sign;
+    });
+  }
+
+  /* A board ordered or thinned here carries its own count and its own ranks —
+     MLB's are for the pool it sent, not the one being read. */
+  const total = whole ? rows.length : (board?.totalSplits ?? 0);
+  if (whole) {
     rows = rows
-      .sort((a, b) => {
-        const va = teamStatNum(a.values.war);
-        const vb = teamStatNum(b.values.war);
-        if (va === null) return vb === null ? 0 : 1;
-        if (vb === null) return -1;
-        return (va - vb) * sign;
-      })
       .map((r, i) => ({ ...r, rank: i + 1 }))
       .slice(offset, offset + limit);
   }
@@ -2065,7 +2236,7 @@ export async function getStatLeaders({
     }),
   );
 
-  return { total: board?.totalSplits ?? 0, rows };
+  return { total, rows };
 }
 
 /**
@@ -2492,7 +2663,10 @@ async function buildSplits(
     if (code && !byCode.has(code))
       byCode.set(code, {
         code,
-        label: (s.split?.description ?? "—").toUpperCase(),
+        /* MLB's own casing — "Home Games", "vs. AL", "September". The tables
+           set in capitals uppercase it themselves; the overview reads it as
+           MLB writes it. */
+        label: s.split?.description ?? "—",
         values: values(s.stat),
       });
   }
@@ -2513,7 +2687,7 @@ async function buildSplits(
   if (total && built.length > 0)
     built[0].lines.unshift({
       code: "total",
-      label: "TOTAL",
+      label: "Total",
       values: values(total.stat),
     });
   return built;
@@ -2674,7 +2848,7 @@ export async function getTeamRosterGroups(
   );
   const rotation = (p: RosterEntry) => {
     const line = starts.get(p.id);
-    return !!line && line.gs > 0 && line.gs * 2 >= line.g;
+    return !!line && inRotation(line.gs, line.g);
   };
 
   const pitchers = roster.filter((p) => p.posType === "Pitcher");
@@ -4828,6 +5002,148 @@ const PLAYER_SPLIT_SECTIONS = [
 ];
 
 /**
+ * The splits an overview leads with, in reading order: recent form, the two
+ * sides of the schedule with the one he plays next first, then who he is
+ * about to face — the opponent himself for a bat, and either way the league
+ * he'll see — the hands he has hit or pitched against, and the month being
+ * played.
+ *
+ * Codes the season can't answer simply don't come back, so an out-of-season
+ * month or a club with nothing scheduled costs a row rather than the panel.
+ */
+export function overviewSplitCodes(
+  group: "hitting" | "pitching",
+  next: { home: boolean; leagueId: number } | null,
+  /** Today, so the month being played names itself. */
+  date: string = todayPT(),
+): string[] {
+  const sides = next?.home === false ? ["a", "h"] : ["h", "a"];
+  /* MLB codes a month by its number — March is "3", October "10". */
+  const month = String(Number(date.slice(5, 7)));
+  return [
+    "d7",
+    ...sides,
+    ...(group === "hitting" ? [VS_TEAM_CODE] : []),
+    ...(next?.leagueId === 103 ? ["val"] : next?.leagueId === 104 ? ["vnl"] : []),
+    ...(group === "hitting" ? ["vl", "vr"] : []),
+    month,
+  ];
+}
+
+/**
+ * The last seven days, added up off the game log.
+ *
+ * MLB publishes a `d7` situation code and has stopped answering it — every
+ * player comes back with no recency splits at all — so recent form, which is
+ * the first thing anyone asks of a bat, is counted from the games themselves.
+ * The log is already on the overview, so this costs no request.
+ */
+export function lastSevenDays(
+  group: StatGroup,
+  months: GameLogGroup[],
+  today: string = todayPT(),
+): SplitLine | null {
+  const from = new Date(Date.parse(today) - 6 * 86400000)
+    .toISOString()
+    .slice(0, 10);
+  const rows = months.flatMap((m) => m.rows).filter((r) => r.date >= from);
+  return rows.length === 0
+    ? null
+    : {
+        code: "d7",
+        label: "Last 7 Days",
+        values: sumStatLines(group, rows.map((r) => r.values)),
+      };
+}
+
+/** The synthetic code the vs-club line is filed under — MLB has none. */
+export const VS_TEAM_CODE = "vsteam";
+
+/**
+ * How much of a club's season is still to be played, as a multiplier on a
+ * line: 162/151 in the middle of September, 1 once the schedule has run out.
+ * Only the regular season is counted, so October's bracket never reads as
+ * games a batting line still has coming.
+ *
+ * A season that isn't the one being played has nothing left to project, and
+ * answers 1 rather than a figure that would only restate the line.
+ */
+export async function seasonPace(
+  teamId: number | null,
+  season: number,
+  today: string = todayPT(),
+): Promise<number> {
+  if (!teamId || season !== seasonOf(today)) return 1;
+  const games = await getTeamSchedule(teamId, season, "R").catch(
+    () => [] as Game[],
+  );
+  const played = games.filter((g) => g.state === "Final").length;
+  return played > 0 && games.length > played ? games.length / played : 1;
+}
+
+/**
+ * A season line carried to the end of the schedule at the pace it was set —
+ * "on pace for", the way a counting column is read in September.
+ *
+ * Only the counts are scaled; every rate is worked out again from them, so
+ * the projected line adds up the way the real one does. The pace is the
+ * club's, not the player's: a line is projected over the games his club has
+ * left, which is what a reader means by "if he keeps this up".
+ */
+export function projectStatLine(
+  group: StatGroup,
+  values: Record<string, TeamStatValue>,
+  pace: number,
+): Record<string, TeamStatValue> {
+  const rates = new Set(RATE_KEYS[group]);
+  const innKey =
+    group === "pitching"
+      ? "inningsPitched"
+      : group === "fielding"
+        ? "innings"
+        : "";
+  const scaled: Record<string, TeamStatValue> = {};
+  for (const k of statLineKeys(group)) {
+    if (rates.has(k) || k === innKey) continue;
+    const n = teamStatNum(values[k]);
+    if (n === null) continue;
+    /* WAR is a counting stat that is written to a tenth; everything else a
+       line counts is a whole thing that happened. */
+    scaled[k] =
+      k === "war" ? Math.round(n * pace * 10) / 10 : Math.round(n * pace);
+  }
+  if (innKey) scaled[innKey] = inningsOf(Math.round(outsOf(values[innKey]) * pace));
+  return sumStatLines(group, [scaled]);
+}
+
+/**
+ * A player's season against one club. MLB reports this under a stat type of
+ * its own rather than a situation code, so it is fetched on its own and
+ * handed back in the same shape the coded splits arrive in.
+ */
+export async function getVsTeamSplit(
+  id: number,
+  season: number,
+  group: "hitting" | "pitching",
+  opponent: { id: number; abbr: string },
+): Promise<SplitLine | null> {
+  const data = await mlb(
+    `/people/${id}/stats?stats=vsTeamTotal&group=${group}&season=${season}` +
+      `&opposingTeamId=${opponent.id}`,
+    1800,
+  ).catch(() => null);
+  const split = (data?.stats?.[0]?.splits ?? [])[0];
+  if (!split?.stat) return null;
+  return {
+    code: VS_TEAM_CODE,
+    label: `vs ${opponent.abbr}`,
+    values: Object.fromEntries(
+      playerCols(group).map((c) => [c.key, split.stat[c.key] ?? null]),
+    ),
+  };
+}
+
+/**
  * One player's season sliced every way MLB reports, section by section — or
  * his whole career, which MLB answers for on the same codes under a different
  * pair of type names. A career has no "last 7 days", so that section goes.
@@ -4860,6 +5176,8 @@ export interface GameLogRow {
   home: boolean;
   /** "W 5-4", "L 13-12", "W 5-4 F/10" — blank if the score never arrived. */
   result: string;
+  /** Being played right now, which is why it has no result to print yet. */
+  live: boolean;
   win: boolean | null;
   /** Which round of October this was — "" in a regular-season log. */
   series: SeriesCode | "";
@@ -5014,6 +5332,9 @@ export async function getPlayerGameLog(
         : null,
       home: !!s.isHome,
       result: gameResult(g, s.team?.id),
+      /* A game still being played has a line but no result — the log says so
+         the way the schedule does rather than printing an empty cell. */
+      live: !!g && gameStatus(g).tone === "live",
       win: typeof s.isWin === "boolean" ? s.isWin : null,
       series: career ? (s.gameType ?? "") : "",
       values: lines[i],

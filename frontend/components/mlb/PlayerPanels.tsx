@@ -25,6 +25,7 @@ import {
   type GameLogGroup,
   type PlayerAward,
   type PlayerBio,
+  type SplitLine,
   type SplitSection,
   type StatGroup,
   type LedScope,
@@ -670,16 +671,29 @@ const dayText = (iso: string) =>
     .toUpperCase();
 
 /** "W 5-4" in the colour of the result, so a log skims — and, like the date
- *  beside it, a way into the game it is the summary of. */
+ *  beside it, a way into the game it is the summary of. A game still being
+ *  played says so instead, the same mark the club's schedule carries. */
 function Result({
   text,
   win,
   gamePk,
+  live = false,
 }: {
   text: string;
   win: boolean | null;
   gamePk: number;
+  live?: boolean;
 }) {
+  if (live)
+    return (
+      <Link
+        href={`/game/${gamePk}`}
+        className="whitespace-nowrap text-[10px] tracking-widest text-crit hover:underline"
+      >
+        <span className="mr-1 inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-crit align-middle" />
+        LIVE
+      </Link>
+    );
   if (!text) return <span className="text-ink-3">—</span>;
   return (
     <Link
@@ -791,7 +805,7 @@ export function GameLogPanel({
                       </span>
                     </td>
                     <td className="px-3 py-1.5 text-center whitespace-nowrap">
-                      <Result text={r.result} win={r.win} gamePk={r.gamePk} />
+                      <Result text={r.result} win={r.win} gamePk={r.gamePk} live={r.live} />
                     </td>
                     {cells(columns, r.values)}
                     {cells(running, r.running, true)}
@@ -864,9 +878,9 @@ function SeeAll({ href }: { href: string }) {
   return (
     <Link
       href={href}
-      className="text-[10px] tracking-[0.2em] text-ink-3 hover:text-accent"
+      className="text-[10px] tracking-wider text-ink-3 hover:text-accent"
     >
-      SEE ALL →
+      See All →
     </Link>
   );
 }
@@ -875,7 +889,7 @@ function SeeAll({ href }: { href: string }) {
 export function NextGamePanel({ game }: { game: Game | null }) {
   if (!game) return null;
   return (
-    <Panel title={game.state === "Final" ? "LAST GAME" : "NEXT GAME"}>
+    <Panel tight title={game.state === "Final" ? "Last Game" : "Next Game"}>
       <Link href={`/game/${game.pk}`} className="block hover:opacity-90">
         <GameCard game={game} detailed />
       </Link>
@@ -886,29 +900,36 @@ export function NextGamePanel({ game }: { game: Game | null }) {
 /** A handful of the season's splits, with the rest a click away. */
 export function SplitsSummaryPanel({
   sections,
+  extra = [],
+  codes,
   columns,
   href,
   season,
 }: {
   sections: SplitSection[];
+  /** Lines that don't arrive with the coded splits — the vs-club one. */
+  extra?: SplitLine[];
+  /** Which splits to lead with, in order — picked for who is up next. */
+  codes: string[];
   columns: TeamStatCol[];
   href: string;
   season: number;
 }) {
-  /* The lines anyone checks first: recent form, home and away, both hands.
-     Whatever the season doesn't have simply isn't listed. */
-  const wanted = ["d7", "h", "a", "vl", "vr"];
-  const lines = sections
-    .flatMap((s) => s.lines)
-    .filter((l) => wanted.includes(l.code))
-    .sort((a, b) => wanted.indexOf(a.code) - wanted.indexOf(b.code));
+  /* Whatever the season doesn't have simply isn't listed. */
+  const lines = [...sections.flatMap((s) => s.lines), ...extra]
+    .filter((l) => codes.includes(l.code))
+    /* One row per split: a code counted here as well as reported by MLB —
+       which is what recent form is, until MLB answers for it again — would
+       otherwise read twice. */
+    .filter((l, i, all) => all.findIndex((o) => o.code === l.code) === i)
+    .sort((a, b) => codes.indexOf(a.code) - codes.indexOf(b.code));
 
   return (
-    <Panel title={`SPLITS — ${season}`} right={<SeeAll href={href} />}>
-      <Table head={["SPLIT", ...columns.map((c) => c.label)]} maxHeight="none">
+    <Panel tight title={`${season} Splits`} right={<SeeAll href={href} />}>
+      <Table head={["Split", ...columns.map((c) => c.label)]} maxHeight="none">
         {lines.length === 0 && (
           <Empty
-            what="NO SPLITS FOR THIS SEASON YET"
+            what="No splits for this season yet"
             cols={columns.length + 1}
           />
         )}
@@ -926,13 +947,15 @@ export function SplitsSummaryPanel({
 }
 
 /**
- * The season against what it is a part of: this year's line, October's if
- * there is one, and the career under both.
+ * The season against what it is a part of: this year's line, where it is
+ * headed at the pace it has been set, October's if there is one, and the
+ * career under all of it.
  */
 export function SeasonSummaryPanel({
   group,
   season,
   seasonRows,
+  projected,
   postRows,
   career,
   href,
@@ -940,39 +963,57 @@ export function SeasonSummaryPanel({
   group: StatGroup;
   season: number;
   seasonRows: CareerRow[];
+  /** The season line carried to the end of the schedule — null once there is
+   *  nothing left to play, when it would only restate the row above it. */
+  projected?: Record<string, TeamStatValue> | null;
   postRows: CareerRow[];
   career: Record<string, TeamStatValue> | null;
   href: string;
 }) {
   const columns = playerCols(group);
-  const label = STAT_GROUP_LABEL[group];
+  /* The group label is carried in capitals, for the controls that are set in
+     them — this head reads "2026 Batting". */
+  const group_ = STAT_GROUP_LABEL[group];
+  const label = group_[0] + group_.slice(1).toLowerCase();
   const rows: [string, Record<string, TeamStatValue>][] = [
     ...seasonRows.map((r): [string, Record<string, TeamStatValue>] => [
-      seasonRows.length > 1 ? `REGULAR SEASON · ${r.team}` : "REGULAR SEASON",
+      seasonRows.length > 1 ? `Regular Season · ${r.team}` : "Regular Season",
       r.values,
     ]),
+    ...(projected
+      ? ([["Projected", projected]] as [
+          string,
+          Record<string, TeamStatValue>,
+        ][])
+      : []),
     ...postRows.map((r): [string, Record<string, TeamStatValue>] => [
-      "POSTSEASON",
+      "Postseason",
       r.values,
     ]),
   ];
 
   return (
-    <Panel title={`${season} ${label}`} right={<SeeAll href={href} />}>
-      <Table head={["STATS", ...columns.map((c) => c.label)]} maxHeight="none">
+    <Panel tight title={`${season} ${label}`} right={<SeeAll href={href} />}>
+      <Table head={["Stats", ...columns.map((c) => c.label)]} maxHeight="none">
         {rows.length === 0 && !career && (
-          <Empty what="NO LINE FOR THIS SEASON" cols={columns.length + 1} />
+          <Empty what="No line for this season" cols={columns.length + 1} />
         )}
         {rows.map(([name, values], i) => (
           <Row key={`${name}-${i}`}>
-            <td className="px-3 py-1.5 whitespace-nowrap text-ink-2">{name}</td>
+            <td
+              className={`px-3 py-1.5 whitespace-nowrap ${
+                name === "Projected" ? "text-ink-3 italic" : "text-ink-2"
+              }`}
+            >
+              {name}
+            </td>
             {cells(columns, values)}
           </Row>
         ))}
         {career && (
           <tr className="border-t border-line bg-surface text-ink">
             <td className="px-3 py-1.5 font-bold tracking-wider whitespace-nowrap">
-              CAREER
+              Career
             </td>
             {cells(columns, career, true)}
           </tr>
@@ -995,13 +1036,13 @@ export function RecentGamesPanel({
   count?: number;
 }) {
   const rows = months.flatMap((m) => m.rows).slice(0, count);
-  const head = ["DATE", "OPP", "RESULT", ...columns.map((c) => c.label)];
+  const head = ["Date", "Opp", "Result", ...columns.map((c) => c.label)];
 
   return (
-    <Panel title="RECENT GAMES" right={<SeeAll href={href} />}>
+    <Panel tight title="Recent Games" right={<SeeAll href={href} />}>
       <Table head={head} maxHeight="none" align={"llc"}>
         {rows.length === 0 && (
-          <Empty what="NO GAMES PLAYED YET" cols={head.length} />
+          <Empty what="No games played yet" cols={head.length} />
         )}
         {rows.map((r) => (
           <Row key={r.gamePk}>
@@ -1023,7 +1064,7 @@ export function RecentGamesPanel({
               </span>
             </td>
             <td className="px-3 py-1.5 text-center whitespace-nowrap">
-              <Result text={r.result} win={r.win} gamePk={r.gamePk} />
+              <Result text={r.result} win={r.win} gamePk={r.gamePk} live={r.live} />
             </td>
             {cells(columns, r.values)}
           </Row>

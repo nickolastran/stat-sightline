@@ -6,8 +6,9 @@ import { mlb, getSchedule } from "@/lib/mlb";
  * (how hard a ball was hit, how far it carried, how hard a pitch arrived,
  * who missed bats, who swung the game), so they are read one game at a time
  * out of the play log and the win probability line and folded together here.
- * Hits and strikeouts are plain box score counts, so those come from a
- * single whole-league read each.
+ * Hits and strikeouts are counted off the same logs rather than off MLB's
+ * day-range stat feed, which reports nothing at all for a game still being
+ * played — the boards used to sit empty until the last out.
  *
  * A game whose log can't be had drops out rather than taking the tab down.
  */
@@ -34,7 +35,7 @@ export interface GameFeed {
 /* The play log, trimmed to the tracked numbers and who they belong to. The
    untrimmed payload is a megabyte a game; this is around sixty kilobytes. */
 const FEED_FIELDS =
-  "allPlays,matchup,batter,pitcher,id,fullName,playEvents," +
+  "allPlays,result,eventType,matchup,batter,pitcher,id,fullName,playEvents," +
   "details,call,code,isPitch,pitchData,startSpeed," +
   "hitData,launchSpeed,totalDistance";
 
@@ -46,6 +47,9 @@ const WP_FIELDS =
 
 /** A pitch the batter swung through — swinging strike, blocked, or tipped. */
 const WHIFF_CODES = new Set(["S", "W", "T"]);
+
+/** What the box score counts as a hit — the four ways a batter reaches on one. */
+const HIT_EVENTS = new Set(["single", "double", "triple", "home_run"]);
 
 /** One tracked mark, before it is ranked into a board. */
 interface Mark {
@@ -76,8 +80,8 @@ function add(at: Map<number, Mark>, id: number, name: string, by: number) {
 }
 
 /**
- * The six tracked boards, folded out of a day's play logs and win
- * probability lines.
+ * All eight boards, folded out of a day's play logs and win probability
+ * lines, in the order the tab reads them.
  *
  * Pure, and separated from the fetch on purpose: this is the only real logic
  * on the tab — which pitch counts as a swing and miss, which side of a win
@@ -92,6 +96,10 @@ export function feedBoards(logs: unknown[], wpLogs: unknown[]): FeedBoard[] {
   const whiffs = new Map<number, Mark>();
   const wpa = new Map<number, Mark>();
   const pwpa = new Map<number, Mark>();
+  /* The two counts the box score would give, taken a plate appearance at a
+     time so they stand up while the game is still on. */
+  const hits = new Map<number, Mark>();
+  const strikeouts = new Map<number, Mark>();
 
   for (const log of logs as any[]) {
     for (const play of (log?.allPlays ?? []) as any[]) {
@@ -101,6 +109,16 @@ export function feedBoards(logs: unknown[], wpLogs: unknown[]): FeedBoard[] {
          playEvents for the substitution if a whiff count ever has to be
          exact — it moves a pitch or two a day, none of it a board-topper. */
       const pitcher = play.matchup?.pitcher;
+
+      /* An at-bat still being pitched has no result yet, which is what keeps
+         a count on the page from running ahead of the game. The strikeout is
+         the finishing pitcher's, which is whose the matchup names. */
+      const event = play.result?.eventType ?? "";
+      if (batter?.id && HIT_EVENTS.has(event))
+        add(hits, batter.id, batter.fullName ?? "—", 1);
+      if (pitcher?.id && event.startsWith("strikeout"))
+        add(strikeouts, pitcher.id, pitcher.fullName ?? "—", 1);
+
       for (const e of (play.playEvents ?? []) as any[]) {
         if (!e.isPitch) continue;
 
@@ -165,6 +183,16 @@ export function feedBoards(logs: unknown[], wpLogs: unknown[]): FeedBoard[] {
       rows: bestPerPlayer([...whiffs.values()], String),
     },
     {
+      code: "hits",
+      label: "MOST HITS",
+      rows: bestPerPlayer([...hits.values()], String),
+    },
+    {
+      code: "strikeouts",
+      label: "MOST STRIKEOUTS",
+      rows: bestPerPlayer([...strikeouts.values()], String),
+    },
+    {
       code: "wpa",
       label: "BATTER WPA",
       rows: bestPerPlayer([...wpa.values()], (v) => v.toFixed(3)),
@@ -177,43 +205,13 @@ export function feedBoards(logs: unknown[], wpLogs: unknown[]): FeedBoard[] {
   ];
 }
 
-/** A whole-league day of one box score figure, ranked. */
-export function statBoard(
-  splits: unknown[],
-  key: string,
-  code: string,
-  label: string,
-): FeedBoard {
-  const marks = (splits as any[]).flatMap((s) => {
-    const id = s.player?.id;
-    const v = s.stat?.[key];
-    return id && typeof v === "number" && v > 0
-      ? [{ personId: id, name: s.player?.fullName ?? "—", value: v }]
-      : [];
-  });
-  return { code, label, rows: bestPerPlayer(marks, String) };
-}
-
-/** The whole league's day in one group — one read, whatever is asked of it. */
-async function dayStats(
-  date: string,
-  group: "hitting" | "pitching",
-): Promise<unknown[]> {
-  const data = await mlb(
-    `/stats?stats=byDateRange&startDate=${date}&endDate=${date}` +
-      `&group=${group}&sportId=1&limit=1000`,
-    60,
-  ).catch(() => null);
-  return data?.stats?.[0]?.splits ?? [];
-}
-
 export async function getGameFeed(date: string): Promise<GameFeed> {
   const games = await getSchedule(date);
   /* A game that hasn't started has no play log to ask for. */
   const started = games.filter((g) => g.state !== "Preview");
   const orNull = (p: Promise<any>) => p.catch(() => null);
 
-  const [logs, wpLogs, hitting, pitching] = await Promise.all([
+  const [logs, wpLogs] = await Promise.all([
     Promise.all(
       started.map((g) =>
         orNull(mlb(`/game/${g.pk}/playByPlay?fields=${FEED_FIELDS}`, 60)),
@@ -224,25 +222,10 @@ export async function getGameFeed(date: string): Promise<GameFeed> {
         orNull(mlb(`/game/${g.pk}/winProbability?fields=${WP_FIELDS}`, 60)),
       ),
     ),
-    dayStats(date, "hitting"),
-    dayStats(date, "pitching"),
   ]);
-
-  const [exit, distance, velo, whiffs, wpa, pwpa] = feedBoards(logs, wpLogs);
 
   return {
     games: logs.filter(Boolean).length,
-    /* The tracked figures first, then the day's counting numbers, then the
-       two sides of the same win probability swing, side by side. */
-    boards: [
-      exit,
-      distance,
-      velo,
-      whiffs,
-      statBoard(hitting, "hits", "hits", "MOST HITS"),
-      statBoard(pitching, "strikeOuts", "strikeouts", "MOST STRIKEOUTS"),
-      wpa,
-      pwpa,
-    ],
+    boards: feedBoards(logs, wpLogs),
   };
 }

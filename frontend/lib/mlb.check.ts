@@ -23,6 +23,10 @@ import {
   gamesBack,
   halfInnings,
   immaculatePlays,
+  inRotation,
+  lastSevenDays,
+  projectStatLine,
+  overviewSplitCodes,
   headToHead,
   inProgress,
   notStarted,
@@ -1347,3 +1351,122 @@ assert.ok(
   "a manager's ballot never lands on a player's career line",
 );
 console.log("awardBallot ok");
+
+/*
+ * Rotation or bullpen. MLB files every arm as "P", so a board asked for
+ * starters and a roster page's groups both hang on this one reading, and the
+ * boundary cases are the ones that were wrong before: an opener, a starter
+ * who also relieved, a September call-up with no line at all.
+ */
+assert.equal(inRotation(32, 32), true, "a full season of starts");
+assert.equal(inRotation(0, 68), false, "a reliever never starts");
+assert.equal(inRotation(15, 30), true, "exactly half is still the rotation");
+assert.equal(inRotation(14, 30), false, "fewer than half is the bullpen");
+assert.equal(inRotation(0, 0), false, "no line yet is a fresh arm, not a starter");
+console.log("inRotation ok");
+
+/*
+ * Which splits an overview leads with. The order is the point — the side of
+ * the schedule he plays next comes first, and the league row is the one he is
+ * about to face, not both — so a wrong reading here quietly shows a batter
+ * his AL line on the way into a National League park.
+ */
+const codes = (g: "hitting" | "pitching", next: any, date = "2026-09-16") =>
+  overviewSplitCodes(g, next, date).join(",");
+
+assert.equal(
+  codes("pitching", { home: true, leagueId: 104 }),
+  "d7,h,a,vnl,9",
+  "a pitcher: form, both sides of the schedule, the league he faces, this month",
+);
+assert.equal(
+  codes("pitching", { home: false, leagueId: 103 }),
+  "d7,a,h,val,9",
+  "on the road next, the road line reads first",
+);
+assert.equal(
+  codes("hitting", { home: true, leagueId: 103 }),
+  "d7,h,a,vsteam,val,vl,vr,9",
+  "a bat also gets the club itself and both hands",
+);
+assert.equal(
+  codes("hitting", null),
+  "d7,h,a,vsteam,vl,vr,9",
+  "nothing scheduled names no league, and costs that row alone",
+);
+assert.equal(
+  codes("hitting", { home: true, leagueId: 103 }, "2026-10-04").split(",").at(-1),
+  "10",
+  "October is 10, not 010 or 1",
+);
+console.log("overviewSplitCodes ok");
+
+/*
+ * Recent form off the log, which is counted here because MLB's own `d7`
+ * split answers for nobody. The window is the day and the six before it, and
+ * the rates are worked out from the totals rather than averaged.
+ */
+{
+  const day = (date: string, hits: number, ab: number) =>
+    ({ date, values: { hits, atBats: ab, avg: ".000" } }) as any;
+  const months = [
+    {
+      label: "SEPTEMBER",
+      rows: [
+        day("2026-09-16", 2, 4),
+        day("2026-09-10", 1, 4),
+        /* Seven days back is a day too far. */
+        day("2026-09-09", 4, 4),
+      ],
+    },
+  ];
+  const line = lastSevenDays("hitting", months, "2026-09-16")!;
+  assert.equal(line.code, "d7");
+  assert.equal(line.values.hits, 3, "only the games inside the window");
+  assert.equal(
+    line.values.avg,
+    ".375",
+    "three hits in eight at-bats, not the mean of two daily averages",
+  );
+  assert.equal(
+    lastSevenDays("hitting", months, "2026-10-01"),
+    null,
+    "a week with no games is no line at all",
+  );
+}
+console.log("lastSevenDays ok");
+
+/*
+ * A line carried out at the pace it was set. The counts scale and the rates
+ * are worked out again from them, so the projected row adds up the way the
+ * real one does — a scaled average taken at face value would drift off its
+ * own hits and at-bats, and innings are thirds, not decimals.
+ */
+{
+  const bat = projectStatLine(
+    "hitting",
+    { gamesPlayed: 81, atBats: 300, hits: 90, homeRuns: 20, avg: ".300" },
+    2,
+  );
+  assert.equal(bat.gamesPlayed, 162, "a half season doubles");
+  assert.equal(bat.homeRuns, 40);
+  assert.equal(bat.avg, ".300", "the rate is the same line, not a doubled one");
+
+  const arm = projectStatLine(
+    "pitching",
+    { inningsPitched: "100.1", earnedRuns: 30, era: "2.69" },
+    1.5,
+  );
+  /* 100.1 IP is 301 outs; half again is 451.5, which lands on 452 — 150 and
+     two thirds, not the 150.1 a decimal would have given. */
+  assert.equal(arm.inningsPitched, "150.2", "innings are counted in outs");
+  assert.equal(arm.earnedRuns, 45);
+  assert.equal(arm.era, "2.69", "the same rate over half again the work");
+
+  assert.equal(
+    projectStatLine("hitting", { homeRuns: 20 }, 1).homeRuns,
+    20,
+    "a season with nothing left to play projects to itself",
+  );
+}
+console.log("projectStatLine ok");
