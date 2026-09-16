@@ -1838,6 +1838,7 @@ export const LEADER_LEAGUES = [
   { value: "104", label: "NATIONAL LEAGUE" },
 ];
 
+/** Every position MLB files a player under — what a fielding board reads by. */
 export const LEADER_POSITIONS = [
   { value: "all", label: "ALL POSITIONS" },
   { value: "P", label: "PITCHER" },
@@ -1846,12 +1847,40 @@ export const LEADER_POSITIONS = [
   { value: "2B", label: "SECOND BASE" },
   { value: "3B", label: "THIRD BASE" },
   { value: "SS", label: "SHORTSTOP" },
+  { value: "IF", label: "INFIELD" },
   { value: "LF", label: "LEFT FIELD" },
   { value: "CF", label: "CENTER FIELD" },
   { value: "RF", label: "RIGHT FIELD" },
   { value: "OF", label: "OUTFIELD" },
   { value: "DH", label: "DESIGNATED HITTER" },
 ];
+
+/* A hitting board has no pitchers on it, so it doesn't offer them; a pitching
+   board is all pitchers, so what it offers is the two jobs an arm has. */
+const BATTER_POSITIONS = LEADER_POSITIONS.filter((p) => p.value !== "P");
+
+const PITCHER_POSITIONS = [
+  { value: "all", label: "ALL PITCHERS" },
+  { value: "SP", label: "STARTING PITCHERS" },
+  { value: "RP", label: "RELIEF PITCHERS" },
+];
+
+/**
+ * Rotation or bullpen, read off the season line — MLB files every arm under
+ * position "P", so this is the only thing that says which job a pitcher has.
+ * Half his appearances as a start puts him in the rotation; nobody with no
+ * line yet has started a game, which leaves him in the bullpen, where a fresh
+ * arm in fact is.
+ */
+export const inRotation = (gs: number, g: number) => gs > 0 && gs * 2 >= g;
+
+/** The POS choices a board of this group can be read by. */
+export const leaderPositions = (group: StatGroup) =>
+  group === "hitting"
+    ? BATTER_POSITIONS
+    : group === "pitching"
+      ? PITCHER_POSITIONS
+      : LEADER_POSITIONS;
 
 /** What each group is ranked by until the reader picks a column. */
 export const defaultLeaderStat = (group: StatGroup): string =>
@@ -1913,6 +1942,12 @@ export const QUALIFIER_NOTE: Record<StatGroup, string> = {
   pitching: "To qualify, a pitcher must have at least 1 IP/game",
   fielding: "Qualified fielders only — MLB's own pool at each position",
 };
+
+/** The same, for a board that sets its own bar — the bullpen's. */
+export const qualifierNote = (group: StatGroup, position: string): string =>
+  position === "RP"
+    ? "Relievers only, from half the appearances of the league's busiest arm — MLB's 1 IP/game qualifier admits no reliever"
+    : QUALIFIER_NOTE[group];
 
 /**
  * Every club a season a trade split was played for — "MIN/HOU", the one the
@@ -1994,15 +2029,30 @@ export async function getStatLeaders({
    * way, not a page's worth more.
    */
   const byWar = stat === "war";
+  /*
+   * The other column MLB can't answer: every arm is filed under position "P",
+   * so `position=SP` comes back as the whole pitching board rather than the
+   * rotation. Starter or reliever is read off the line instead — the same
+   * reading a roster page uses — which again means the whole pool arrives and
+   * is filtered and paged here.
+   */
+  const byRole = position === "SP" || position === "RP";
+  /* MLB's pitching qualifier is an inning per team game, which no reliever
+     has ever thrown — asking for the qualified pool would answer a bullpen
+     board with nobody on it, so the bullpen is drawn from every arm and given
+     a bar of its own below. */
+  const relief = position === "RP";
+  const whole = byWar || byRole;
   const [data, war] = await Promise.all([
     mlb(
       `/stats?stats=season&group=${group}&season=${season}&sportId=1` +
-        `&gameType=${gameType}&playerPool=qualified&hydrate=team` +
+        `&gameType=${gameType}&hydrate=team` +
+        `&playerPool=${relief ? "all" : "qualified"}` +
         `&sortStat=${byWar ? defaultLeaderStat(group) : stat}` +
-        `&limit=${byWar ? WHOLE_BOARD : limit}&offset=${byWar ? 0 : offset}` +
+        `&limit=${whole ? WHOLE_BOARD : limit}&offset=${whole ? 0 : offset}` +
         (order && !byWar ? `&order=${order}` : "") +
         (league === "all" ? "" : `&leagueId=${league}`) +
-        (position === "all" ? "" : `&position=${position}`),
+        (position === "all" || byRole ? "" : `&position=${position}`),
       1800,
     ),
     seasonWar(season, group, gameType),
@@ -2032,19 +2082,48 @@ export async function getStatLeaders({
     }),
   );
 
+  if (byRole) {
+    const starter = (r: StatLeaderRow) =>
+      inRotation(
+        teamStatNum(r.values.gamesStarted) ?? 0,
+        teamStatNum(r.values.gamesPlayed) ?? 0,
+      );
+    rows = rows.filter((r) => starter(r) === (position === "SP"));
+  }
+
+  if (relief) {
+    /* A bullpen board has to keep the September call-up's two scoreless
+       innings from leading the league in ERA, and MLB publishes no bar to
+       use — so the board sets one off itself: half the work the busiest arm
+       in the league has been given, which is around 35 appearances over a
+       full season and scales down to what a bullpen has actually thrown in
+       April.
+       ponytail: a self-scaled bar, not MLB's — a published reliever
+       qualifier would replace it if one ever existed. */
+    const apps = (r: StatLeaderRow) => teamStatNum(r.values.gamesPlayed) ?? 0;
+    const bar = Math.max(0, ...rows.map(apps)) / 2;
+    rows = rows.filter((r) => apps(r) >= bar);
+  }
+
   if (byWar) {
     /* Best first, like every other column's first click. A player the feed
        has no WAR for sinks to the bottom in both directions rather than
        reading as the worst season in the league. */
     const sign = order === "asc" ? 1 : -1;
+    rows = rows.sort((a, b) => {
+      const va = teamStatNum(a.values.war);
+      const vb = teamStatNum(b.values.war);
+      if (va === null) return vb === null ? 0 : 1;
+      if (vb === null) return -1;
+      return (va - vb) * sign;
+    });
+  }
+
+  /* A board ordered or thinned here carries its own count and its own ranks —
+     MLB's are for the pool it sent, not the one being read. */
+  const total = whole ? rows.length : (board?.totalSplits ?? 0);
+  if (whole) {
     rows = rows
-      .sort((a, b) => {
-        const va = teamStatNum(a.values.war);
-        const vb = teamStatNum(b.values.war);
-        if (va === null) return vb === null ? 0 : 1;
-        if (vb === null) return -1;
-        return (va - vb) * sign;
-      })
       .map((r, i) => ({ ...r, rank: i + 1 }))
       .slice(offset, offset + limit);
   }
@@ -2065,7 +2144,7 @@ export async function getStatLeaders({
     }),
   );
 
-  return { total: board?.totalSplits ?? 0, rows };
+  return { total, rows };
 }
 
 /**
@@ -2674,7 +2753,7 @@ export async function getTeamRosterGroups(
   );
   const rotation = (p: RosterEntry) => {
     const line = starts.get(p.id);
-    return !!line && line.gs > 0 && line.gs * 2 >= line.g;
+    return !!line && inRotation(line.gs, line.g);
   };
 
   const pitchers = roster.filter((p) => p.posType === "Pitcher");

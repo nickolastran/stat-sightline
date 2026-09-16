@@ -23,6 +23,7 @@ import {
   gamesBack,
   halfInnings,
   immaculatePlays,
+  inRotation,
   headToHead,
   inProgress,
   notStarted,
@@ -1347,3 +1348,16 @@ assert.ok(
   "a manager's ballot never lands on a player's career line",
 );
 console.log("awardBallot ok");
+
+/*
+ * Rotation or bullpen. MLB files every arm as "P", so a board asked for
+ * starters and a roster page's groups both hang on this one reading, and the
+ * boundary cases are the ones that were wrong before: an opener, a starter
+ * who also relieved, a September call-up with no line at all.
+ */
+assert.equal(inRotation(32, 32), true, "a full season of starts");
+assert.equal(inRotation(0, 68), false, "a reliever never starts");
+assert.equal(inRotation(15, 30), true, "exactly half is still the rotation");
+assert.equal(inRotation(14, 30), false, "fewer than half is the bullpen");
+assert.equal(inRotation(0, 0), false, "no line yet is a fresh arm, not a starter");
+console.log("inRotation ok");

@@ -36,9 +36,9 @@ import {
   pickLeaderStat,
   pickPlayerGameType,
   LEADER_LEAGUES,
-  LEADER_POSITIONS,
+  leaderPositions,
   PLAYER_GAME_TYPES,
-  QUALIFIER_NOTE,
+  qualifierNote,
   todayPT,
   seasonOf,
   pickGameType,
@@ -213,7 +213,7 @@ async function SectionBody({
               total={board.total}
               stat={players.stat}
               query={{ ...players, season }}
-              note={QUALIFIER_NOTE[players.group]}
+              note={qualifierNote(players.group, players.position)}
             />
             <Glossary columns={columns} />
           </div>
@@ -294,7 +294,7 @@ export default async function LeagueSectionPage({
     type: pickPlayerGameType(sp.type),
     stat: pickLeaderStat(sp.stat, group),
     league: inList(sp.league, LEADER_LEAGUES),
-    position: inList(sp.pos, LEADER_POSITIONS),
+    position: inList(sp.pos, leaderPositions(group)),
     order: pickLeaderOrder(sp.order),
   };
   const abs = pickAbsQuery(sp);
@@ -339,7 +339,7 @@ export default async function LeagueSectionPage({
                 param="pos"
                 label="POS"
                 value={players.position}
-                options={LEADER_POSITIONS}
+                options={leaderPositions(players.group)}
               />
               <SeasonSelect value={season} first={FIRST_SEASON} last={current} />
             </div>
