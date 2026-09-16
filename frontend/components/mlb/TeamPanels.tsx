@@ -291,7 +291,7 @@ export function SplitsPanels({
               {sec.lines.map((l) => (
                 <Row key={sec.label + l.code}>
                   <td
-                    className={`px-3 py-1.5 whitespace-nowrap ${
+                    className={`px-3 py-1.5 whitespace-nowrap uppercase ${
                       l.code === "total" ? "text-ink" : "text-ink-2"
                     }`}
                   >

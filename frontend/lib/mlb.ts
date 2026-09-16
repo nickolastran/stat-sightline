@@ -2663,7 +2663,10 @@ async function buildSplits(
     if (code && !byCode.has(code))
       byCode.set(code, {
         code,
-        label: (s.split?.description ?? "—").toUpperCase(),
+        /* MLB's own casing — "Home Games", "vs. AL", "September". The tables
+           set in capitals uppercase it themselves; the overview reads it as
+           MLB writes it. */
+        label: s.split?.description ?? "—",
         values: values(s.stat),
       });
   }
@@ -2684,7 +2687,7 @@ async function buildSplits(
   if (total && built.length > 0)
     built[0].lines.unshift({
       code: "total",
-      label: "TOTAL",
+      label: "Total",
       values: values(total.stat),
     });
   return built;
@@ -5048,7 +5051,7 @@ export function lastSevenDays(
     ? null
     : {
         code: "d7",
-        label: "LAST 7 DAYS",
+        label: "Last 7 Days",
         values: sumStatLines(group, rows.map((r) => r.values)),
       };
 }
@@ -5133,7 +5136,7 @@ export async function getVsTeamSplit(
   if (!split?.stat) return null;
   return {
     code: VS_TEAM_CODE,
-    label: `VS ${opponent.abbr}`,
+    label: `vs ${opponent.abbr}`,
     values: Object.fromEntries(
       playerCols(group).map((c) => [c.key, split.stat[c.key] ?? null]),
     ),

@@ -878,9 +878,9 @@ function SeeAll({ href }: { href: string }) {
   return (
     <Link
       href={href}
-      className="text-[10px] tracking-[0.2em] text-ink-3 hover:text-accent"
+      className="text-[10px] tracking-wider text-ink-3 hover:text-accent"
     >
-      SEE ALL →
+      See All →
     </Link>
   );
 }
@@ -889,7 +889,7 @@ function SeeAll({ href }: { href: string }) {
 export function NextGamePanel({ game }: { game: Game | null }) {
   if (!game) return null;
   return (
-    <Panel title={game.state === "Final" ? "LAST GAME" : "NEXT GAME"}>
+    <Panel tight title={game.state === "Final" ? "Last Game" : "Next Game"}>
       <Link href={`/game/${game.pk}`} className="block hover:opacity-90">
         <GameCard game={game} detailed />
       </Link>
@@ -925,11 +925,11 @@ export function SplitsSummaryPanel({
     .sort((a, b) => codes.indexOf(a.code) - codes.indexOf(b.code));
 
   return (
-    <Panel title={`SPLITS — ${season}`} right={<SeeAll href={href} />}>
-      <Table head={["SPLIT", ...columns.map((c) => c.label)]} maxHeight="none">
+    <Panel tight title={`${season} Splits`} right={<SeeAll href={href} />}>
+      <Table head={["Split", ...columns.map((c) => c.label)]} maxHeight="none">
         {lines.length === 0 && (
           <Empty
-            what="NO SPLITS FOR THIS SEASON YET"
+            what="No splits for this season yet"
             cols={columns.length + 1}
           />
         )}
@@ -971,35 +971,38 @@ export function SeasonSummaryPanel({
   href: string;
 }) {
   const columns = playerCols(group);
-  const label = STAT_GROUP_LABEL[group];
+  /* The group label is carried in capitals, for the controls that are set in
+     them — this head reads "2026 Batting". */
+  const group_ = STAT_GROUP_LABEL[group];
+  const label = group_[0] + group_.slice(1).toLowerCase();
   const rows: [string, Record<string, TeamStatValue>][] = [
     ...seasonRows.map((r): [string, Record<string, TeamStatValue>] => [
-      seasonRows.length > 1 ? `REGULAR SEASON · ${r.team}` : "REGULAR SEASON",
+      seasonRows.length > 1 ? `Regular Season · ${r.team}` : "Regular Season",
       r.values,
     ]),
     ...(projected
-      ? ([["PROJECTED", projected]] as [
+      ? ([["Projected", projected]] as [
           string,
           Record<string, TeamStatValue>,
         ][])
       : []),
     ...postRows.map((r): [string, Record<string, TeamStatValue>] => [
-      "POSTSEASON",
+      "Postseason",
       r.values,
     ]),
   ];
 
   return (
-    <Panel title={`${season} ${label}`} right={<SeeAll href={href} />}>
-      <Table head={["STATS", ...columns.map((c) => c.label)]} maxHeight="none">
+    <Panel tight title={`${season} ${label}`} right={<SeeAll href={href} />}>
+      <Table head={["Stats", ...columns.map((c) => c.label)]} maxHeight="none">
         {rows.length === 0 && !career && (
-          <Empty what="NO LINE FOR THIS SEASON" cols={columns.length + 1} />
+          <Empty what="No line for this season" cols={columns.length + 1} />
         )}
         {rows.map(([name, values], i) => (
           <Row key={`${name}-${i}`}>
             <td
               className={`px-3 py-1.5 whitespace-nowrap ${
-                name === "PROJECTED" ? "text-ink-3 italic" : "text-ink-2"
+                name === "Projected" ? "text-ink-3 italic" : "text-ink-2"
               }`}
             >
               {name}
@@ -1010,7 +1013,7 @@ export function SeasonSummaryPanel({
         {career && (
           <tr className="border-t border-line bg-surface text-ink">
             <td className="px-3 py-1.5 font-bold tracking-wider whitespace-nowrap">
-              CAREER
+              Career
             </td>
             {cells(columns, career, true)}
           </tr>
@@ -1033,13 +1036,13 @@ export function RecentGamesPanel({
   count?: number;
 }) {
   const rows = months.flatMap((m) => m.rows).slice(0, count);
-  const head = ["DATE", "OPP", "RESULT", ...columns.map((c) => c.label)];
+  const head = ["Date", "Opp", "Result", ...columns.map((c) => c.label)];
 
   return (
-    <Panel title="RECENT GAMES" right={<SeeAll href={href} />}>
+    <Panel tight title="Recent Games" right={<SeeAll href={href} />}>
       <Table head={head} maxHeight="none" align={"llc"}>
         {rows.length === 0 && (
-          <Empty what="NO GAMES PLAYED YET" cols={head.length} />
+          <Empty what="No games played yet" cols={head.length} />
         )}
         {rows.map((r) => (
           <Row key={r.gamePk}>
