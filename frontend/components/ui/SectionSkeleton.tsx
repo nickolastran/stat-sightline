@@ -90,14 +90,9 @@ export default function SectionSkeleton({ section }: { section: string }) {
 
     case "gamefeed":
       return (
-        <div className="space-y-4">
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            {Array.from({ length: 4 }).map((_, i) => (
-              <SkeletonTable key={i} rows={5} delay={i * 0.08} />
-            ))}
-          </div>
-          {[0, 1].map((i) => (
-            <SkeletonTable key={i} rows={10} delay={0.2 + i * 0.12} />
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          {Array.from({ length: 8 }).map((_, i) => (
+            <SkeletonTable key={i} rows={5} delay={i * 0.08} />
           ))}
         </div>
       );
