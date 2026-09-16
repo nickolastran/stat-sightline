@@ -21,7 +21,7 @@ import { getPlayoffOdds, type PlayoffOdds } from "@/lib/api";
  * are there and seeds itself from the standings either way.
  */
 
-export const metadata: Metadata = { title: "PLAYOFFS — STAT//SIGHTLINE" };
+export const metadata: Metadata = { title: "Playoffs" };
 
 /** The first season under the twelve-club bracket this page draws. */
 const FIRST_SEASON = 2022;

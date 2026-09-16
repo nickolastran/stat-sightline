@@ -89,6 +89,24 @@ const yearOptions = (first: number, last: number) =>
     label: String(last - i),
   }));
 
+/*
+ * The board on screen, as the file route asks for it. Built from what was
+ * applied rather than from the draft beside it: the link downloads the board
+ * being read, not the one half-picked in the bar above it.
+ */
+const csvHref = (q: CustomQuery, season: number) =>
+  `/stats/custom/csv?${new URLSearchParams({
+    group: q.group,
+    season: String(season),
+    min: q.min,
+    league: q.league,
+    div: q.division,
+    team: q.team,
+    pos: q.position,
+    rookies: q.rookies ? "1" : "",
+    cols: q.cols.join("|"),
+  })}`;
+
 /** What the draft is: the applied query, plus the season it was read at. */
 type Draft = CustomQuery & { season: number };
 
@@ -135,6 +153,7 @@ export default function CustomFilterBar({
     draft.division !== query.division ||
     draft.team !== query.team ||
     draft.position !== query.position ||
+    draft.rookies !== query.rookies ||
     draft.cols.join("|") !== query.cols.join("|");
 
   const update = (e: React.FormEvent) => {
@@ -147,6 +166,7 @@ export default function CustomFilterBar({
       div: draft.division === "all" ? null : draft.division,
       team: draft.team === "all" ? null : draft.team,
       pos: draft.position === "all" ? null : draft.position,
+      rookies: draft.rookies ? "1" : null,
       /* Always written, even empty: an absent `cols` is a first visit and
          opens on the default line, where an empty one is a reader who
          cleared every box and means it. */
@@ -206,6 +226,32 @@ export default function CustomFilterBar({
           options={LEADER_POSITIONS}
           onChange={(v) => set("position", v)}
         />
+        {/* A pool rather than a filter — MLB decides who is a rookie, so this
+            is one press, not a service-time box a reader has to fill in. */}
+        <button
+          type="button"
+          aria-pressed={draft.rookies}
+          onClick={() => set("rookies", !draft.rookies)}
+          className={`border px-2 py-0.5 text-[10px] tracking-[0.2em] ${
+            draft.rookies
+              ? "border-accent bg-accent font-bold text-white"
+              : "border-line text-ink-3 hover:border-accent hover:text-ink"
+          }`}
+        >
+          ROOKIES
+        </button>
+        {/* Sits over UPDATE, which is the other thing on this form that isn't
+            a control: one applies the board, one takes it away with you. A
+            plain link, so it can be copied, and empty columns are a board
+            with nothing to write. */}
+        {query.cols.length > 0 && (
+          <a
+            href={csvHref(query, season)}
+            className="ml-auto border border-line px-2 py-0.5 text-[10px] tracking-[0.2em] text-ink-3 hover:border-accent hover:text-ink"
+          >
+            DOWNLOAD CSV
+          </a>
+        )}
       </div>
 
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border border-line bg-bg px-3 py-2">

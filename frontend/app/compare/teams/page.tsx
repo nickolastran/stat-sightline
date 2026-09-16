@@ -28,7 +28,7 @@ import {
  * full hitting or pitching table with a column picker.
  */
 
-export const metadata: Metadata = { title: "COMPARE TEAMS — STAT//SIGHTLINE" };
+export const metadata: Metadata = { title: "Compare Teams" };
 
 const MAX = 4;
 

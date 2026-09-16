@@ -40,7 +40,7 @@ export async function generateMetadata({
   const { id, season } = await params;
   const label = `${season} ${awardLabel(id)}`;
   return {
-    title: `${label} — STAT//SIGHTLINE`,
+    title: label,
     description: `Every winner of the ${label}, with the season line each won it on.`,
   };
 }

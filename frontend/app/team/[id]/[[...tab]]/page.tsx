@@ -68,7 +68,7 @@ export async function generateMetadata({
   const t = await getTeamIdentity(teamIdOf(id), seasonOf(todayPT())).catch(
     () => null
   );
-  return { title: t ? `${t.name} — STAT//SIGHTLINE` : "STAT//SIGHTLINE" };
+  return t ? { title: t.name } : {};
 }
 
 function Unavailable({ what }: { what: string }) {

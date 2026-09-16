@@ -56,17 +56,17 @@ export async function generateMetadata({
     const pair = monthlyPair(id);
     if (pair)
       return {
-        title: `MLB ${pair.label.toUpperCase()} — STAT//SIGHTLINE`,
+        title: `MLB ${pair.label}`,
         description: `Every ${pair.label.replace(/s of the Month$/, " of the Month")} winner, both leagues, with the month line each won it on.`,
       };
     const label = awardLabel(id);
     return {
-      title: `${label.toUpperCase()} WINNERS — STAT//SIGHTLINE`,
+      title: `${label} Winners`,
       description: `Every ${label} winner, decade by decade, with the season line each won it on.`,
     };
   }
   return {
-    title: `${id} AWARDS VOTING — STAT//SIGHTLINE`,
+    title: `${id} Awards Voting`,
     description: `Every BBWAA ballot of the ${id} season — MVP, Cy Young, Rookie of the Year and Manager of the Year, both leagues, with the line each man polled on.`,
   };
 }

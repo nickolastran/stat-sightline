@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 export const metadata: Metadata = {
-  title: "SIGN IN — STAT//SIGHTLINE",
+  title: "Sign In",
   description: "Operator sign-in — not yet available.",
 };
 

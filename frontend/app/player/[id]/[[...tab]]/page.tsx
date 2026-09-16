@@ -69,7 +69,8 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { id } = await params;
   const p = await getPlayer(Number(id), seasonOf(todayPT())).catch(() => null);
-  return { title: p ? `${p.name} — STAT//SIGHTLINE` : "STAT//SIGHTLINE" };
+  /* No player, no title of our own — the tab falls back to the site's. */
+  return p ? { title: p.name } : {};
 }
 
 /** What the splits tab can be read over — one season, or all of them. */

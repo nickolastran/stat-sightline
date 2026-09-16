@@ -211,11 +211,18 @@ every remaining game to answer, and a retrain invalidates it without a restart.
   projections endpoint, server-rendered; each source fails independently
 - `/league/[section]` — the reference sections, declared once in
   `lib/leagueSections.ts` so a new one is added in a single place:
-  `scoreboard`, `leaders`, `probables`, `standings` (division / league /
-  all-MLB scopes, every stat column click-sortable, plus the projected-finish
-  columns when our own API answers — they are dropped rather than blanked when
-  it doesn't, so standings never depend on it), `wildcard` (the same table read
-  as a race, reached from standings rather than the bar), `teams`, `players`
+  `gamefeed`, `scoreboard`, `leaders`, `probables`, `standings` (division /
+  league / all-MLB scopes, every stat column click-sortable, plus the
+  projected-finish columns when our own API answers — they are dropped rather
+  than blanked when it doesn't, so standings never depend on it), `wildcard`
+  (the same table read as a race, reached from standings rather than the bar),
+  `teams`, `players`, `abs`. The game feed is one day as eight boards of five —
+  exit velocity, batted-ball distance, pitch velocity, swings and misses, hits,
+  strikeouts, and win probability added for batters and pitchers. Most of those
+  exist nowhere but the play log, so they are folded out of one `playByPlay`
+  and one `winProbability` read per game (`lib/gamefeed.ts`); hits and
+  strikeouts are a single whole-league box score read each. A game whose log
+  can't be had drops out rather than taking the tab down
 - `/team/[id]/[[...tab]]` — one club: `home`, `schedule`, `stats`, `roster`,
   `splits`, `injuries`, `transactions`. Each tab is a link to its own
   server-rendered payload rather than local state, so it prefetches and the URL
@@ -230,6 +237,24 @@ every remaining game to answer, and a retrain invalidates it without a restart.
   plot, MLB's win-probability line play by play, and the play log (all plays or
   scoring only); afterwards, the box score. Re-fetches itself on a timer only
   while the game is in progress
+- `/stats/[view]` — the advanced boards: `player-batting`, `player-pitching`,
+  `league-batting`, `league-pitching`, `top` (the leader cards) and `custom`.
+  Columns are stitched from MLB's own season and advanced lines, FanGraphs'
+  WAR/wRC+, and up to four Savant leaderboards, joined on player id — a Savant
+  board that stops answering costs its own columns and nothing else.
+  `custom` is the board a reader builds: group, season, minimum, league,
+  division, club, position, a `ROOKIES` toggle that swaps MLB's rookie pool in
+  for the qualified one, and any subset of the group's catalogue (78 columns
+  for batters, 88 for pitchers, 18 for fielders). Every control
+  stages into a draft and `UPDATE` applies the lot in one request, because a
+  board is one MLB read and up to four to Savant. The whole selection lives in
+  the query string, so a board is a link — which is also how `DOWNLOAD CSV`
+  works: it points at `/stats/custom/csv` with the same parameters, and
+  `app/stats/[view]/csv/route.ts` rebuilds the board and writes it out
+  (`csvOf` in `lib/advanced.ts`, the inverse of the Savant CSV reader beside
+  it). Figures are written as stored — no thousands separators, an untracked
+  figure left blank rather than an em dash — so a spreadsheet can add the
+  column up
 - `/pitcher/[id]` — pitch-level analysis: strike-zone scatter, filter panel,
   summary metrics. A non-numeric id falls back to the highest-workload pitcher.
 - `/api/games`, `/api/search` — same-origin proxies for the day's schedule and
@@ -243,11 +268,19 @@ columns touch our own API.
 ## Tests
 
 ```bash
-pytest                                   # cleaning, feature math, ask parsing, projection leakage
-cd frontend && npx tsx lib/mlb.check.ts  # assertions for lib/mlb.ts's derived values
+pytest                                        # cleaning, feature math, ask parsing, projection leakage
+cd frontend && for f in lib/*.check.ts; do npx tsx "$f"; done
 ```
 
-`mlb.check.ts` covers the MLB-feed logic that isn't a straight field read —
-clinch marks, games back, head-to-head, log5 win probability, leaderboard
-merging, draft/signing text, park factors — the places where a plausible wrong
-answer is worse than a crash.
+Each `lib/*.check.ts` is a plain `node:assert` script — no runner, no fixtures —
+covering the frontend logic that isn't a straight field read, where a plausible
+wrong answer is worse than a crash:
+
+| Check | What it pins down |
+| --- | --- |
+| `mlb.check.ts` | clinch marks, games back, head-to-head, log5 win probability, leaderboard merging, draft/signing text, park factors |
+| `advanced.check.ts` | the Savant CSV reader (`"Last, First"` shifts every column if commas are split naively), the column catalogues, the custom board's query parsing, and the CSV writer round-tripping back through the reader |
+| `gamefeed.check.ts` | which pitch counts as a swing and miss, one row per player rather than one per batted ball, and which side of a win-probability swing the batter is on |
+| `abs.check.ts` | pulling Savant's ABS table out of the 1.6 MB page it is embedded in, next to a second array a loose regex would grab instead |
+| `metrics.check.ts` | the zone grid's batter-normalized pitch height, and the BA denominator (walks and sacs are plate appearances but not at-bats) |
+| `playoffs.check.ts` | the seeding: a division winner outranks every club that didn't win one, and the bracket doesn't reseed after the wild-card round |

@@ -119,6 +119,37 @@ export function parseCsv(text: string): Record<string, string>[] {
   return rows.map((r) => Object.fromEntries(head.map((h, i) => [h, r[i] ?? ""])));
 }
 
+/*
+ * The board as a file. A cell is written as it is stored rather than as it is
+ * printed — no thousands separator, and an untracked figure left empty rather
+ * than an em dash — because the thing opening this is a spreadsheet, which
+ * would read both as text and refuse to add them up.
+ */
+const cell = (v: TeamStatValue): string =>
+  v === null || v === undefined ? "" : String(v);
+
+/** RFC 4180: a field carrying a comma, a quote or a newline is quoted. */
+const field = (s: string): string =>
+  /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+
+export const csvOf = (
+  columns: ViewCol[],
+  rows: AdvRow[],
+  pos: boolean,
+): string =>
+  [
+    ["RK", "NAME", "TEAM", ...(pos ? ["POS"] : []), ...columns.map((c) => c.label)],
+    ...rows.map((r, i) => [
+      String(i + 1),
+      r.name,
+      r.team,
+      ...(pos ? [r.position] : []),
+      ...columns.map((c) => cell(r.values[c.key])),
+    ]),
+  ]
+    .map((line) => line.map(field).join(","))
+    .join("\n");
+
 const SAVANT = "https://baseballsavant.mlb.com/leaderboard";
 
 /**
@@ -1307,6 +1338,8 @@ export interface CustomQuery {
   team: string;
   position: string;
   min: string;
+  /** First-year players only — MLB's own rookie pool, not a cutoff of ours. */
+  rookies: boolean;
   sort?: string;
 }
 
@@ -1327,6 +1360,7 @@ export function pickCustomQuery(
     team?: string;
     pos?: string;
     min?: string;
+    rookies?: string;
     sort?: string;
   },
   clubIds: Set<string>,
@@ -1352,6 +1386,7 @@ export function pickCustomQuery(
     team: sp.team && clubIds.has(sp.team) ? sp.team : "all",
     position: oneOf(sp.pos, LEADER_POSITIONS, "all"),
     min: oneOf(sp.min, CUSTOM_MINS, "q"),
+    rookies: sp.rookies === "1",
     /* The reader's own column if they picked one, else this group's headline
        figure — and its leftmost column when that isn't on the board. */
     sort: picked.includes(sp.sort ?? "")
@@ -1371,12 +1406,18 @@ const customNote = (q: CustomQuery, clubs: Club[], rows: number): string => {
     CUSTOM_LEAGUES.find((l) => l.value === q.league && l.value !== "all")?.label,
     LEADER_POSITIONS.find((p) => p.value === q.position && p.value !== "all")?.label,
   ].filter(Boolean);
-  const pool =
-    q.min === "q"
-      ? "MLB's qualified pool"
-      : q.min === "0"
-        ? "everyone who appeared"
-        : `everyone with ${q.min}+ ${q.group === "hitting" ? "plate appearances" : "innings"}`;
+  const many = q.group === "hitting" ? "plate appearances" : "innings";
+  const floor =
+    q.min === "0" || (q.rookies && q.min === "q")
+      ? null
+      : q.min === "q"
+        ? "MLB's qualified pool"
+        : `${q.min}+ ${many}`;
+  /* The rookie pool is a pool of its own, so it can't also be the qualified
+     one — a rookie board asked for qualified players is every rookie. */
+  const pool = q.rookies
+    ? `every rookie${floor ? ` with ${floor}` : ""}`
+    : (floor ?? "everyone who appeared");
   return `${rows} ${rows === 1 ? "player" : "players"} — ${pool}${
     where.length ? `, ${where.join(" · ").toLowerCase()}` : ""
   }. Pick columns and filters above; the board is the link.`;
@@ -1403,7 +1444,9 @@ export async function getCustomBoard(
   const [data, clubs, adv, saber, x, ev, bat, oaa, arm] = await Promise.all([
     mlb(
       `/stats?stats=season&group=${q.group}&season=${season}&sportId=1` +
-        `&gameType=R&playerPool=${q.min === "q" ? "qualified" : "all"}` +
+        `&gameType=R&playerPool=${
+          q.rookies ? "rookies" : q.min === "q" ? "qualified" : "all"
+        }` +
         `&hydrate=team&limit=2000` +
         (q.league === "all" ? "" : `&leagueId=${q.league}`) +
         (q.team === "all" ? "" : `&teamId=${q.team}`) +
@@ -1477,6 +1520,8 @@ export async function getCustomBoard(
       .filter((c) => q.division === "all" || c.division === q.division)
       .map((c) => c.id),
   );
+  /* A numeric floor is ours to apply either way; QUALIFIED is MLB's pool and
+     has no number here, so it simply doesn't narrow a rookie board. */
   const floor = q.min === "q" || q.min === "0" ? null : Number(q.min);
 
   const rows = ((data.stats?.[0]?.splits ?? []) as any[]).flatMap(

@@ -37,7 +37,7 @@ import {
  * a link, not a session.
  */
 
-export const metadata: Metadata = { title: "COMPARE PLAYERS — STAT//SIGHTLINE" };
+export const metadata: Metadata = { title: "Compare Players" };
 
 const MAX = 4;
 const GROUP_ORDER: StatGroup[] = ["hitting", "pitching", "fielding"];
