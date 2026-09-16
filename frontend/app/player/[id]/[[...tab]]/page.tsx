@@ -32,6 +32,12 @@ import {
   getPlayerGroups,
   getPlayerSeasons,
   getPlayerSplits,
+  getVsTeamSplit,
+  lastSevenDays,
+  overviewSplitCodes,
+  getClubs,
+  type Club,
+  type SplitLine,
   getTeamSchedule,
   groupOptions,
   pickPlayerGameType,
@@ -138,6 +144,22 @@ async function nextGame(teamId: number | null, season: number): Promise<Game | n
 }
 
 /**
+ * Who the player is up against next and where — what the overview's splits
+ * are chosen for. A club with nothing on the schedule leaves them generic.
+ */
+async function nextUp(teamId: number | null, game: Game | null) {
+  if (!teamId || !game) return null;
+  const home = game.home.id === teamId;
+  const opponent = home ? game.away : game.home;
+  const clubs = await getClubs().catch(() => [] as Club[]);
+  return {
+    home,
+    opponent: { id: opponent.id, abbr: opponent.abbr },
+    leagueId: clubs.find((c) => c.id === opponent.id)?.leagueId ?? 0,
+  };
+}
+
+/**
  * A little of every other tab: what's next, how the season has gone in the
  * slices anyone checks first, the season against the career, and the last few
  * games. Every block links through to the tab it is a preview of.
@@ -167,6 +189,15 @@ async function Overview({
   ]);
   const line = player.lines.find((l) => l.group === group);
   const year = String(season);
+  /* The next opponent decides which league and club lines are worth leading
+     with, so it is read off the game the panel above is already showing. */
+  const next = await nextUp(player.teamId, game);
+  const vsClub =
+    next && splitGroup === "hitting"
+      ? await getVsTeamSplit(player.id, season, splitGroup, next.opponent).catch(
+          () => null,
+        )
+      : null;
 
   return (
     <div className="space-y-3">
@@ -179,7 +210,18 @@ async function Overview({
       />
       <SplitsSummaryPanel
         sections={splits}
-        columns={playerCols(splitGroup)}
+        extra={[lastSevenDays(splitGroup, log), vsClub].filter(
+          (l): l is SplitLine => l !== null,
+        )}
+        codes={overviewSplitCodes(splitGroup, next)}
+        columns={playerCols(splitGroup).filter(
+          /* The overview's slice is read across at a glance, so a bat's line
+             drops the two columns a split says least about. The full set is
+             one click away on the splits tab. */
+          (c) =>
+            splitGroup !== "hitting" ||
+            (c.key !== "runs" && c.key !== "stolenBases"),
+        )}
         href={`${href}/splits${query}`}
         season={season}
       />

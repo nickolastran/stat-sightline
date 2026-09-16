@@ -25,6 +25,7 @@ import {
   type GameLogGroup,
   type PlayerAward,
   type PlayerBio,
+  type SplitLine,
   type SplitSection,
   type StatGroup,
   type LedScope,
@@ -886,22 +887,29 @@ export function NextGamePanel({ game }: { game: Game | null }) {
 /** A handful of the season's splits, with the rest a click away. */
 export function SplitsSummaryPanel({
   sections,
+  extra = [],
+  codes,
   columns,
   href,
   season,
 }: {
   sections: SplitSection[];
+  /** Lines that don't arrive with the coded splits — the vs-club one. */
+  extra?: SplitLine[];
+  /** Which splits to lead with, in order — picked for who is up next. */
+  codes: string[];
   columns: TeamStatCol[];
   href: string;
   season: number;
 }) {
-  /* The lines anyone checks first: recent form, home and away, both hands.
-     Whatever the season doesn't have simply isn't listed. */
-  const wanted = ["d7", "h", "a", "vl", "vr"];
-  const lines = sections
-    .flatMap((s) => s.lines)
-    .filter((l) => wanted.includes(l.code))
-    .sort((a, b) => wanted.indexOf(a.code) - wanted.indexOf(b.code));
+  /* Whatever the season doesn't have simply isn't listed. */
+  const lines = [...sections.flatMap((s) => s.lines), ...extra]
+    .filter((l) => codes.includes(l.code))
+    /* One row per split: a code counted here as well as reported by MLB —
+       which is what recent form is, until MLB answers for it again — would
+       otherwise read twice. */
+    .filter((l, i, all) => all.findIndex((o) => o.code === l.code) === i)
+    .sort((a, b) => codes.indexOf(a.code) - codes.indexOf(b.code));
 
   return (
     <Panel title={`SPLITS — ${season}`} right={<SeeAll href={href} />}>

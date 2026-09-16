@@ -4997,6 +4997,91 @@ const PLAYER_SPLIT_SECTIONS = [
 ];
 
 /**
+ * The splits an overview leads with, in reading order: recent form, the two
+ * sides of the schedule with the one he plays next first, then who he is
+ * about to face — the opponent himself for a bat, and either way the league
+ * he'll see — the hands he has hit or pitched against, and the month being
+ * played.
+ *
+ * Codes the season can't answer simply don't come back, so an out-of-season
+ * month or a club with nothing scheduled costs a row rather than the panel.
+ */
+export function overviewSplitCodes(
+  group: "hitting" | "pitching",
+  next: { home: boolean; leagueId: number } | null,
+  /** Today, so the month being played names itself. */
+  date: string = todayPT(),
+): string[] {
+  const sides = next?.home === false ? ["a", "h"] : ["h", "a"];
+  /* MLB codes a month by its number — March is "3", October "10". */
+  const month = String(Number(date.slice(5, 7)));
+  return [
+    "d7",
+    ...sides,
+    ...(group === "hitting" ? [VS_TEAM_CODE] : []),
+    ...(next?.leagueId === 103 ? ["val"] : next?.leagueId === 104 ? ["vnl"] : []),
+    ...(group === "hitting" ? ["vl", "vr"] : []),
+    month,
+  ];
+}
+
+/**
+ * The last seven days, added up off the game log.
+ *
+ * MLB publishes a `d7` situation code and has stopped answering it — every
+ * player comes back with no recency splits at all — so recent form, which is
+ * the first thing anyone asks of a bat, is counted from the games themselves.
+ * The log is already on the overview, so this costs no request.
+ */
+export function lastSevenDays(
+  group: StatGroup,
+  months: GameLogGroup[],
+  today: string = todayPT(),
+): SplitLine | null {
+  const from = new Date(Date.parse(today) - 6 * 86400000)
+    .toISOString()
+    .slice(0, 10);
+  const rows = months.flatMap((m) => m.rows).filter((r) => r.date >= from);
+  return rows.length === 0
+    ? null
+    : {
+        code: "d7",
+        label: "LAST 7 DAYS",
+        values: sumStatLines(group, rows.map((r) => r.values)),
+      };
+}
+
+/** The synthetic code the vs-club line is filed under — MLB has none. */
+export const VS_TEAM_CODE = "vsteam";
+
+/**
+ * A player's season against one club. MLB reports this under a stat type of
+ * its own rather than a situation code, so it is fetched on its own and
+ * handed back in the same shape the coded splits arrive in.
+ */
+export async function getVsTeamSplit(
+  id: number,
+  season: number,
+  group: "hitting" | "pitching",
+  opponent: { id: number; abbr: string },
+): Promise<SplitLine | null> {
+  const data = await mlb(
+    `/people/${id}/stats?stats=vsTeamTotal&group=${group}&season=${season}` +
+      `&opposingTeamId=${opponent.id}`,
+    1800,
+  ).catch(() => null);
+  const split = (data?.stats?.[0]?.splits ?? [])[0];
+  if (!split?.stat) return null;
+  return {
+    code: VS_TEAM_CODE,
+    label: `VS ${opponent.abbr}`,
+    values: Object.fromEntries(
+      playerCols(group).map((c) => [c.key, split.stat[c.key] ?? null]),
+    ),
+  };
+}
+
+/**
  * One player's season sliced every way MLB reports, section by section — or
  * his whole career, which MLB answers for on the same codes under a different
  * pair of type names. A career has no "last 7 days", so that section goes.
