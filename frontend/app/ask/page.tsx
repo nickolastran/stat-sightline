@@ -12,7 +12,7 @@ import { ask } from "@/lib/api";
  */
 
 export const metadata: Metadata = {
-  title: "ASK — STAT//SIGHTLINE",
+  title: "Ask",
   description: "Ask the Statcast pitch warehouse a question in plain English.",
 };
 

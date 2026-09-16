@@ -8,7 +8,7 @@ import AdvancedTable from "@/components/mlb/AdvancedTable";
 import CustomFilterBar from "@/components/mlb/CustomFilterBar";
 import TopPerformers from "@/components/mlb/TopPerformers";
 import { SkeletonTable } from "@/components/ui/Skeleton";
-import { getClubs, seasonOf, todayPT, type Club } from "@/lib/mlb";
+import { getClubs, seasonOf, titleCase, todayPT, type Club } from "@/lib/mlb";
 import {
   ADV_FIRST_SEASON,
   ADV_VIEWS,
@@ -47,9 +47,7 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { view } = await params;
   const found = findAdvView(view);
-  return {
-    title: found ? `${found.title} — STAT//SIGHTLINE` : "STAT//SIGHTLINE",
-  };
+  return found ? { title: titleCase(found.title) } : {};
 }
 
 /** The four boards and the cards, as the row of tabs over each of them. */

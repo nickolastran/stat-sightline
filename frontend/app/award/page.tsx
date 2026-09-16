@@ -18,7 +18,7 @@ import { AWARD_PAGES, ballotIndex } from "@/lib/mlb";
  */
 
 export const metadata: Metadata = {
-  title: "AWARDS INDEX — STAT//SIGHTLINE",
+  title: "Awards Index",
   description:
     "Every MLB award — MVP, Cy Young, Rookie and Manager of the Year, the postseason and monthly awards, Gold Gloves and Silver Sluggers, back to the Chalmers Award of 1911 — with every winner by decade, and the BBWAA's ballots season by season.",
 };

@@ -293,6 +293,34 @@ export function gameStatus(
   return { text: clock(g.startTime, timeZone), tone: "pre" };
 }
 
+/*
+ * The site is set in capitals; a browser tab is not. These two turn a
+ * heading and a first pitch into the sentence case a tab strip is read in.
+ * Both run in `generateMetadata`, on the server, where there is no viewer to
+ * ask for a zone — so a game's day is its Pacific one, the same day the
+ * scoreboard rolls over on.
+ */
+
+/** Initials that are words in their own right and stay shouted. */
+const TITLE_KEEP = new Set(["ABS", "MLB", "AL", "NL", "WAR", "ERA", "WPA"]);
+
+/** "PROBABLE PITCHERS — TODAY" → "Probable Pitchers — Today". */
+export const titleCase = (s: string): string =>
+  s.replace(/[A-Za-z]+/g, (w) =>
+    TITLE_KEEP.has(w.toUpperCase())
+      ? w.toUpperCase()
+      : w[0].toUpperCase() + w.slice(1).toLowerCase(),
+  );
+
+/** "Sep 10, 2025" — the day a game belongs to. */
+export const gameDay = (iso: string): string =>
+  new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    timeZone: "America/Los_Angeles",
+  }).format(new Date(iso));
+
 /** "7:40 PM PDT" — a first pitch in the zone it is being read in. */
 const clock = (iso: string, timeZone: string) =>
   new Intl.DateTimeFormat("en-US", {

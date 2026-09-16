@@ -45,6 +45,7 @@ import {
   FIRST_SEASON,
   GAME_TYPES,
   getClubs,
+  titleCase,
   type GameType,
   type PlayerGameType,
   type StatGroup,
@@ -79,11 +80,7 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { section } = await params;
   const found = findSection(section);
-  return {
-    title: found
-      ? `${found.title} — STAT//SIGHTLINE`
-      : "STAT//SIGHTLINE",
-  };
+  return found ? { title: titleCase(found.title) } : {};
 }
 
 /** A `?season=` the boards can actually serve, else the running season. */

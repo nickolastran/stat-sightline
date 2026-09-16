@@ -16,6 +16,7 @@ import Pregame from "@/components/mlb/Pregame";
 import {
   getBoxScore,
   getGame,
+  gameDay,
   getLive,
   inProgress,
   notStarted,
@@ -110,11 +111,9 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { pk } = await params;
   const game = await getGame(Number(pk)).catch(() => null);
-  return {
-    title: game
-      ? `${game.away.abbr} @ ${game.home.abbr} — STAT//SIGHTLINE`
-      : "STAT//SIGHTLINE",
-  };
+  return game
+    ? { title: `${game.away.name} vs. ${game.home.name} - ${gameDay(game.startTime)}` }
+    : {};
 }
 
 export default async function GamePage({

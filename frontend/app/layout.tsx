@@ -7,7 +7,13 @@ import SiteFooter from "@/components/SiteFooter";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "STAT//SIGHTLINE — pitch-level MLB analytics",
+  /* The tab, not the page: read at 11px in a strip of other tabs, so it is
+     the one place on the site that isn't set in capitals. Every page below
+     names only itself and the template hangs the mark off the end. */
+  title: {
+    default: "Stat//Sightline - Scores, Stats, Advanced Analytics",
+    template: "%s - Stat//Sightline",
+  },
   description:
     "Pitch-level Statcast warehouse: strike-zone plots, arsenal breakdowns, matchup forecasting.",
 };
