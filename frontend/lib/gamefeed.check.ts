@@ -11,18 +11,24 @@
  * Run with:  npx tsx lib/gamefeed.check.ts
  */
 import assert from "node:assert/strict";
-import { feedBoards, statBoard } from "./gamefeed";
+import { feedBoards } from "./gamefeed";
 
 const pitch = (o: Record<string, unknown>) => ({ isPitch: true, ...o });
 
 const log = (plays: unknown[]) => ({ allPlays: plays });
 
-const play = (batter: number, pitcher: number, events: unknown[]) => ({
+const play = (
+  batter: number,
+  pitcher: number,
+  events: unknown[],
+  eventType?: string,
+) => ({
   matchup: {
     batter: { id: batter, fullName: `B${batter}` },
     pitcher: { id: pitcher, fullName: `P${pitcher}` },
   },
   playEvents: events,
+  ...(eventType ? { result: { eventType } } : {}),
 });
 
 /** One line of a win probability log: who batted, who pitched, which half,
@@ -179,29 +185,41 @@ const board = (boards: ReturnType<typeof feedBoards>, code: string) =>
   );
   assert.deepEqual(
     boards.map((b) => b.rows.length),
-    [0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0],
   );
 }
 
-/* ── A day of one box score figure, ranked, nobody with none of it ──── */
+/* ── Hits and strikeouts, counted off the log while the game is on ───── */
 {
-  const split = (id: number, hits: number) => ({
-    player: { id, fullName: `B${id}` },
-    stat: { hits },
-  });
-  const rows = statBoard(
-    [split(1, 2), split(2, 4), split(3, 0), { stat: { hits: 5 } }, split(4, 3)],
-    "hits",
-    "hits",
-    "MOST HITS",
-  ).rows;
-  assert.deepEqual(
-    rows.map((r) => [r.name, r.value]),
+  const boards = feedBoards(
     [
-      ["B2", "4"],
-      ["B4", "3"],
-      ["B1", "2"],
+      log([
+        play(1, 9, [], "single"),
+        play(1, 9, [], "home_run"),
+        play(1, 9, [], "walk"),
+        play(2, 9, [], "double"),
+        play(2, 8, [], "triple"),
+        play(3, 9, [], "strikeout"),
+        play(4, 9, [], "strikeout_double_play"),
+        play(5, 8, [], "field_out"),
+        /* The at-bat on the screen right now — no result, nothing counted. */
+        play(6, 8, [pitch({ pitchData: { startSpeed: 98 } })]),
+      ]),
     ],
+    [],
+  );
+  assert.deepEqual(
+    board(boards, "hits").rows.map((r) => [r.name, r.value]),
+    [
+      ["B1", "2"],
+      ["B2", "2"],
+    ],
+    "the walk is not a hit, and the live at-bat has yet to be one",
+  );
+  assert.deepEqual(
+    board(boards, "strikeouts").rows.map((r) => [r.name, r.value]),
+    [["P9", "2"]],
+    "the strikeout double play is still a strikeout, and the ground-out is not",
   );
 }
 
