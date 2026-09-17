@@ -461,9 +461,12 @@ export default async function PlayerPage({
   /* There is no fielding split, so that tab offers one fewer choice than the
      rest and lands on batting when fielding was the standing pick. */
   const splitGroups = groups.filter((g) => g !== "fielding");
-  /* Two tabs have nothing to control: the bio is fixed, and the career table
-     stacks every line of every season rather than showing one at a time. */
-  const hasControls = section !== "bio" && section !== "stats";
+  /* Three tabs have nothing to control: the bio is fixed, the career table
+     stacks every line of every season rather than showing one at a time, and
+     the overview is the running season's summary — a bar over it would be two
+     controls for a page that reads one line either way. */
+  const hasControls =
+    section !== "bio" && section !== "stats" && section !== "overview";
 
   /* One group strip either way — splits offer one line fewer and land on
      batting when fielding was the standing pick. No fragment around the pair:
