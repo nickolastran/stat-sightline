@@ -170,6 +170,8 @@ export interface Game {
   detailedState: string;
   startTime: string; // ISO
   venue: string;
+  /** MLB's own day/night mark, which the stat feeds don't carry. */
+  night: boolean;
   inning: number | null;
   inningState: string | null;
   away: GameSide;
@@ -199,6 +201,7 @@ const toGame = (g: any): Game => ({
   detailedState: g.status?.detailedState ?? "",
   startTime: g.gameDate,
   venue: g.venue?.name ?? "",
+  night: g.dayNight === "night",
   inning: g.linescore?.currentInning ?? null,
   inningState: g.linescore?.inningState ?? null,
   away: side(g.teams?.away ?? {}),
@@ -848,8 +851,14 @@ export const teamStatNum = (v: TeamStatValue): number | null => {
   return Number.isFinite(n) ? n : null;
 };
 
-const cols = (group: "hitting" | "pitching") =>
-  group === "hitting" ? TEAM_HITTING_COLS : TEAM_PITCHING_COLS;
+/* A club's columns for a group. Fielding is reported with the same handful of
+   figures for a club as for a player, so it reads the player set. */
+export const cols = (group: StatGroup): TeamStatCol[] =>
+  group === "hitting"
+    ? TEAM_HITTING_COLS
+    : group === "pitching"
+      ? TEAM_PITCHING_COLS
+      : PLAYER_FIELDING_COLS;
 
 /**
  * Every player's WAR for one season, and each club's — the sum of the WAR its
@@ -2606,22 +2615,42 @@ const SPLIT_SECTIONS: {
   codes: string[];
   hittingOnly?: boolean;
 }[] = [
-  { label: "GAME", codes: ["h", "a", "d", "n", "g", "t"] },
-  { label: "MONTH", codes: ["3", "4", "5", "6", "7", "8", "9", "10"] },
-  { label: "HALF", codes: ["preas", "posas"] },
-  { label: "OPPONENT", codes: ["vl", "vr", "val", "vnl"] },
-  { label: "BASES", codes: ["r0", "ron", "risp", "risp2", "r123", "lo"] },
-  { label: "SCORE", codes: ["sah", "sti", "sbh", "lc"] },
-  { label: "RESULT", codes: ["twn", "tls", "taw", "tal"] },
-  { label: "INNING", codes: ["ig01", "i07", "i08", "i09", "ix"] },
-  { label: "COUNT", codes: ["fp", "ac", "ec", "bc", "2s", "fc"] },
+  { label: "Game", codes: ["h", "a", "d", "n", "g", "t"] },
+  { label: "Month", codes: ["3", "4", "5", "6", "7", "8", "9", "10"] },
+  { label: "Half", codes: ["preas", "posas"] },
+  /* The hand a club hit or pitched against is not who it played, so it reads
+     as its own block rather than the head of the opponent one. */
+  { label: "Handedness", codes: ["vl", "vr"] },
+  { label: "Opponent", codes: ["val", "vnl", "int"] },
+  { label: "Bases", codes: ["r0", "ron", "risp", "risp2", "r123", "lo"] },
+  { label: "Score", codes: ["sah", "sti", "sbh", "lc"] },
+  { label: "Result", codes: ["twn", "tls", "taw", "tal"] },
+  /* Every inning, not the four MLB's own page stops at: the shape of a
+     bullpen is in the seventh against the sixth, and of an offence in the
+     first. Extras ride on the end. */
   {
-    label: "BATTING ORDER",
+    label: "Inning",
+    codes: [
+      "i01",
+      "i02",
+      "i03",
+      "i04",
+      "i05",
+      "i06",
+      "i07",
+      "i08",
+      "i09",
+      "ix",
+    ],
+  },
+  { label: "Count", codes: ["fp", "ac", "ec", "bc", "2s", "fc"] },
+  {
+    label: "Batting Order",
     hittingOnly: true,
     codes: ["b1", "b2", "b3", "b4", "b5", "b6", "b7", "b8", "b9"],
   },
   {
-    label: "POSITION",
+    label: "Position",
     hittingOnly: true,
     codes: ["p2", "p3", "p4", "p5", "p6", "p7", "p8", "p9", "pD", "pH"],
   },
@@ -2696,14 +2725,249 @@ async function buildSplits(
 export async function getTeamSplits(
   id: number,
   season: number,
-  group: "hitting" | "pitching",
+  group: StatGroup,
 ): Promise<SplitSection[]> {
-  return buildSplits(
-    (codes) =>
-      `/teams/${id}/stats?season=${season}&group=${group}&stats=season,statSplits&sitCodes=${codes}`,
-    cols(group),
-    SPLIT_SECTIONS.filter((s) => !s.hittingOnly || group === "hitting"),
+  const [situational, logged] = await Promise.all([
+    /* MLB answers no situation code at all for a fielding line, so that group
+       is read entirely off the game log below. */
+    group === "fielding"
+      ? Promise.resolve<SplitSection[]>([])
+      : buildSplits(
+          (codes) =>
+            `/teams/${id}/stats?season=${season}&group=${group}&stats=season,statSplits&sitCodes=${codes}`,
+          cols(group),
+          SPLIT_SECTIONS.filter((s) => !s.hittingOnly || group === "hitting"),
+        ),
+    /* A club whose log the feed won't answer for still gets the situational
+       half of its page rather than an unavailable tab. */
+    getTeamLogSplits(id, season, group).catch(() => [] as SplitSection[]),
+  ]);
+  /* A block the log and the situation codes both answer — the opponents — is
+     one section read twice, not two: MLB's league lines head it and the
+     division lines counted off the games follow them. */
+  const built = [...situational];
+  for (const sec of logged) {
+    const at = built.find((s) => s.label === sec.label);
+    if (at) at.lines = [...at.lines, ...sec.lines];
+    else built.push(sec);
+  }
+  return built;
+}
+
+/* ── Splits counted off the club's game log ─────────────────────────── */
+
+/** One game of a club's log, cut down to what a split is grouped by. */
+export interface TeamLogGame {
+  pk: number;
+  date: string;
+  isHome: boolean;
+  opponent: number;
+  values: Record<string, TeamStatValue>;
+}
+
+/** What the schedule knows about a game that its stat line doesn't — the park
+    it was played in, and whether it was a night game, which the game log
+    reports as "day" for all 162. */
+export interface TeamLogGameInfo {
+  park: string;
+  night: boolean;
+}
+
+/** "AL East" — MLB's own name for a division, set the way a split line is
+    rather than in the capitals the standings are read in. */
+const divisionName = (id: number): string =>
+  (DIVISIONS[id] ?? "").replace(
+    /\s(\w+)$/,
+    (_, w: string) => ` ${w[0]}${w.slice(1).toLowerCase()}`,
   );
+
+/* The recent windows, in the order they narrow. MLB publishes d7 and d30
+   situation codes and has stopped answering them, and has never had a 14 or a
+   365, so all four are counted off the games themselves. */
+const RECENT_WINDOWS: { days: number; label: string }[] = [
+  { days: 7, label: "Last 7 Days" },
+  { days: 14, label: "Last 14 Days" },
+  { days: 30, label: "Last 30 Days" },
+  { days: 365, label: "Last 365 Days" },
+];
+
+/**
+ * The sections a game log answers that the situation codes don't: recent
+ * form, the clubs played and the parks played in — and, for a fielding line,
+ * every section there is.
+ *
+ * `prior` is the season before, which only the 365-day window reads: a year
+ * back from any date in a season reaches into the one before it.
+ */
+export function teamLogSections(
+  group: StatGroup,
+  games: TeamLogGame[],
+  prior: TeamLogGame[],
+  /** The day the windows count back from — today, or the season's last game. */
+  anchor: string,
+  /** The park each game was played in and whether it was at night, by gamePk. */
+  info: Map<number, TeamLogGameInfo>,
+  /** Which division each club played in that season, by club id. */
+  division: Map<number, number>,
+): SplitSection[] {
+  if (games.length === 0) return [];
+  const line = (code: string, label: string, rows: TeamLogGame[]) =>
+    rows.length === 0
+      ? null
+      : {
+          code,
+          label,
+          values: sumStatLines(
+            group,
+            rows.map((r) => r.values),
+          ),
+        };
+  const kept = (lines: (SplitLine | null)[]) =>
+    lines.filter((l): l is SplitLine => l !== null);
+
+  /* One line per club, park or month, alphabetical — MLB's own order on both
+     tables. A game the schedule can't name is left out rather than filed
+     under a blank heading. */
+  const binned = (
+    label: string,
+    rows: TeamLogGame[],
+    name: (g: TeamLogGame) => string,
+  ) => {
+    const bins = new Map<string, TeamLogGame[]>();
+    for (const g of rows) {
+      const k = name(g);
+      if (!k) continue;
+      const bin = bins.get(k);
+      if (bin) bin.push(g);
+      else bins.set(k, [g]);
+    }
+    return {
+      label,
+      lines: kept(
+        [...bins.keys()].sort().map((k) => line(k, k, bins.get(k)!)),
+      ),
+    };
+  };
+
+  const since = (days: number) =>
+    new Date(Date.parse(anchor) - (days - 1) * 86400000)
+      .toISOString()
+      .slice(0, 10);
+  const back = [...prior, ...games];
+  const sections: SplitSection[] = [];
+
+  /* Fielding has no situational payload to head the page, so its own GAME and
+     MONTH blocks — and the season line above them — come from the log. */
+  if (group === "fielding") {
+    sections.push({
+      label: "Game",
+      lines: kept([
+        line("total", "Total", games),
+        line("h", "Home Games", games.filter((g) => g.isHome)),
+        line("a", "Away Games", games.filter((g) => !g.isHome)),
+        line("d", "Day Games", games.filter((g) => !info.get(g.pk)?.night)),
+        line("n", "Night Games", games.filter((g) => info.get(g.pk)?.night)),
+      ]),
+    });
+    /* Months read in the order they were played, not alphabetically — the
+       one section a sort by name gets wrong. */
+    sections.push({
+      label: "Month",
+      lines: kept(
+        MONTHS.map((m, i) =>
+          line(
+            `m${i + 1}`,
+            /* The months are held in capitals for the game log's bands; a
+               split reads them the way every other line on the page is set. */
+            m.charAt(0) + m.slice(1).toLowerCase(),
+            games.filter((g) => Number(g.date.slice(5, 7)) === i + 1),
+          ),
+        ),
+      ),
+    });
+  }
+
+  sections.push({
+    label: "Recent",
+    lines: kept(
+      RECENT_WINDOWS.map((w) =>
+        line(
+          `d${w.days}`,
+          w.label,
+          back.filter((g) => g.date >= since(w.days) && g.date <= anchor),
+        ),
+      ),
+    ),
+  });
+  /* Who was played, added up by division — six lines under MLB's two league
+     ones, in the order every scoreboard reads them. Thirty club lines would be
+     a list rather than a split, and a season played before the divisions
+     existed simply has none of them. */
+  sections.push({
+    label: "Opponent",
+    lines: kept(
+      DIVISION_ORDER.map((d) =>
+        line(
+          `div${d}`,
+          `vs. ${divisionName(d)}`,
+          games.filter((g) => division.get(g.opponent) === d),
+        ),
+      ),
+    ),
+  });
+  sections.push(binned("Ballpark", games, (g) => info.get(g.pk)?.park ?? ""));
+  return sections.filter((s) => s.lines.length > 0);
+}
+
+/** One club's season, a line per game, in the shape the sections group by. */
+async function teamGameLog(
+  id: number,
+  season: number,
+  group: StatGroup,
+): Promise<TeamLogGame[]> {
+  const data = await mlb(
+    `/teams/${id}/stats?season=${season}&group=${group}&stats=gameLog`,
+    1800,
+  );
+  return ((data.stats?.[0]?.splits ?? []) as any[]).map((s) => ({
+    pk: s.game?.gamePk ?? 0,
+    date: s.date ?? "",
+    isHome: !!s.isHome,
+    opponent: s.opponent?.id ?? 0,
+    values: (s.stat ?? {}) as Record<string, TeamStatValue>,
+  }));
+}
+
+/**
+ * The log-counted half of a club's splits. Four requests, all cached: the
+ * season's log, the season before it for the 365-day window, and the schedule,
+ * which is the only thing that names the park a game was played in — an away
+ * game is not always at the other club's own yard — and the only one that
+ * knows a night game from a day one, and the division each club played in
+ * that season, which is what the opponents are added up by.
+ */
+async function getTeamLogSplits(
+  id: number,
+  season: number,
+  group: StatGroup,
+): Promise<SplitSection[]> {
+  const [games, prior, schedule, division] = await Promise.all([
+    teamGameLog(id, season, group),
+    teamGameLog(id, season - 1, group).catch(() => [] as TeamLogGame[]),
+    getTeamSchedule(id, season).catch(() => [] as Game[]),
+    divisionsOf(season),
+  ]);
+  const info = new Map(
+    schedule.map((g) => [g.pk, { park: g.venue, night: g.night }] as const),
+  );
+
+  /* A season being played counts back from today; a finished one from its own
+     last game, where "last 30 days" means the thirty it ended on. */
+  const anchor =
+    season === seasonOf(todayPT())
+      ? todayPT()
+      : (games[games.length - 1]?.date ?? todayPT());
+  return teamLogSections(group, games, prior, anchor, info, division);
 }
 
 /** One roster move — the transactions tab, newest first. */
@@ -4188,6 +4452,19 @@ async function leaguesOf(season: number): Promise<Map<number, number>> {
   );
 }
 
+/** Which club was in which division that season — the same payload the
+ *  leagues are read off, so it costs no second request. */
+async function divisionsOf(season: number): Promise<Map<number, number>> {
+  const data = await mlb(`/teams?sportId=1&season=${season}`, 86400).catch(
+    () => null,
+  );
+  return new Map(
+    ((data?.teams ?? []) as any[])
+      .filter((t) => t.id && t.division?.id)
+      .map((t) => [t.id as number, t.division.id as number]),
+  );
+}
+
 /*
  * What the league's pitchers did at the plate. A plus stat measures a hitter
  * against the hitters, and until the designated hitter went universal in 2022
@@ -4997,7 +5274,7 @@ function summarise(
    one has no "last 7 days" — so the section simply drops out of a past year.
    They lead the page because they are the first thing anyone asks of a bat. */
 const PLAYER_SPLIT_SECTIONS = [
-  { label: "RECENT", codes: ["d7", "d30", "l10"] },
+  { label: "Recent", codes: ["d7", "d30", "l10"] },
   ...SPLIT_SECTIONS,
 ];
 
