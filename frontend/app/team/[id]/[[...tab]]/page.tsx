@@ -197,8 +197,9 @@ const STAT_GROUPS: { value: StatGroup; label: string }[] = [
   { value: "fielding", label: "FIELDING" },
 ];
 
-/* Splits come in two of those three groups — nobody splits a fielding line. */
-const SPLIT_GROUPS = STAT_GROUPS.filter((g) => g.value !== "fielding");
+/* Every group splits — a fielding line has no situation codes behind it, so
+   its sections are counted off the game log instead. */
+const SPLIT_GROUPS = STAT_GROUPS;
 
 /* One group at a time, the way MLB's own stats page reads, rather than three
    tables stacked: a reader is looking at one of them, and the other two cost a
@@ -293,17 +294,14 @@ async function TabBody({
         );
       case "roster":
         return <RosterPanel groups={await getTeamRosterGroups(id, season)} />;
-      case "splits": {
-        /* No fielding splits — anything but pitching reads as batting. */
-        const g = group === "pitching" ? "pitching" : "hitting";
+      case "splits":
         return (
           <SplitsPanels
-            group={g}
-            sections={await getTeamSplits(id, statSeason, g)}
+            group={group}
+            sections={await getTeamSplits(id, statSeason, group)}
             season={statSeason}
           />
         );
-      }
       case "injuries":
         return <InjuriesPanel players={await getTeamInjuries(id, season)} />;
       case "transactions":
@@ -402,8 +400,7 @@ export default async function TeamPage({
   const statSeason = pickSeason(sp.season, first, season);
   const gameType = pickPlayerGameType(sp.type);
   const statGroup = pickStatGroup(sp.group);
-  /* Splits come in two groups, not three — there is no fielding split. */
-  const splitGroup = statGroup === "pitching" ? "pitching" : "hitting";
+
 
   return (
     <div className="mx-auto max-w-7xl space-y-3 p-3">
@@ -415,7 +412,7 @@ export default async function TeamPage({
             param="group"
             ariaLabel="Stat group"
             size="lg"
-            value={splits ? splitGroup : statGroup}
+            value={statGroup}
             options={splits ? SPLIT_GROUPS : STAT_GROUPS}
           />
           <div className="ml-auto flex flex-wrap items-center gap-3">

@@ -35,6 +35,7 @@ import {
   winProbability,
   breakIndex,
   latestByGame,
+  teamLogSections,
   leaderBoard,
   mergeFielding,
   eraPlus,
@@ -1470,3 +1471,134 @@ console.log("lastSevenDays ok");
   );
 }
 console.log("projectStatLine ok");
+
+/*
+ * The splits counted off a club's game log. The windows are inclusive of the
+ * anchor day and of the day they reach back to — "last 7 days" is seven days,
+ * not six or eight — and the 365-day one is the only section the season
+ * before is allowed into: a park or an opponent belongs to the season on the
+ * page. Every line is a sum, so the rates come back off the totals.
+ */
+{
+  const game = (
+    pk: number,
+    date: string,
+    opponent: number,
+    isHome: boolean,
+    hits: number,
+  ) => ({
+    pk,
+    date,
+    isHome,
+    opponent,
+    values: { atBats: 10, hits, gamesPlayed: 1 },
+  });
+  const games = [
+    game(1, "2025-09-01", 111, true, 1),
+    game(2, "2025-09-10", 111, false, 2),
+    game(3, "2025-09-14", 141, true, 3),
+    game(4, "2025-09-15", 121, true, 4),
+  ];
+  const prior = [game(9, "2024-10-01", 141, false, 9)];
+  const info = new Map([
+    [1, { park: "Yankee Stadium", night: false }],
+    [2, { park: "Fenway Park", night: true }],
+    [3, { park: "Yankee Stadium", night: true }],
+    [4, { park: "Citi Field", night: false }],
+  ]);
+  /* Boston and Toronto are the AL East; the Mets are the NL East. */
+  const divisions = new Map([
+    [111, 201],
+    [141, 201],
+    [121, 204],
+  ]);
+  const sections = teamLogSections(
+    "hitting",
+    games,
+    prior,
+    "2025-09-15",
+    info,
+    divisions,
+  );
+  const find = (label: string) => sections.find((s) => s.label === label)!;
+
+  const recent = find("Recent");
+  assert.deepEqual(
+    recent.lines.map((l) => [l.label, l.values.hits]),
+    [
+      ["Last 7 Days", 9],
+      ["Last 14 Days", 9],
+      ["Last 30 Days", 10],
+      ["Last 365 Days", 19],
+    ],
+    "each window reaches back exactly as far as it says, and only the year " +
+      "back reaches into the season before",
+  );
+  assert.equal(
+    recent.lines[0].values.avg,
+    ".300",
+    "a window's rate is worked out from its own totals",
+  );
+
+  assert.deepEqual(
+    find("Opponent").lines.map((l) => [l.label, l.values.hits]),
+    [
+      ["vs. AL East", 6],
+      ["vs. NL East", 4],
+    ],
+    "the clubs played are added up by division, in scoreboard order, and " +
+      "last October is not this season's",
+  );
+  assert.deepEqual(
+    find("Ballpark").lines.map((l) => [l.label, l.values.hits]),
+    [
+      ["Citi Field", 4],
+      ["Fenway Park", 2],
+      ["Yankee Stadium", 4],
+    ],
+    "two games in the same park are one line",
+  );
+  assert.equal(
+    sections.find((s) => s.label === "Game"),
+    undefined,
+    "a batting line already has its home and road split from MLB",
+  );
+
+  const fielding = teamLogSections(
+    "fielding",
+    games,
+    prior,
+    "2025-09-15",
+    info,
+    divisions,
+  );
+  assert.deepEqual(
+    fielding.find((s) => s.label === "Game")!.lines.map((l) => l.code),
+    ["total", "h", "a", "d", "n"],
+    "fielding has no situational payload, so the log heads the page itself",
+  );
+  assert.deepEqual(
+    fielding.find((s) => s.label === "Month")!.lines.map((l) => l.label),
+    ["September"],
+    "and names its own months, in the order they were played",
+  );
+  assert.deepEqual(
+    fielding.map((s) => s.label),
+    ["Game", "Month", "Recent", "Opponent", "Ballpark"],
+    "and reads the same sections a batting line's log does",
+  );
+
+  assert.deepEqual(
+    teamLogSections("hitting", games, prior, "2025-09-15", new Map(), new Map())
+      .map((s) => s.label),
+    ["Recent"],
+    "a section with nothing to name is dropped, not printed empty",
+  );
+
+  assert.deepEqual(
+    teamLogSections("hitting", [], prior, "2025-09-15", new Map(), new Map()),
+    [],
+    "a season not yet played has no splits at all",
+  );
+}
+console.log("teamLogSections ok");
