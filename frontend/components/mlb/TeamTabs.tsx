@@ -25,12 +25,17 @@ export default function TeamTabs({
   id,
   name,
   active,
+  season,
 }: {
   id: number;
   /** The club's name, which rides along in every tab's URL. */
   name: string;
   active: string;
+  /** The season being read, carried across so switching tabs keeps the year.
+      Undefined for the running season, whose URL stays clean. */
+  season?: number;
 }) {
+  const year = season ? `?season=${season}` : "";
   return (
     <nav
       aria-label="Team sections"
@@ -39,7 +44,7 @@ export default function TeamTabs({
       {TEAM_TABS.map((t) => (
         <Link
           key={t.id}
-          href={teamHref(id, name, t.id === "home" ? "" : t.id)}
+          href={teamHref(id, name, t.id === "home" ? "" : t.id) + year}
           aria-current={t.id === active ? "page" : undefined}
           className={`border px-2 py-1 text-[11px] tracking-wide ${
             t.id === active
