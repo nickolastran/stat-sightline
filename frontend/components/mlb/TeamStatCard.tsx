@@ -57,7 +57,7 @@ export default function TeamStatCard({
         ))}
       </dl>
       <Link
-        href="/league/teams"
+        href={`/league/teams?season=${season}`}
         className="block px-3 py-2 text-center text-[10px] tracking-wider text-ink-2 hover:text-accent"
       >
         FULL TEAM STATS →

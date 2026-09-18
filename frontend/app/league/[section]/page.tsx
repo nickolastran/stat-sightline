@@ -191,7 +191,12 @@ async function SectionBody({
           />
         );
       case "teams":
-        return <TeamStats tables={await getTeamStats(season, gameType)} />;
+        return (
+          <TeamStats
+            tables={await getTeamStats(season, gameType)}
+            season={season}
+          />
+        );
       case "abs":
         return <AbsBoard board={await getAbsLeaders(season, abs)} type={abs.type} />;
       case "players": {

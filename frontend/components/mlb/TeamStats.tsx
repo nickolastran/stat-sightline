@@ -30,7 +30,13 @@ const DEFAULT_SORT: Record<"hitting" | "pitching", Sort> = {
   pitching: { key: "era", dir: "asc" },
 };
 
-export default function TeamStats({ tables }: { tables: TeamStatTable[] }) {
+export default function TeamStats({
+  tables,
+  season,
+}: {
+  tables: TeamStatTable[];
+  season: number;
+}) {
   const setParam = useSetParam();
   const group =
     useSearchParams().get("group") === "pitching" ? "pitching" : "hitting";
@@ -98,7 +104,7 @@ export default function TeamStats({ tables }: { tables: TeamStatTable[] }) {
                   {/* The frozen team column repaints with the row it belongs
                       to — its own background would otherwise mask the hover. */}
                   <td className="sticky left-0 z-10 bg-bg px-3 py-1.5 group-hover:bg-surface-2">
-                    <TeamLink id={r.id} name={r.name} />
+                    <TeamLink id={r.id} name={r.name} season={season} />
                   </td>
                   {table!.columns.map((c) => (
                     <td
