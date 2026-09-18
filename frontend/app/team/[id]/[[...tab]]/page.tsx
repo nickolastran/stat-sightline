@@ -79,7 +79,17 @@ function Unavailable({ what }: { what: string }) {
   );
 }
 
-function Identity({ t, season }: { t: TeamIdentity; season: number }) {
+function Identity({
+  t,
+  season,
+  first,
+  last,
+}: {
+  t: TeamIdentity;
+  season: number;
+  first: number;
+  last: number;
+}) {
   const facts = [
     t.division,
     t.league,
@@ -104,6 +114,9 @@ function Identity({ t, season }: { t: TeamIdentity; season: number }) {
         <p className="mt-1 truncate text-[10px] tracking-[0.2em] text-ink-3">
           {[`${season} SEASON`, ...facts].join(" · ")}
         </p>
+      </div>
+      <div className="ml-auto shrink-0">
+        <SeasonSelect value={season} first={first} last={last} />
       </div>
     </div>
   );
@@ -152,13 +165,10 @@ function pickHalf(
 async function TeamSchedule({
   id,
   season,
-  first,
   half,
 }: {
   id: number;
   season: number;
-  /** The club's first year, the floor of its season picker. */
-  first: number;
   half: string | undefined;
 }) {
   const [games, records, breakAt] = await Promise.all([
@@ -180,10 +190,7 @@ async function TeamSchedule({
       records={records}
       title={`SCHEDULE — ${season}`}
       controls={
-        <div className="flex flex-wrap items-center gap-3">
-          <ParamSelect param="half" label="SHOW" value={shown} options={HALVES} />
-          <SeasonSelect value={season} first={first} last={seasonOf(todayPT())} />
-        </div>
+        <ParamSelect param="half" label="SHOW" value={shown} options={HALVES} />
       }
     />
   );
@@ -253,8 +260,6 @@ async function TabBody({
   tab,
   id,
   season,
-  statSeason,
-  first,
   gameType,
   group,
   half,
@@ -262,9 +267,6 @@ async function TabBody({
   tab: TeamTab;
   id: number;
   season: number;
-  /** The stats, schedule, splits and transactions tabs read their own season. */
-  statSeason: number;
-  first: number;
   gameType: PlayerGameType;
   /** Which table the stats tab is showing. */
   group: StatGroup;
@@ -275,19 +277,12 @@ async function TabBody({
       case "home":
         return <TeamHome id={id} season={season} />;
       case "schedule":
-        return (
-          <TeamSchedule
-            id={id}
-            season={statSeason}
-            first={first}
-            half={half}
-          />
-        );
+        return <TeamSchedule id={id} season={season} half={half} />;
       case "stats":
         return (
           <PlayerStats
             id={id}
-            season={statSeason}
+            season={season}
             gameType={gameType}
             group={group}
           />
@@ -298,24 +293,15 @@ async function TabBody({
         return (
           <SplitsPanels
             group={group}
-            sections={await getTeamSplits(id, statSeason, group)}
-            season={statSeason}
+            sections={await getTeamSplits(id, season, group)}
+            season={season}
           />
         );
       case "injuries":
         return <InjuriesPanel players={await getTeamInjuries(id, season)} />;
       case "transactions":
         return (
-          <TransactionsPanel
-            moves={await getTeamTransactions(id, statSeason)}
-            controls={
-              <SeasonSelect
-                value={statSeason}
-                first={first}
-                last={seasonOf(todayPT())}
-              />
-            }
-          />
+          <TransactionsPanel moves={await getTeamTransactions(id, season)} />
         );
     }
   } catch {
@@ -375,11 +361,11 @@ export default async function TeamPage({
   if (!Number.isFinite(teamId)) notFound();
   const section = tab?.[0] ?? "home";
   if (tab && (tab.length > 1 || !isTeamTab(section))) notFound();
-  const season = seasonOf(todayPT());
+  const current = seasonOf(todayPT());
 
   let team: TeamIdentity | null;
   try {
-    team = await getTeamIdentity(teamId, season);
+    team = await getTeamIdentity(teamId, current);
   } catch {
     return (
       <div className="mx-auto max-w-7xl p-3">
@@ -389,23 +375,27 @@ export default async function TeamPage({
   }
   if (!team) notFound();
 
-  /* Only the tabs that carry a season control read the query string — every
-     other tab stays on the running season. */
+  /* One season for the whole page: the picker sits in the identity bar and
+     every tab reads it, so a year chosen on the home summary is still the
+     year the roster and the stat tables show. */
   const stats = section === "stats";
   const splits = section === "splits";
-  const dated =
-    stats || splits || section === "schedule" || section === "transactions";
-  const sp = dated ? await searchParams : {};
+  const sp = await searchParams;
   const first = Number(team.firstYear) || FIRST_SEASON;
-  const statSeason = pickSeason(sp.season, first, season);
+  const season = pickSeason(sp.season, first, current);
   const gameType = pickPlayerGameType(sp.type);
   const statGroup = pickStatGroup(sp.group);
 
 
   return (
     <div className="mx-auto max-w-7xl space-y-3 p-3">
-      <Identity t={team} season={season} />
-      <TeamTabs id={teamId} name={team.name} active={section} />
+      <Identity t={team} season={season} first={first} last={current} />
+      <TeamTabs
+        id={teamId}
+        name={team.name}
+        active={section}
+        season={season === current ? undefined : season}
+      />
       {(stats || splits) && (
         <div className="flex flex-wrap items-center gap-3 border border-line bg-surface px-3 py-2">
           <ParamTabs
@@ -424,14 +414,13 @@ export default async function TeamPage({
               options={PLAYER_GAME_TYPES}
             />
           )}
-          <SeasonSelect value={statSeason} first={first} last={season} />
           </div>
         </div>
       )}
       {/* Keyed on the tab, so switching re-suspends into the skeleton rather
           than holding the last section on screen. */}
       <Suspense
-        key={`${section}-${statSeason}-${gameType}-${statGroup}-${sp.half ?? ""}`}
+        key={`${section}-${season}-${gameType}-${statGroup}-${sp.half ?? ""}`}
         fallback={<TabSkeleton tab={section as TeamTab} />}
       >
         <div className="space-y-3">
@@ -439,8 +428,6 @@ export default async function TeamPage({
             tab={section as TeamTab}
             id={teamId}
             season={season}
-            statSeason={statSeason}
-            first={first}
             gameType={gameType}
             group={statGroup}
             half={sp.half}

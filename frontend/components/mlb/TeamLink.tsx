@@ -17,6 +17,7 @@ export default function TeamLink({
   text,
   className = "",
   logo = true,
+  season,
 }: {
   id: number | null | undefined;
   name: string;
@@ -25,6 +26,9 @@ export default function TeamLink({
   text?: string;
   className?: string;
   logo?: boolean;
+  /** The season to open the club's page on, where the table is already
+   *  reading one — the team-stats board's return trip. */
+  season?: number;
 }) {
   const label = (
     <>
@@ -49,7 +53,7 @@ export default function TeamLink({
 
   return (
     <Link
-      href={teamHref(id, name)}
+      href={teamHref(id, name) + (season ? `?season=${season}` : "")}
       className={`flex items-center gap-1.5 hover:text-accent ${className}`}
     >
       {label}
