@@ -41,6 +41,7 @@ import {
   qualifierNote,
   todayPT,
   seasonOf,
+  shortDate,
   pickGameType,
   FIRST_SEASON,
   GAME_TYPES,
@@ -320,7 +321,14 @@ export default async function LeagueSectionPage({
   return (
     <div className={`mx-auto ${sectionWidth(found.id)} space-y-3 p-3`}>
       <Panel
-        title={found.title}
+        /* Probables is today's slate and says so in its own heading, rather
+           than pairing a shouted title with a loose date beside it. */
+        title={
+          found.id === "probables"
+            ? `Probable Pitchers for ${shortDate(date)}`
+            : found.title
+        }
+        tight={found.id === "probables"}
         right={
           dated ? (
             <ScoreboardDate value={date} today={today} />
@@ -360,10 +368,7 @@ export default async function LeagueSectionPage({
               )}
               <SeasonSelect value={season} first={FIRST_SEASON} last={current} />
             </div>
-          ) : (
-            /* Probables is today's slate, so it carries the day it was read. */
-            <span className="text-[10px] text-ink-3">{date}</span>
-          )
+          ) : null
         }
       >
         {absBoard && (

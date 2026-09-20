@@ -15,6 +15,7 @@ import {
   getLeaderboards,
   todayPT,
   seasonOf,
+  shortDate,
   type Game,
 } from "@/lib/mlb";
 import { getProjections } from "@/lib/api";
@@ -54,7 +55,7 @@ async function ScheduleSections({ date }: { date: string }) {
       </div>
 
       {probables.length > 0 && (
-        <Panel title="PROBABLE PITCHERS — TODAY">
+        <Panel title={`Probable Pitchers for ${shortDate(date)}`} tight>
           <ProbablePitchers games={games} />
         </Panel>
       )}

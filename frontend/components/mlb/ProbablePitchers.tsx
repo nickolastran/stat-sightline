@@ -47,11 +47,15 @@ const rate = (n: TeamStatValue, of: TeamStatValue): number | null => {
   return a === null || !b ? null : (a / b) * 100;
 };
 
-/* Where the league sits, and the swing off it that earns a fully saturated
-   cell. Red is the side that hurts the pitcher — few strikeouts, many walks —
-   so a red cell means trouble for him on either row. */
-const LEAGUE_K = 22.5;
-const LEAGUE_BB = 8.2;
+/* Where the league sits (2026: 22.1% of batters faced struck out, 8.9%
+   walked), and the swing off it that earns a fully saturated cell.
+
+   Red is the pitcher's good end on both rows — the strikeouts he gets, the
+   walks he doesn't — so the walk column is read upside down against the
+   shared scale rather than colouring "more walks" the same way "more
+   strikeouts" is coloured. */
+const LEAGUE_K = 22.1;
+const LEAGUE_BB = 8.9;
 const K_SWING = 8;
 const BB_SWING = 4;
 
@@ -59,13 +63,12 @@ const BB_SWING = 4;
    paint a September call-up's one start as an ace. */
 const HEAT_MIN_BF = 25;
 
-/* `worse` is how far the rate sits on the wrong side of the league for the
-   pitcher, so the shared scale's red always falls on his bad end — which is
-   the low end of a strikeout rate and the high end of a walk rate. */
-const shade = (line: Line, worse: number | null, swing: number) =>
-  worse === null || (teamStatNum(line.battersFaced) ?? 0) < HEAT_MIN_BF
+/* `edge` is how far the rate sits on the pitcher's side of the league, so the
+   shared scale's red always falls where he is beating it. */
+const shade = (line: Line, edge: number | null, swing: number) =>
+  edge === null || (teamStatNum(line.battersFaced) ?? 0) < HEAT_MIN_BF
     ? undefined
-    : heat(worse, swing);
+    : heat(edge, swing);
 
 const COLS: {
   label: string;
@@ -79,7 +82,7 @@ const COLS: {
     read: (l) => text(rate(l.strikeOuts, l.battersFaced)),
     heat: (l) => {
       const r = rate(l.strikeOuts, l.battersFaced);
-      return shade(l, r === null ? null : LEAGUE_K - r, K_SWING);
+      return shade(l, r === null ? null : r - LEAGUE_K, K_SWING);
     },
   },
   {
@@ -87,7 +90,7 @@ const COLS: {
     read: (l) => text(rate(l.baseOnBalls, l.battersFaced)),
     heat: (l) => {
       const r = rate(l.baseOnBalls, l.battersFaced);
-      return shade(l, r === null ? null : r - LEAGUE_BB, BB_SWING);
+      return shade(l, r === null ? null : LEAGUE_BB - r, BB_SWING);
     },
   },
   { label: "AVG", read: (l) => teamStatText(l.avg) },
@@ -165,7 +168,7 @@ function Arm({
           {/* Whose club he pitches for is already the line above, in logos
               the width of a thumbnail — it does not need saying twice. */}
           <p className="mt-1 truncate text-[11px] tracking-[0.2em] text-ink-3">
-            {[id?.number && `#${id.number}`, id?.throws && `THROWS ${id.throws}`]
+            {[id?.number && `#${id.number}`, id?.throws && `${id.throws}HP`]
               .filter(Boolean)
               .join(" · ")}
           </p>
@@ -222,7 +225,7 @@ export default async function ProbablePitchers({ games }: { games: Game[] }) {
         <Link
           key={g.pk}
           href={`/game/${g.pk}`}
-          className="block border border-line bg-bg p-3 hover:bg-surface-2"
+          className="block border border-line bg-bg p-3"
         >
           <div className="mb-3 border-b border-grid pb-2 text-center">
             <p className="flex items-center justify-center gap-3">

@@ -315,6 +315,14 @@ export const titleCase = (s: string): string =>
       : w[0].toUpperCase() + w.slice(1).toLowerCase(),
   );
 
+/* "9/19/26". Read off the string's own parts rather than through a Date: a
+   bare YYYY-MM-DD parses as UTC midnight, which is the evening before in
+   every American zone. */
+export const shortDate = (iso: string): string => {
+  const [y, m, d] = iso.split("-");
+  return `${Number(m)}/${Number(d)}/${y.slice(2)}`;
+};
+
 /** "Sep 10, 2025" — the day a game belongs to. */
 export const gameDay = (iso: string): string =>
   new Intl.DateTimeFormat("en-US", {
@@ -3392,11 +3400,14 @@ export async function getArmIdentities(
 }
 
 /**
- * A cell shaded by how far a figure sits from the league's, red over and blue
- * under, at the saturation the swing deserves — one convention, so a red cell
- * means the same thing on every table that shades one. `max` is the swing
- * that earns full colour. Shading goes on the cell itself: a padded span
- * inside it would sit a hairline short of the row's edges.
+ * A cell shaded by how far a figure sits from the league's, at the saturation
+ * the swing deserves: red for a positive swing, blue for a negative one, and
+ * `max` the swing that earns full colour.
+ *
+ * Which side is which is the caller's to decide — it hands over a signed
+ * distance, so a column where the low end is the good end flips the sign
+ * rather than inventing a second palette. Shading goes on the cell itself: a
+ * padded span inside it would sit a hairline short of the row's edges.
  */
 export function heat(
   value: number,
