@@ -3391,6 +3391,23 @@ export async function getArmIdentities(
   );
 }
 
+/**
+ * A cell shaded by how far a figure sits from the league's, red over and blue
+ * under, at the saturation the swing deserves — one convention, so a red cell
+ * means the same thing on every table that shades one. `max` is the swing
+ * that earns full colour. Shading goes on the cell itself: a padded span
+ * inside it would sit a hairline short of the row's edges.
+ */
+export function heat(
+  value: number,
+  max: number,
+): { backgroundColor: string } | undefined {
+  if (!value || !max) return undefined;
+  const alpha = (Math.min(Math.abs(value) / max, 1) * 0.55).toFixed(2);
+  const rgb = value > 0 ? "198, 45, 45" : "38, 104, 201";
+  return { backgroundColor: `rgba(${rgb}, ${alpha})` };
+}
+
 /** A club's season line for each of its hitters, keyed by player id. */
 export const lineupSeason = (
   rows: PlayerStatRow[],

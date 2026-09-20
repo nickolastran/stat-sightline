@@ -2,6 +2,7 @@ import Link from "next/link";
 import GameStatus from "@/components/mlb/GameStatus";
 import {
   getArmIdentities,
+  heat,
   getPitcherLog,
   playerHeadshot,
   seasonOf,
@@ -38,22 +39,65 @@ type Line = Record<string, TeamStatValue>;
 export const probableGames = (games: Game[]) =>
   games.filter((g) => g.away.probable || g.home.probable);
 
-/* The six numbers a matchup is read on. Rates are worked out from the totals
-   the log was summed into, since a percentage of batters faced is not a
+/* The six numbers a matchup is read on. The two rates are worked out from the
+   totals the log was summed into, since a share of batters faced is not a
    column MLB publishes. */
-const pct = (n: TeamStatValue, of: TeamStatValue): string => {
+const rate = (n: TeamStatValue, of: TeamStatValue): number | null => {
   const [a, b] = [teamStatNum(n), teamStatNum(of)];
-  return a === null || !b ? "—" : `${((a / b) * 100).toFixed(1)}%`;
+  return a === null || !b ? null : (a / b) * 100;
 };
 
-const COLS: [string, (l: Line) => string][] = [
-  ["G", (l) => teamStatText(l.gamesPlayed)],
-  ["ERA", (l) => teamStatText(l.era)],
-  ["K%", (l) => pct(l.strikeOuts, l.battersFaced)],
-  ["BB%", (l) => pct(l.baseOnBalls, l.battersFaced)],
-  ["AVG", (l) => teamStatText(l.avg)],
-  ["W-L", (l) => `${teamStatNum(l.wins) ?? 0}-${teamStatNum(l.losses) ?? 0}`],
+/* Where the league sits, and the swing off it that earns a fully saturated
+   cell. Red is the side that hurts the pitcher — few strikeouts, many walks —
+   so a red cell means trouble for him on either row. */
+const LEAGUE_K = 22.5;
+const LEAGUE_BB = 8.2;
+const K_SWING = 8;
+const BB_SWING = 4;
+
+/* A rate off two dozen hitters is noise, not a tendency, and shading it would
+   paint a September call-up's one start as an ace. */
+const HEAT_MIN_BF = 25;
+
+/* `worse` is how far the rate sits on the wrong side of the league for the
+   pitcher, so the shared scale's red always falls on his bad end — which is
+   the low end of a strikeout rate and the high end of a walk rate. */
+const shade = (line: Line, worse: number | null, swing: number) =>
+  worse === null || (teamStatNum(line.battersFaced) ?? 0) < HEAT_MIN_BF
+    ? undefined
+    : heat(worse, swing);
+
+const COLS: {
+  label: string;
+  read: (l: Line) => string;
+  heat?: (l: Line) => { backgroundColor: string } | undefined;
+}[] = [
+  { label: "G", read: (l) => teamStatText(l.gamesPlayed) },
+  { label: "ERA", read: (l) => teamStatText(l.era) },
+  {
+    label: "K%",
+    read: (l) => text(rate(l.strikeOuts, l.battersFaced)),
+    heat: (l) => {
+      const r = rate(l.strikeOuts, l.battersFaced);
+      return shade(l, r === null ? null : LEAGUE_K - r, K_SWING);
+    },
+  },
+  {
+    label: "BB%",
+    read: (l) => text(rate(l.baseOnBalls, l.battersFaced)),
+    heat: (l) => {
+      const r = rate(l.baseOnBalls, l.battersFaced);
+      return shade(l, r === null ? null : r - LEAGUE_BB, BB_SWING);
+    },
+  },
+  { label: "AVG", read: (l) => teamStatText(l.avg) },
+  {
+    label: "W-L",
+    read: (l) => `${teamStatNum(l.wins) ?? 0}-${teamStatNum(l.losses) ?? 0}`,
+  },
 ];
+
+const text = (r: number | null) => (r === null ? "—" : `${r.toFixed(1)}%`);
 
 function StatBox({ title, line }: { title: string; line: Line | null }) {
   return (
@@ -63,10 +107,14 @@ function StatBox({ title, line }: { title: string; line: Line | null }) {
       </p>
       {line ? (
         <div className="grid grid-cols-6">
-          {COLS.map(([label, read]) => (
-            <div key={label} className="border-l border-grid px-1 py-1.5 text-center first:border-l-0">
-              <p className="text-[9px] tracking-wider text-ink-3">{label}</p>
-              <p className="text-xs tabular-nums text-ink">{read(line)}</p>
+          {COLS.map((c) => (
+            <div
+              key={c.label}
+              style={c.heat?.(line)}
+              className="border-l border-grid px-1 py-1.5 text-center first:border-l-0"
+            >
+              <p className="text-[9px] tracking-wider text-ink-3">{c.label}</p>
+              <p className="text-xs tabular-nums text-ink">{c.read(line)}</p>
             </div>
           ))}
         </div>
@@ -104,22 +152,20 @@ function Arm({
       <div className="flex items-center gap-3">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
-          src={p ? playerHeadshot(p.id, 120) : teamLogo(side.id)}
+          src={p ? playerHeadshot(p.id, 240) : teamLogo(side.id)}
           alt=""
-          width={56}
-          height={56}
-          className="h-14 w-14 shrink-0"
+          width={96}
+          height={96}
+          className="h-24 w-24 shrink-0"
         />
         <div className="min-w-0">
-          <p className="truncate text-sm font-bold tracking-wide text-ink">
+          <p className="truncate text-xl font-bold tracking-wide text-ink">
             {p?.name ?? "TBA"}
           </p>
-          <p className="mt-0.5 truncate text-[10px] tracking-[0.2em] text-ink-3">
-            {[
-              side.abbr,
-              id?.number && `#${id.number}`,
-              id?.throws && `THROWS ${id.throws}`,
-            ]
+          {/* Whose club he pitches for is already the line above, in logos
+              the width of a thumbnail — it does not need saying twice. */}
+          <p className="mt-1 truncate text-[11px] tracking-[0.2em] text-ink-3">
+            {[id?.number && `#${id.number}`, id?.throws && `THROWS ${id.throws}`]
               .filter(Boolean)
               .join(" · ")}
           </p>
@@ -178,12 +224,31 @@ export default async function ProbablePitchers({ games }: { games: Game[] }) {
           href={`/game/${g.pk}`}
           className="block border border-line bg-bg p-3 hover:bg-surface-2"
         >
-          <div className="mb-3 flex items-center justify-center gap-2 border-b border-grid pb-2 text-[10px] tracking-widest text-ink-3">
-            <span className="font-bold text-ink">
-              {g.away.abbr} @ {g.home.abbr}
-            </span>
-            <GameStatus game={g} />
-            {g.venue && <span className="truncate">· {g.venue}</span>}
+          <div className="mb-3 border-b border-grid pb-2 text-center">
+            <p className="flex items-center justify-center gap-3">
+              {[g.away, g.home].map((s, i) => (
+                <span key={s.id} className="flex items-center gap-3">
+                  {i === 1 && (
+                    <span className="text-sm tracking-widest text-ink-3">@</span>
+                  )}
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={teamLogo(s.id)}
+                    alt=""
+                    width={32}
+                    height={32}
+                    className="h-8 w-8 shrink-0"
+                  />
+                  <span className="text-lg font-bold tracking-wider text-ink">
+                    {s.abbr}
+                  </span>
+                </span>
+              ))}
+            </p>
+            <p className="mt-1 flex items-center justify-center gap-2 text-[10px] tracking-widest text-ink-3">
+              <GameStatus game={g} />
+              {g.venue && <span className="truncate">· {g.venue}</span>}
+            </p>
           </div>
           <div className="grid gap-3 md:grid-cols-2">
             {armOf(g.away, g.home)}

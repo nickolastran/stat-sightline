@@ -28,6 +28,7 @@ import {
   projectStatLine,
   overviewSplitCodes,
   headToHead,
+  heat,
   inProgress,
   notStarted,
   scoringPlays,
@@ -1602,3 +1603,19 @@ console.log("projectStatLine ok");
   );
 }
 console.log("teamLogSections ok");
+
+/* Shading: a swing the wrong way is red, the right way blue, and the alpha
+   only ever grows — a negative one is a cell the browser silently leaves
+   blank, which is how a flipped sign hides. */
+{
+  const alpha = (v: number, max: number) =>
+    Number(heat(v, max)?.backgroundColor.match(/([\d.]+)\)$/)?.[1] ?? 0);
+
+  assert.match(heat(3, 8)!.backgroundColor, /^rgba\(198, 45, 45,/, "over is red");
+  assert.match(heat(-3, 8)!.backgroundColor, /^rgba\(38, 104, 201,/, "under is blue");
+  assert.equal(heat(0, 8), undefined, "a figure on the league's line is plain");
+  assert.ok(alpha(6, 8) > alpha(3, 8), "a bigger swing is a stronger cell");
+  assert.equal(alpha(99, 8), 0.55, "and saturates rather than running past it");
+  assert.equal(alpha(-99, 8), 0.55, "either way");
+}
+console.log("heat ok");
