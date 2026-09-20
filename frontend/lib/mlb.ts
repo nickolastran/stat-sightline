@@ -315,6 +315,26 @@ export const titleCase = (s: string): string =>
       : w[0].toUpperCase() + w.slice(1).toLowerCase(),
   );
 
+/** A game day n days on, still as YYYY-MM-DD. UTC, so no zone shifts it. */
+export const addDays = (iso: string, n: number): string =>
+  new Date(
+    Date.UTC(
+      Number(iso.slice(0, 4)),
+      Number(iso.slice(5, 7)) - 1,
+      Number(iso.slice(8, 10)) + n,
+    ),
+  )
+    .toISOString()
+    .slice(0, 10);
+
+/* "9/19/26". Read off the string's own parts rather than through a Date: a
+   bare YYYY-MM-DD parses as UTC midnight, which is the evening before in
+   every American zone. */
+export const shortDate = (iso: string): string => {
+  const [y, m, d] = iso.split("-");
+  return `${Number(m)}/${Number(d)}/${y.slice(2)}`;
+};
+
 /** "Sep 10, 2025" — the day a game belongs to. */
 export const gameDay = (iso: string): string =>
   new Intl.DateTimeFormat("en-US", {
@@ -3314,6 +3334,101 @@ export async function getVsPitcher(
     ),
   );
   return Object.fromEntries(batters.map((id, i) => [id, lines[i]]));
+}
+
+/*
+ * No pitcher on a major-league roster debuted before this, so a whole career
+ * is one call away without first asking which seasons it covers.
+ */
+const FIRST_ACTIVE_SEASON = 1995;
+
+/* Only the counts a pitching line is added up from — a career of game logs is
+   a large payload to carry the six numbers a matchup card prints. */
+const LOG_FIELDS = [
+  "stats,splits,season,gameType,opponent,id,stat",
+  "gamesPlayed,inningsPitched,earnedRuns,wins,losses",
+  "strikeOuts,baseOnBalls,battersFaced,hits,atBats",
+].join(",");
+
+/** One appearance, as a line waiting to be added into a total. */
+export interface ArmGame {
+  season: number;
+  opponentId: number;
+  stat: Record<string, TeamStatValue>;
+}
+
+/**
+ * Every regular-season appearance of a pitcher's career, game by game.
+ *
+ * MLB's vs-team total is a hitting line — what the other club did off him —
+ * so it carries no ERA and no record. The game log is the only feed that
+ * does, and it answers a whole career in one request, which both a season
+ * line and a line against one club are then summed out of.
+ */
+export async function getPitcherLog(
+  id: number,
+  through: number,
+): Promise<ArmGame[]> {
+  const seasons = Array.from(
+    { length: through - FIRST_ACTIVE_SEASON + 1 },
+    (_, i) => FIRST_ACTIVE_SEASON + i,
+  ).join(",");
+  const data = await mlb(
+    `/people/${id}/stats?stats=gameLog&group=pitching&seasons=${seasons}` +
+      `&fields=${LOG_FIELDS}`,
+    3600,
+  ).catch(() => null);
+  return ((data?.stats?.[0]?.splits ?? []) as any[])
+    .filter((s) => s.gameType === "R")
+    .map((s) => ({
+      season: Number(s.season),
+      opponentId: s.opponent?.id ?? 0,
+      stat: s.stat ?? {},
+    }));
+}
+
+/** A starter's number and throwing hand, the two facts a card names him by. */
+export interface ArmIdentity {
+  number: string;
+  throws: string;
+}
+
+/** Those two facts for a whole slate's starters, in one request. */
+export async function getArmIdentities(
+  ids: number[],
+): Promise<Record<number, ArmIdentity>> {
+  if (ids.length === 0) return {};
+  const data = await mlb(
+    `/people?personIds=${ids.join(",")}` +
+      `&fields=people,id,primaryNumber,pitchHand,code`,
+    86400,
+  ).catch(() => null);
+  return Object.fromEntries(
+    ((data?.people ?? []) as any[]).map((p) => [
+      p.id,
+      { number: p.primaryNumber ?? "", throws: p.pitchHand?.code ?? "" },
+    ]),
+  );
+}
+
+/**
+ * A cell shaded by how far a figure sits from the league's, at the saturation
+ * the swing deserves: red for a positive swing, blue for a negative one, and
+ * `max` the swing that earns full colour.
+ *
+ * Which side is which is the caller's to decide — it hands over a signed
+ * distance, so a column where the low end is the good end flips the sign
+ * rather than inventing a second palette. Shading goes on the cell itself: a
+ * padded span inside it would sit a hairline short of the row's edges.
+ */
+export function heat(
+  value: number,
+  max: number,
+): { backgroundColor: string } | undefined {
+  if (!value || !max) return undefined;
+  const alpha = (Math.min(Math.abs(value) / max, 1) * 0.55).toFixed(2);
+  const rgb = value > 0 ? "198, 45, 45" : "38, 104, 201";
+  return { backgroundColor: `rgba(${rgb}, ${alpha})` };
 }
 
 /** A club's season line for each of its hitters, keyed by player id. */

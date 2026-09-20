@@ -27,7 +27,9 @@ import {
   lastSevenDays,
   projectStatLine,
   overviewSplitCodes,
+  addDays,
   headToHead,
+  heat,
   inProgress,
   notStarted,
   scoringPlays,
@@ -1602,3 +1604,29 @@ console.log("projectStatLine ok");
   );
 }
 console.log("teamLogSections ok");
+
+/* Shading: a swing the wrong way is red, the right way blue, and the alpha
+   only ever grows — a negative one is a cell the browser silently leaves
+   blank, which is how a flipped sign hides. */
+{
+  const alpha = (v: number, max: number) =>
+    Number(heat(v, max)?.backgroundColor.match(/([\d.]+)\)$/)?.[1] ?? 0);
+
+  assert.match(heat(3, 8)!.backgroundColor, /^rgba\(198, 45, 45,/, "over is red");
+  assert.match(heat(-3, 8)!.backgroundColor, /^rgba\(38, 104, 201,/, "under is blue");
+  assert.equal(heat(0, 8), undefined, "a figure on the league's line is plain");
+  assert.ok(alpha(6, 8) > alpha(3, 8), "a bigger swing is a stronger cell");
+  assert.equal(alpha(99, 8), 0.55, "and saturates rather than running past it");
+  assert.equal(alpha(-99, 8), 0.55, "either way");
+}
+console.log("heat ok");
+
+/* The probables window is built by adding days to a game-day string, so the
+   arithmetic has to roll a month, a year and a leap day without a zone ever
+   getting a say. */
+assert.equal(addDays("2026-09-19", 5), "2026-09-24", "inside a month");
+assert.equal(addDays("2026-09-30", 1), "2026-10-01", "over its end");
+assert.equal(addDays("2026-12-31", 1), "2027-01-01", "and over the year's");
+assert.equal(addDays("2024-02-28", 1), "2024-02-29", "a leap day is a day");
+assert.equal(addDays("2026-09-19", 0), "2026-09-19", "and today is today");
+console.log("addDays ok");

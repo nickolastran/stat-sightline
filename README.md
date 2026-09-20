@@ -278,7 +278,7 @@ wrong answer is worse than a crash:
 
 | Check | What it pins down |
 | --- | --- |
-| `mlb.check.ts` | clinch marks, games back, head-to-head, log5 win probability, leaderboard merging, draft/signing text, park factors |
+| `mlb.check.ts` | clinch marks, games back, head-to-head, log5 win probability, leaderboard merging, draft/signing text, park factors, heat shading, day math |
 | `advanced.check.ts` | the Savant CSV reader (`"Last, First"` shifts every column if commas are split naively), the column catalogues, the custom board's query parsing, and the CSV writer round-tripping back through the reader |
 | `gamefeed.check.ts` | which pitch counts as a swing and miss, one row per player rather than one per batted ball, and which side of a win-probability swing the batter is on |
 | `abs.check.ts` | pulling Savant's ABS table out of the 1.6 MB page it is embedded in, next to a second array a loose regex would grab instead |

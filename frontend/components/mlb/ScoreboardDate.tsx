@@ -14,9 +14,14 @@ import DatePicker from "@/components/ui/DatePicker";
 export default function ScoreboardDate({
   value,
   today,
+  min,
+  max,
 }: {
   value: string;
   today: string;
+  /** The window of days on offer — probables only run a few days ahead. */
+  min?: string;
+  max?: string;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -25,6 +30,8 @@ export default function ScoreboardDate({
     <DatePicker
       value={value}
       today={today}
+      min={min}
+      max={max}
       disabled={pending}
       onSelect={(d) =>
         startTransition(() => router.replace(`?date=${d}`, { scroll: false }))

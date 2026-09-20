@@ -5,7 +5,7 @@ import SortHeader from "@/components/ui/SortHeader";
 import Glossary from "@/components/mlb/Glossary";
 import TeamLink from "@/components/mlb/TeamLink";
 import PlayerLink from "@/components/mlb/PlayerLink";
-import { teamLogo } from "@/lib/mlb";
+import { heat, teamLogo } from "@/lib/mlb";
 import { sortRows, toggleSort, type Sort } from "@/lib/sortTable";
 import { isTeamBoard, type AbsBoard as Board, type AbsRow, type AbsType } from "@/lib/abs";
 
@@ -33,17 +33,6 @@ import { isTeamBoard, type AbsBoard as Board, type AbsRow, type AbsType } from "
 
 /** Rows added per click of the button under the table. */
 const PAGE = 50;
-
-/* Red over the league average, blue under — scaled against the biggest swing
-   on the board, so the strongest cell is always fully saturated whether the
-   season is a week or a year old. Shading goes on the cell itself: a padded
-   span inside it would sit a hairline short of the row's edges. */
-function heat(value: number, max: number): React.CSSProperties | undefined {
-  if (!value || !max) return undefined;
-  const alpha = (Math.min(Math.abs(value) / max, 1) * 0.55).toFixed(2);
-  const rgb = value > 0 ? "198, 45, 45" : "38, 104, 201";
-  return { backgroundColor: `rgba(${rgb}, ${alpha})` };
-}
 
 const pct = (v: number | null, digits = 0) =>
   v === null ? "—" : `${(v * 100).toFixed(digits)}%`;
