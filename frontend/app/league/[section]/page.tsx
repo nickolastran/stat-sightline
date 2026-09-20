@@ -42,6 +42,7 @@ import {
   todayPT,
   seasonOf,
   shortDate,
+  addDays,
   pickGameType,
   FIRST_SEASON,
   GAME_TYPES,
@@ -95,6 +96,10 @@ function pickSeason(raw: string | undefined, current: number): number {
  * into an MLB API query, and "2025-02-31" parses into March — round-tripping
  * through ISO is what rejects it.
  */
+/* Clubs name starters about this far out, so the picker offers today and the
+   few days after it and nothing else. */
+const PROBABLE_DAYS = 5;
+
 function pickDate(raw: string | undefined, today: string): string {
   if (!raw || !/^\d{4}-\d{2}-\d{2}$/.test(raw)) return today;
   const d = new Date(`${raw}T00:00:00Z`);
@@ -268,13 +273,17 @@ export default async function LeagueSectionPage({
   const current = seasonOf(today);
   /* Which controls a section carries: the scoreboard picks a game day, and
      everything that reports a season total picks the season — the standings
-     and team tables also picking which half of the calendar it covers.
-     Probables is today's slate only, so it reads no searchParams at all and
-     stays statically prerenderable. */
+     and team tables also picking which half of the calendar it covers. */
   const scoreboard = found.id === "scoreboard";
   /* The feed is one day's play, so it picks a day rather than a season — the
-     same control the scoreboard carries, over the same `?date=`. */
-  const dated = scoreboard || found.id === "gamefeed";
+     same control the scoreboard carries, over the same `?date=`. Probables
+     picks a day too, but only out of the few ahead that have any: a starter
+     is announced a handful of games out, and yesterday's matchups have been
+     pitched. */
+  const probables = found.id === "probables";
+  const dated = scoreboard || found.id === "gamefeed" || probables;
+  /* How far ahead clubs have named anyone. */
+  const lastProbable = addDays(today, PROBABLE_DAYS);
   const playerBoard = found.id === "players";
   /* The ABS boards are this season's only — the challenge system has no
      earlier regular season to show — so they pick a board, not a year. */
@@ -290,7 +299,11 @@ export default async function LeagueSectionPage({
   const typed = found.id === "standings" || found.id === "teams";
   const sp = seasonal || dated || absBoard ? await searchParams : {};
   const season = seasonal ? pickSeason(sp.season, current) : current;
-  const date = dated ? pickDate(sp.date, today) : today;
+  const picked = dated ? pickDate(sp.date, today) : today;
+  /* A day outside the window — a stale link, or a hand-typed query — reads as
+     today rather than as an empty slate nobody asked for. */
+  const date =
+    probables && (picked < today || picked > lastProbable) ? today : picked;
   const gameType = typed ? pickGameType(sp.type) : "R";
   const group = pickGroup(sp.group);
   const players: PlayerQuery = {
@@ -324,14 +337,19 @@ export default async function LeagueSectionPage({
         /* Probables is today's slate and says so in its own heading, rather
            than pairing a shouted title with a loose date beside it. */
         title={
-          found.id === "probables"
+          probables
             ? `Probable Pitchers for ${shortDate(date)}`
             : found.title
         }
-        tight={found.id === "probables"}
+        tight={probables}
         right={
           dated ? (
-            <ScoreboardDate value={date} today={today} />
+            <ScoreboardDate
+              value={date}
+              today={today}
+              min={probables ? today : undefined}
+              max={probables ? lastProbable : undefined}
+            />
           ) : absBoard ? (
             <span className="text-[10px] text-ink-3">{season}</span>
           ) : playerBoard ? (

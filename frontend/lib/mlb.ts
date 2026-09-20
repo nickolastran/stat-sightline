@@ -315,6 +315,18 @@ export const titleCase = (s: string): string =>
       : w[0].toUpperCase() + w.slice(1).toLowerCase(),
   );
 
+/** A game day n days on, still as YYYY-MM-DD. UTC, so no zone shifts it. */
+export const addDays = (iso: string, n: number): string =>
+  new Date(
+    Date.UTC(
+      Number(iso.slice(0, 4)),
+      Number(iso.slice(5, 7)) - 1,
+      Number(iso.slice(8, 10)) + n,
+    ),
+  )
+    .toISOString()
+    .slice(0, 10);
+
 /* "9/19/26". Read off the string's own parts rather than through a Date: a
    bare YYYY-MM-DD parses as UTC midnight, which is the evening before in
    every American zone. */

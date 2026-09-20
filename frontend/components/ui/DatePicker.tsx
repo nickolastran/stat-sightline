@@ -32,12 +32,17 @@ export default function DatePicker({
   today,
   onSelect,
   disabled = false,
+  min,
+  max,
 }: {
   value: string; // YYYY-MM-DD
   today: string;
   onSelect: (date: string) => void;
   /** Dim the button while the caller is loading the day it was handed. */
   disabled?: boolean;
+  /** The window of days on offer, where the caller only has some. */
+  min?: string;
+  max?: string;
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -85,6 +90,8 @@ export default function DatePicker({
             <Calendar
               value={value}
               today={today}
+              min={min}
+              max={max}
               onSelect={(d) => {
                 setOpen(false);
                 onSelect(d);

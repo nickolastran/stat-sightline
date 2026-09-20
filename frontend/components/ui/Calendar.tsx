@@ -59,10 +59,16 @@ export default function Calendar({
   value,
   today,
   onSelect,
+  min,
+  max,
 }: {
   value: string; // YYYY-MM-DD
   today: string;
   onSelect: (date: string) => void;
+  /** Days outside [min, max] are shown but not offered — YYYY-MM-DD sorts
+   *  as a string, so the bounds compare without parsing anything. */
+  min?: string;
+  max?: string;
 }) {
   const [cursor, setCursor] = useState({
     y: Number(value.slice(0, 4)),
@@ -133,19 +139,23 @@ export default function Calendar({
           const date = iso(cursor.y, cursor.m, d);
           const selected = date === value;
           const isToday = date === today;
+          const out = Boolean((min && date < min) || (max && date > max));
           return (
             <button
               key={date}
               type="button"
               aria-label={date}
               aria-current={selected ? "date" : undefined}
+              disabled={out}
               onClick={() => onSelect(date)}
               className={`h-7 border text-[11px] tabular-nums ${
-                selected
-                  ? "border-accent bg-accent font-bold text-white"
-                  : isToday
-                    ? "border-accent text-ink hover:bg-surface-2"
-                    : "border-transparent text-ink-2 hover:border-line hover:bg-surface-2 hover:text-ink"
+                out
+                  ? "cursor-not-allowed border-transparent text-ink-3/40"
+                  : selected
+                    ? "border-accent bg-accent font-bold text-white"
+                    : isToday
+                      ? "border-accent text-ink hover:bg-surface-2"
+                      : "border-transparent text-ink-2 hover:border-line hover:bg-surface-2 hover:text-ink"
               }`}
             >
               {d}

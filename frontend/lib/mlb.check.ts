@@ -27,6 +27,7 @@ import {
   lastSevenDays,
   projectStatLine,
   overviewSplitCodes,
+  addDays,
   headToHead,
   heat,
   inProgress,
@@ -1619,3 +1620,13 @@ console.log("teamLogSections ok");
   assert.equal(alpha(-99, 8), 0.55, "either way");
 }
 console.log("heat ok");
+
+/* The probables window is built by adding days to a game-day string, so the
+   arithmetic has to roll a month, a year and a leap day without a zone ever
+   getting a say. */
+assert.equal(addDays("2026-09-19", 5), "2026-09-24", "inside a month");
+assert.equal(addDays("2026-09-30", 1), "2026-10-01", "over its end");
+assert.equal(addDays("2026-12-31", 1), "2027-01-01", "and over the year's");
+assert.equal(addDays("2024-02-28", 1), "2024-02-29", "a leap day is a day");
+assert.equal(addDays("2026-09-19", 0), "2026-09-19", "and today is today");
+console.log("addDays ok");

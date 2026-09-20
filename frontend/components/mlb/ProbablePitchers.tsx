@@ -108,26 +108,23 @@ function StatBox({ title, line }: { title: string; line: Line | null }) {
       <p className="border-b border-line bg-surface px-2 py-1 text-[10px] tracking-widest text-ink-3">
         {title}
       </p>
-      {line ? (
-        <div className="grid grid-cols-6">
-          {COLS.map((c) => (
-            <div
-              key={c.label}
-              style={c.heat?.(line)}
-              className="border-l border-grid px-1 py-1.5 text-center first:border-l-0"
-            >
-              <p className="text-[9px] tracking-wider text-ink-3">{c.label}</p>
-              <p className="text-xs tabular-nums text-ink">{c.read(line)}</p>
-            </div>
-          ))}
-        </div>
-      ) : (
-        /* Never having faced them is a fact about the matchup, not a missing
-           number — it says so rather than printing a row of zeros. */
-        <p className="px-2 py-3 text-center text-[10px] tracking-widest text-ink-3">
-          NO RECORD AGAINST THEM
-        </p>
-      )}
+      {/* An unannounced starter, or one who has never faced them, keeps the
+          box: the shape of the card is the same either way, with dashes where
+          the numbers will be. */}
+      <div className="grid grid-cols-6">
+        {COLS.map((c) => (
+          <div
+            key={c.label}
+            style={line ? c.heat?.(line) : undefined}
+            className="border-l border-grid px-1 py-1.5 text-center first:border-l-0"
+          >
+            <p className="text-[9px] tracking-wider text-ink-3">{c.label}</p>
+            <p className="text-xs tabular-nums text-ink">
+              {line ? c.read(line) : "—"}
+            </p>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -153,17 +150,22 @@ function Arm({
   return (
     <div className="space-y-2">
       <div className="flex items-center gap-3">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={p ? playerHeadshot(p.id, 240) : teamLogo(side.id)}
-          alt=""
-          width={96}
-          height={96}
-          className="h-24 w-24 shrink-0"
-        />
+        {p ? (
+          /* eslint-disable-next-line @next/next/no-img-element */
+          <img
+            src={playerHeadshot(p.id, 240)}
+            alt=""
+            width={96}
+            height={96}
+            className="h-24 w-24 shrink-0"
+          />
+        ) : (
+          /* Nobody named yet: the space he will fill, held open and blank. */
+          <div className="h-24 w-24 shrink-0" />
+        )}
         <div className="min-w-0">
           <p className="truncate text-xl font-bold tracking-wide text-ink">
-            {p?.name ?? "TBA"}
+            {p?.name ?? "TBD"}
           </p>
           {/* Whose club he pitches for is already the line above, in logos
               the width of a thumbnail — it does not need saying twice. */}
