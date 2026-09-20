@@ -22,7 +22,7 @@ export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en">
+    <html lang="en" data-scroll-behavior="smooth">
       {/* A column, so the footer sits at the bottom of a short page rather
           than floating up under the content. */}
       <body className="flex min-h-screen flex-col antialiased">

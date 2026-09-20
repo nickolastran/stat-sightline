@@ -3316,6 +3316,81 @@ export async function getVsPitcher(
   return Object.fromEntries(batters.map((id, i) => [id, lines[i]]));
 }
 
+/*
+ * No pitcher on a major-league roster debuted before this, so a whole career
+ * is one call away without first asking which seasons it covers.
+ */
+const FIRST_ACTIVE_SEASON = 1995;
+
+/* Only the counts a pitching line is added up from — a career of game logs is
+   a large payload to carry the six numbers a matchup card prints. */
+const LOG_FIELDS = [
+  "stats,splits,season,gameType,opponent,id,stat",
+  "gamesPlayed,inningsPitched,earnedRuns,wins,losses",
+  "strikeOuts,baseOnBalls,battersFaced,hits,atBats",
+].join(",");
+
+/** One appearance, as a line waiting to be added into a total. */
+export interface ArmGame {
+  season: number;
+  opponentId: number;
+  stat: Record<string, TeamStatValue>;
+}
+
+/**
+ * Every regular-season appearance of a pitcher's career, game by game.
+ *
+ * MLB's vs-team total is a hitting line — what the other club did off him —
+ * so it carries no ERA and no record. The game log is the only feed that
+ * does, and it answers a whole career in one request, which both a season
+ * line and a line against one club are then summed out of.
+ */
+export async function getPitcherLog(
+  id: number,
+  through: number,
+): Promise<ArmGame[]> {
+  const seasons = Array.from(
+    { length: through - FIRST_ACTIVE_SEASON + 1 },
+    (_, i) => FIRST_ACTIVE_SEASON + i,
+  ).join(",");
+  const data = await mlb(
+    `/people/${id}/stats?stats=gameLog&group=pitching&seasons=${seasons}` +
+      `&fields=${LOG_FIELDS}`,
+    3600,
+  ).catch(() => null);
+  return ((data?.stats?.[0]?.splits ?? []) as any[])
+    .filter((s) => s.gameType === "R")
+    .map((s) => ({
+      season: Number(s.season),
+      opponentId: s.opponent?.id ?? 0,
+      stat: s.stat ?? {},
+    }));
+}
+
+/** A starter's number and throwing hand, the two facts a card names him by. */
+export interface ArmIdentity {
+  number: string;
+  throws: string;
+}
+
+/** Those two facts for a whole slate's starters, in one request. */
+export async function getArmIdentities(
+  ids: number[],
+): Promise<Record<number, ArmIdentity>> {
+  if (ids.length === 0) return {};
+  const data = await mlb(
+    `/people?personIds=${ids.join(",")}` +
+      `&fields=people,id,primaryNumber,pitchHand,code`,
+    86400,
+  ).catch(() => null);
+  return Object.fromEntries(
+    ((data?.people ?? []) as any[]).map((p) => [
+      p.id,
+      { number: p.primaryNumber ?? "", throws: p.pitchHand?.code ?? "" },
+    ]),
+  );
+}
+
 /** A club's season line for each of its hitters, keyed by player id. */
 export const lineupSeason = (
   rows: PlayerStatRow[],

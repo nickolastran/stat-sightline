@@ -20,19 +20,22 @@ const Controls = ({ width = "w-40" }: { width?: string }) => (
   </div>
 );
 
-/** One probable-pitchers row: two sides, each a logo, a headshot and a name. */
+/** One probable-pitchers card: two starters, each a headshot and two boxes. */
 const ProbableRow = ({ delay = 0 }: { delay?: number }) => (
-  <div className="flex items-center gap-3 border border-line bg-bg px-3 py-2">
-    {[0, 1].map((s) => (
-      <div key={s} className="flex min-w-0 flex-1 items-center gap-2">
-        <Skeleton className="h-5 w-5 shrink-0" delay={delay + s * 0.05} />
-        <Skeleton
-          className="h-5 w-5 shrink-0 rounded-full"
-          delay={delay + s * 0.05}
-        />
-        <Skeleton className="h-3 flex-1" delay={delay + s * 0.05} />
-      </div>
-    ))}
+  <div className="border border-line bg-bg p-3">
+    <Skeleton className="mx-auto mb-3 h-3 w-48" delay={delay} />
+    <div className="grid gap-3 md:grid-cols-2">
+      {[0, 1].map((s) => (
+        <div key={s} className="space-y-2">
+          <div className="flex items-center gap-3">
+            <Skeleton className="h-14 w-14 shrink-0" delay={delay + s * 0.05} />
+            <Skeleton className="h-4 flex-1" delay={delay + s * 0.05} />
+          </div>
+          <Skeleton className="h-12 w-full" delay={delay + s * 0.05} />
+          <Skeleton className="h-12 w-full" delay={delay + s * 0.05} />
+        </div>
+      ))}
+    </div>
   </div>
 );
 
@@ -108,8 +111,8 @@ export default function SectionSkeleton({ section }: { section: string }) {
 
     case "probables":
       return (
-        <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
-          {Array.from({ length: 8 }).map((_, i) => (
+        <div className="space-y-2">
+          {Array.from({ length: 4 }).map((_, i) => (
             <ProbableRow key={i} delay={i * 0.06} />
           ))}
         </div>
