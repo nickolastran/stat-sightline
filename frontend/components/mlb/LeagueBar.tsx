@@ -80,6 +80,7 @@ function MoreMenu() {
       <div className="invisible absolute top-full right-0 z-50 -translate-y-1 border border-line bg-bg p-3 opacity-0 shadow-lg transition peer-checked:visible peer-checked:translate-y-0 peer-checked:opacity-100 group-focus-within:visible group-focus-within:translate-y-0 group-focus-within:opacity-100 group-hover:visible group-hover:translate-y-0 group-hover:opacity-100">
         <div className="space-y-1.5">
           {[
+            { href: "/minors", label: "MINOR LEAGUES" },
             { href: "/compare", label: "COMPARE PLAYERS" },
             { href: "/compare/teams", label: "COMPARE TEAMS" },
             { href: "/award", label: "AWARDS INDEX" },

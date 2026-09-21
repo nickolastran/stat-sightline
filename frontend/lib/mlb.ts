@@ -595,6 +595,9 @@ export interface StandingRow {
   away: string;
   /** "z"/"y"/"w" etc. when the club has clinched something; "" otherwise. */
   clinch: string;
+  /** The major-league club a minor-league affiliate belongs to; "" in the
+   *  majors, where a club belongs to nobody. */
+  org: string;
 }
 
 export interface Division {
@@ -640,7 +643,7 @@ export const pickGameType = (raw: string | undefined): GameType =>
 export const clubCity = (name: string, clubName: string) =>
   name.slice(0, name.length - clubName.length).trim() || name;
 
-function standingRow(t: any): StandingRow {
+export function standingRow(t: any): StandingRow {
   const splits = t.records?.splitRecords;
   const divisionId = t.team?.division?.id;
   const leagueId = t.team?.league?.id;
@@ -650,9 +653,15 @@ function standingRow(t: any): StandingRow {
     name,
     city: clubCity(name, t.team?.clubName ?? ""),
     divisionId,
-    division: DIVISIONS[divisionId] ?? `DIV ${divisionId}`,
+    /* A minor league that plays without divisions names none on its clubs —
+       its own name is what that group of them is. */
+    division:
+      DIVISIONS[divisionId] ??
+      t.team?.division?.name ??
+      t.team?.league?.name ??
+      `DIV ${divisionId}`,
     leagueId,
-    league: LEAGUES[leagueId] ?? `LEAGUE ${leagueId}`,
+    league: LEAGUES[leagueId] ?? t.team?.league?.name ?? `LEAGUE ${leagueId}`,
     wins: t.wins ?? 0,
     losses: t.losses ?? 0,
     pct: t.winningPercentage ?? "—",
@@ -672,6 +681,7 @@ function standingRow(t: any): StandingRow {
     home: splitRecord(splits, "home"),
     away: splitRecord(splits, "away"),
     clinch: t.clinchIndicator ?? "",
+    org: t.team?.parentOrgName ?? "",
   };
 }
 
@@ -966,13 +976,19 @@ async function teamStatTable(
   group: "hitting" | "pitching",
   season: number,
   gameType: GameType,
+  sportId: number,
 ): Promise<TeamStatTable> {
   const [data, war] = await Promise.all([
     mlb(
-      `/teams/stats?season=${season}&sportIds=1&group=${group}&stats=season&gameType=${gameType}`,
+      `/teams/stats?season=${season}&sportIds=${sportId}&group=${group}&stats=season&gameType=${gameType}`,
       1800,
     ),
-    seasonWar(season, group, gameType),
+    /* The sabermetrics feed is a major-league one: asking it for a minor
+       league answers with major-league clubs, whose ids would land WAR on
+       whatever affiliate happened to share one. */
+    sportId === 1
+      ? seasonWar(season, group, gameType)
+      : { team: new Map<number, number>(), player: new Map<number, number>() },
   ]);
   const splits = (data.stats?.[0]?.splits ?? []) as any[];
   const standard = cols(group);
@@ -1004,10 +1020,12 @@ async function teamStatTable(
 export async function getTeamStats(
   season: number,
   gameType: GameType = "R",
+  /** The level, as StatsAPI numbers it — 1 for the majors, 11 for Triple-A. */
+  sportId = 1,
 ): Promise<TeamStatTable[]> {
   return Promise.all([
-    teamStatTable("hitting", season, gameType),
-    teamStatTable("pitching", season, gameType),
+    teamStatTable("hitting", season, gameType, sportId),
+    teamStatTable("pitching", season, gameType, sportId),
   ]);
 }
 
