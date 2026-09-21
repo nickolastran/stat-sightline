@@ -22,6 +22,9 @@ export default function DivisionTable({
   full?: boolean;
 }) {
   const gb = gamesBack(division.teams);
+  /* Minor-league clubs carry the organisation they feed; major-league ones
+     belong to nobody, so the column only exists where it means something. */
+  const orgs = division.teams.some((t) => t.org);
   const rows = [...division.teams].sort(
     (a, b) => Number(a.divRank) - Number(b.divRank)
   );
@@ -37,7 +40,15 @@ export default function DivisionTable({
         <table className="w-full border-collapse text-xs">
           <thead>
             <tr>
-              {["TEAM", "W", "L", "PCT", "GB", "STRK"].map((h, i) => (
+              {[
+                "TEAM",
+                ...(orgs ? ["ORG"] : []),
+                "W",
+                "L",
+                "PCT",
+                "GB",
+                "STRK",
+              ].map((h, i) => (
                 <th
                   key={h}
                   scope="col"
@@ -68,6 +79,11 @@ export default function DivisionTable({
                         division, and the seven stat columns need the room. */}
                     <TeamLink id={r.id} name={r.name} text={r.city} />
                   </td>
+                  {orgs && (
+                    <td className="px-2 py-1.5 text-right text-ink-3">
+                      {r.org || "—"}
+                    </td>
+                  )}
                   {[
                     String(r.wins),
                     String(r.losses),

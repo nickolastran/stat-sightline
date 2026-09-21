@@ -102,8 +102,9 @@ export default function SectionSkeleton({ section }: { section: string }) {
 
     case "scoreboard":
       return (
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3">
-          {Array.from({ length: 9 }).map((_, i) => (
+        /* Two to a row, the shape GameGrid lands in. */
+        <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
+          {Array.from({ length: 8 }).map((_, i) => (
             <SkeletonGameCard key={i} delay={i * 0.06} />
           ))}
         </div>
