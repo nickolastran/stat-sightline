@@ -392,7 +392,12 @@ function CareerTableBody({
                 ) : (
                   /* No mark beside the three letters: a logo per row, eleven
                      rows deep, costs the column the width the line needs. */
-                  <TeamLink id={r.teamId} name={r.team} logo={false} />
+                  <TeamLink
+                    id={r.teamId}
+                    name={r.team}
+                    logo={false}
+                    season={Number(r.season) || undefined}
+                  />
                 )}
               </td>
               <td className={cell}>{r.league || "—"}</td>
