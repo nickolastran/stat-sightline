@@ -16,6 +16,7 @@ export default function TeamLink({
   name,
   text,
   className = "",
+  title,
   logo = true,
   season,
 }: {
@@ -25,6 +26,8 @@ export default function TeamLink({
    *  town alone. The link itself still points at the club's own slug. */
   text?: string;
   className?: string;
+  /** The hover, where the cell is the mark alone and `text` is empty. */
+  title?: string;
   logo?: boolean;
   /** The season to open the club's page on, where the table is already
    *  reading one — the team-stats board's return trip. */
@@ -36,24 +39,27 @@ export default function TeamLink({
         /* eslint-disable-next-line @next/next/no-img-element */
         <img
           src={teamLogo(id ?? 0)}
-          alt=""
+          alt={text === "" ? name : ""}
           width={16}
           height={16}
           className="h-4 w-4 shrink-0"
         />
       )}
-      <span className="truncate">{text ?? name}</span>
+      {text === "" ? null : <span className="truncate">{text ?? name}</span>}
     </>
   );
 
   if (!id)
     return (
-      <span className={`flex items-center gap-1.5 ${className}`}>{label}</span>
+      <span title={title} className={`flex items-center gap-1.5 ${className}`}>
+        {label}
+      </span>
     );
 
   return (
     <Link
       href={teamHref(id, name) + (season ? `?season=${season}` : "")}
+      title={title}
       className={`flex items-center gap-1.5 hover:text-accent ${className}`}
     >
       {label}

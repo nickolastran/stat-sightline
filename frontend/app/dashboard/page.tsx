@@ -32,6 +32,14 @@ import { getProjections } from "@/lib/api";
  * the standings intact.
  */
 
+/*
+ * Rendered per request, not at build. The four sources below are live and
+ * already cached at the fetch layer; prerendering them only tied the deploy to
+ * statsapi answering inside Vercel's 60s static-generation budget, which on a
+ * single build worker it does not.
+ */
+export const dynamic = "force-dynamic";
+
 /* ── Sections ───────────────────────────────────────────────────────── */
 
 /** Snapshot metrics and today's probables — both read the same slate. */
