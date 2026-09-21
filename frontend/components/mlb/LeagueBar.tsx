@@ -83,6 +83,7 @@ function MoreMenu() {
             { href: "/minors", label: "MINOR LEAGUES" },
             { href: "/draft", label: "DRAFT TRACKER" },
             { href: "/injuries", label: "INJURY REPORT" },
+            { href: "/salaries", label: "SALARIES" },
             { href: "/compare", label: "COMPARE PLAYERS" },
             { href: "/compare/teams", label: "COMPARE TEAMS" },
             { href: "/award", label: "AWARDS INDEX" },
