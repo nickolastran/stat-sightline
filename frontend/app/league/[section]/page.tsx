@@ -25,6 +25,7 @@ import {
   type LeagueSection,
 } from "@/lib/leagueSections";
 import {
+  getDecisionLines,
   getSchedule,
   getStandings,
   getWildCard,
@@ -162,8 +163,15 @@ async function SectionBody({
 }) {
   try {
     switch (id) {
-      case "scoreboard":
-        return <GameGrid games={await getSchedule(date)} />;
+      case "scoreboard": {
+        const games = await getSchedule(date);
+        /* The pitchers of record read with their lines; either feed failing
+           leaves the names bare rather than the slate unrendered. */
+        const lines = await getDecisionLines(games, seasonOf(date)).catch(
+          () => undefined,
+        );
+        return <GameGrid games={games} lines={lines} />;
+      }
       case "leaders":
         return (
           <Leaderboards boards={await getLeaderboards(season)} season={season} />
@@ -326,6 +334,9 @@ export default async function LeagueSectionPage({
      no spring slate of its own and so resolves to "R", but it should still
      hand a reader back to the spring standings they came from. */
   const carried = pickGameType(sp.type);
+  const title = probables
+    ? `Probable Pitchers for ${shortDate(date)}`
+    : found.title;
   const viewQuery =
     season === current && carried === "R"
       ? ""
@@ -335,13 +346,11 @@ export default async function LeagueSectionPage({
     <div className={`mx-auto ${sectionWidth(found.id)} space-y-3 p-3`}>
       <Panel
         /* Probables is today's slate and says so in its own heading, rather
-           than pairing a shouted title with a loose date beside it. */
-        title={
-          probables
-            ? `Probable Pitchers for ${shortDate(date)}`
-            : found.title
-        }
-        tight={probables}
+           than pairing a shouted title with a loose date beside it. A title
+           that isn't shouted takes the tighter spacing with it — capitals
+           need the letter-spacing, mixed case reads as a gap in the word. */
+        title={title}
+        tight={title !== title.toUpperCase()}
         right={
           dated ? (
             <ScoreboardDate

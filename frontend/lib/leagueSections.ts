@@ -9,7 +9,9 @@
  */
 export const LEAGUE_SECTIONS = [
   { id: "gamefeed", tab: "GAME FEED", title: "GAME FEED" },
-  { id: "scoreboard", tab: "SCOREBOARD", title: "SCOREBOARD" },
+  /* Set in mixed case, like the probables board: these two are read as a
+     heading over a slate of games rather than as a shouted section label. */
+  { id: "scoreboard", tab: "SCOREBOARD", title: "Scoreboard" },
   { id: "probables", tab: "PROBABLES", title: "PROBABLE PITCHERS — TODAY" },
   { id: "standings", tab: "STANDINGS", title: "STANDINGS" },
   { id: "wildcard", tab: "WILD CARD", title: "WILD CARD RACE", inBar: false },

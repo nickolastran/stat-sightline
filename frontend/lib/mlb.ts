@@ -151,6 +151,10 @@ export interface GameSide {
   name: string;
   abbr: string;
   score: number | null;
+  /** The other two thirds of a line score, off the linescore rather than the
+   *  schedule row — null for a game that hasn't started. */
+  hits: number | null;
+  errors: number | null;
   wins: number | null;
   losses: number | null;
   isWinner: boolean;
@@ -181,13 +185,15 @@ export interface Game {
   attendance: number | null;
 }
 
-function side(raw: any): GameSide {
+function side(raw: any, line: any): GameSide {
   const t = raw.team ?? {};
   return {
     id: t.id,
     name: t.name ?? "TBD",
     abbr: t.abbreviation ?? "—",
     score: typeof raw.score === "number" ? raw.score : null,
+    hits: typeof line?.hits === "number" ? line.hits : null,
+    errors: typeof line?.errors === "number" ? line.errors : null,
     wins: raw.leagueRecord?.wins ?? null,
     losses: raw.leagueRecord?.losses ?? null,
     isWinner: !!raw.isWinner,
@@ -204,8 +210,8 @@ const toGame = (g: any): Game => ({
   night: g.dayNight === "night",
   inning: g.linescore?.currentInning ?? null,
   inningState: g.linescore?.inningState ?? null,
-  away: side(g.teams?.away ?? {}),
-  home: side(g.teams?.home ?? {}),
+  away: side(g.teams?.away ?? {}, g.linescore?.teams?.away),
+  home: side(g.teams?.home ?? {}, g.linescore?.teams?.home),
   decisions: {
     winner: person(g.decisions?.winner),
     loser: person(g.decisions?.loser),
@@ -2336,6 +2342,60 @@ export async function getPitcherRecords(
       ((data.dates ?? []) as any[]).flatMap((d) => d.games ?? []).map(toGame),
     ),
   );
+}
+
+/** Every pitcher's season ERA, keyed by id — the figure a decision is read
+ *  with. One filtered read of the season feed, which is under a thousand arms. */
+async function seasonEras(season: number): Promise<Map<number, string>> {
+  const data = await mlb(
+    `/stats?stats=season&group=pitching&season=${season}&sportId=1` +
+      `&playerPool=all&limit=2000&fields=stats,splits,player,id,stat,era`,
+    1800,
+  );
+  const out = new Map<number, string>();
+  for (const sp of (data.stats?.[0]?.splits ?? []) as any[])
+    if (sp.player?.id && sp.stat?.era) out.set(sp.player.id, sp.stat.era);
+  return out;
+}
+
+/**
+ * The line each pitcher of record is read with on a scoreboard card —
+ * "(8-7, 3.95)" for a win or a loss, "(16)" for a save — keyed
+ * `${gamePk}:${pitcherId}`.
+ *
+ * The record is the one the pitcher carried out of that game, the way the
+ * schedule already works it out for a club's season. Either feed failing
+ * leaves the names on the card without their line rather than no card.
+ *
+ * ponytail: the ERA is the season's to date, not the one he took off the
+ * mound that day — an as-of-game figure would be a box score per game on the
+ * slate. Fine for today's slate, a little generous on an old one.
+ */
+export async function getDecisionLines(
+  games: Game[],
+  season: number,
+): Promise<Map<string, string>> {
+  const [records, eras] = await Promise.all([
+    getPitcherRecords(season).catch(() => new Map<string, PitcherRecord>()),
+    seasonEras(season).catch(() => new Map<number, string>()),
+  ]);
+  const out = new Map<string, string>();
+  for (const g of games) {
+    for (const role of ["winner", "loser", "save"] as const) {
+      const p = g.decisions[role];
+      if (!p) continue;
+      const r = records.get(`${g.pk}:${p.id}`);
+      const era = eras.get(p.id);
+      const parts =
+        role === "save"
+          ? r
+            ? [String(r.saves)]
+            : []
+          : [r ? `${r.wins}-${r.losses}` : "", era ?? ""].filter(Boolean);
+      if (parts.length) out.set(`${g.pk}:${p.id}`, `(${parts.join(", ")})`);
+    }
+  }
+  return out;
 }
 
 /**

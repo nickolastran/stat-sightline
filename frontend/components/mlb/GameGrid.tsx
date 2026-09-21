@@ -1,13 +1,23 @@
-import Link from "next/link";
 import GameCard from "@/components/mlb/GameCard";
 import { sortGames, type Game } from "@/lib/mlb";
 
 /*
  * The whole day's slate on one page — the scoreboard strip's rail unrolled
- * into a grid. Same card in its detailed form (probables + venue), each one
- * opening that game's box score, which carries the Gameday link itself.
+ * into a grid. The card in its full form: line score, pitchers of record, and
+ * the two ways into the game, which is why the card isn't wrapped in a link
+ * of its own.
+ *
+ * Two to a row rather than three, so each card has the width its line score
+ * and decisions need.
  */
-export default function GameGrid({ games }: { games: Game[] }) {
+export default function GameGrid({
+  games,
+  lines,
+}: {
+  games: Game[];
+  /** Each pitcher of record's line, keyed `${gamePk}:${pitcherId}`. */
+  lines?: Map<string, string>;
+}) {
   if (games.length === 0)
     return (
       <p className="border border-line bg-bg px-3 py-6 text-center text-xs text-ink-3">
@@ -16,16 +26,9 @@ export default function GameGrid({ games }: { games: Game[] }) {
     );
 
   return (
-    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3">
+    <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
       {sortGames(games).map((g) => (
-        <Link
-          key={g.pk}
-          href={`/game/${g.pk}`}
-          aria-label={`Box score — ${g.away.name} at ${g.home.name}`}
-          className="block focus-visible:outline-2 focus-visible:outline-accent"
-        >
-          <GameCard game={g} detailed className="hover:border-accent" />
-        </Link>
+        <GameCard key={g.pk} game={g} detailed full lines={lines} />
       ))}
     </div>
   );
