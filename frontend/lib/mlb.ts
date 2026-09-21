@@ -8,6 +8,15 @@ import awardVotes from "@/data/award-votes.json";
 
 const BASE = "https://statsapi.mlb.com/api/v1";
 
+/*
+ * A ceiling on any one upstream request. Without it a statsapi socket that
+ * never answers hangs the whole render, and a prerendered page that hangs
+ * burns Vercel's 60s static-generation budget and fails the build. Callers
+ * already treat a throw as "no data for this panel", so a timeout degrades
+ * the section rather than the deploy.
+ */
+const FETCH_TIMEOUT_MS = 8000;
+
 /** Division id → short name. These ids are fixed; no lookup needed. */
 const DIVISIONS: Record<number, string> = {
   200: "AL WEST",
@@ -139,7 +148,10 @@ export const FIRST_SEASON = 1876;
  * through the same cache rather than opening a second client onto them.
  */
 export async function mlb(path: string, revalidate: number): Promise<any> {
-  const res = await fetch(`${BASE}${path}`, { next: { revalidate } });
+  const res = await fetch(`${BASE}${path}`, {
+    next: { revalidate },
+    signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+  });
   if (!res.ok) throw new Error(`MLB API ${res.status}: ${path}`);
   return res.json();
 }

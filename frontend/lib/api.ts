@@ -1,5 +1,11 @@
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
+/* Same ceiling as the Stats API client, and for the same reason: a backend
+   that is cold, unreachable or simply slow must not be able to hold a
+   prerender open past the build's per-page budget. `ask` is exempt below —
+   it is a live query that legitimately runs long, and never prerenders. */
+const FETCH_TIMEOUT_MS = 8000;
+
 export interface Pitcher {
   player_id: number;
   full_name: string | null;
@@ -85,6 +91,7 @@ export async function getProjections(
 ): Promise<StandingsProjection> {
   const res = await fetch(`${API_URL}/api/standings/projections?season=${season}`, {
     next: { revalidate: 1800 },
+    signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
   });
   if (!res.ok) throw new Error(`getProjections failed: ${res.status}`);
   return res.json();
@@ -139,6 +146,7 @@ export interface PlayoffOdds {
 export async function getPlayoffOdds(season: number): Promise<PlayoffOdds> {
   const res = await fetch(`${API_URL}/api/standings/odds?season=${season}`, {
     next: { revalidate: 1800 },
+    signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
   });
   if (!res.ok) throw new Error(`getPlayoffOdds failed: ${res.status}`);
   return res.json();
@@ -154,6 +162,7 @@ export async function searchPitchers(
   const params = new URLSearchParams({ q, limit: String(limit) });
   const res = await fetch(`${API_URL}/api/pitchers?${params}`, {
     ...(revalidate ? { next: { revalidate } } : { cache: "no-store" as const }),
+    signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
   });
   if (!res.ok) throw new Error(`searchPitchers failed: ${res.status}`);
   return res.json();
@@ -169,7 +178,7 @@ export async function getPitcherPitches(
   if (opts.limit) params.set("limit", String(opts.limit));
   const res = await fetch(
     `${API_URL}/api/pitchers/${pitcherId}/pitches?${params.toString()}`,
-    { cache: "no-store" }
+    { cache: "no-store", signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) }
   );
   if (!res.ok) throw new Error(`getPitcherPitches failed: ${res.status}`);
   return res.json();
