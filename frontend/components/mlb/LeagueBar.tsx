@@ -81,6 +81,7 @@ function MoreMenu() {
         <div className="space-y-1.5">
           {[
             { href: "/minors", label: "MINOR LEAGUES" },
+            { href: "/draft", label: "DRAFT TRACKER" },
             { href: "/compare", label: "COMPARE PLAYERS" },
             { href: "/compare/teams", label: "COMPARE TEAMS" },
             { href: "/award", label: "AWARDS INDEX" },
