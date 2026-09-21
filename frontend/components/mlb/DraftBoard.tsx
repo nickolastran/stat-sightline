@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import DataTable, { type Column } from "@/components/ui/DataTable";
+import FilterSelect, { FILTER_CONTROL } from "@/components/ui/FilterSelect";
 import PlayerLink from "@/components/mlb/PlayerLink";
 import TeamLink from "@/components/mlb/TeamLink";
 import { dob, money, type DraftPick } from "@/lib/draft";
@@ -30,39 +31,6 @@ const BLANK = {
 };
 
 type Filters = typeof BLANK;
-
-const CONTROL =
-  "h-7 border border-line bg-bg px-2 text-[10px] tracking-wider text-ink placeholder:text-ink-3 hover:border-accent focus:border-accent focus:outline-none";
-
-/** A dropdown whose empty option is its own label, the way a filter bar reads. */
-function Pick({
-  label,
-  value,
-  options,
-  onChange,
-}: {
-  label: string;
-  value: string;
-  options: string[];
-  onChange: (v: string) => void;
-}) {
-  if (options.length === 0) return null;
-  return (
-    <select
-      aria-label={label}
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      className={`${CONTROL} ${value ? "border-accent text-ink" : "text-ink-3"}`}
-    >
-      <option value="">{label}</option>
-      {options.map((o) => (
-        <option key={o} value={o}>
-          {o}
-        </option>
-      ))}
-    </select>
-  );
-}
 
 export default function DraftBoard({
   picks,
@@ -255,18 +223,18 @@ export default function DraftBoard({
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-1.5">
-        <Pick label="ROUND" value={f.round} options={options.rounds} onChange={(v) => set("round", v)} />
-        <Pick label="POSITION" value={f.position} options={options.positions} onChange={(v) => set("position", v)} />
-        <Pick label="TEAM" value={f.team} options={options.teams} onChange={(v) => set("team", v)} />
-        <Pick label="STATE" value={f.state} options={options.states} onChange={(v) => set("state", v)} />
-        <Pick label="BIRTHPLACE" value={f.country} options={options.countries} onChange={(v) => set("country", v)} />
+        <FilterSelect label="ROUND" value={f.round} options={options.rounds} onChange={(v) => set("round", v)} />
+        <FilterSelect label="POSITION" value={f.position} options={options.positions} onChange={(v) => set("position", v)} />
+        <FilterSelect label="TEAM" value={f.team} options={options.teams} onChange={(v) => set("team", v)} />
+        <FilterSelect label="STATE" value={f.state} options={options.states} onChange={(v) => set("state", v)} />
+        <FilterSelect label="BIRTHPLACE" value={f.country} options={options.countries} onChange={(v) => set("country", v)} />
         <input
           type="search"
           aria-label="Name"
           placeholder="NAME"
           value={f.name}
           onChange={(e) => set("name", e.target.value)}
-          className={`${CONTROL} w-36 ${f.name ? "border-accent" : ""}`}
+          className={`${FILTER_CONTROL} w-36 ${f.name ? "border-accent" : ""}`}
         />
         <input
           type="search"
@@ -274,13 +242,13 @@ export default function DraftBoard({
           placeholder="SCHOOL"
           value={f.school}
           onChange={(e) => set("school", e.target.value)}
-          className={`${CONTROL} w-36 ${f.school ? "border-accent" : ""}`}
+          className={`${FILTER_CONTROL} w-36 ${f.school ? "border-accent" : ""}`}
         />
         <button
           type="button"
           onClick={() => setF(BLANK)}
           disabled={!dirty}
-          className={`${CONTROL} ml-auto tracking-[0.2em] ${
+          className={`${FILTER_CONTROL} ml-auto tracking-[0.2em] ${
             dirty ? "text-ink-2 hover:text-ink" : "cursor-default text-ink-3 opacity-50"
           }`}
         >
