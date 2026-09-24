@@ -14,7 +14,7 @@
  * than the page. The spine — who is on the board at all — is always MLB's,
  * so the table still renders in full with Savant dark.
  *
- * Server-only, like lib/mlb.ts. Cached for an hour: none of this moves more
+ * Server-only, like lib/mlb. Cached for an hour: none of this moves more
  * than once a day.
  */
 import {

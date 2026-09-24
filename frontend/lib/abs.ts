@@ -9,7 +9,7 @@
  * and the CSV export drops the challenge-rate and "reasonable take" columns
  * the board is built around.
  *
- * Server-only, like lib/mlb.ts. Cached for an hour — the figures move once a
+ * Server-only, like lib/mlb. Cached for an hour — the figures move once a
  * day at most, and the batter page is well over a megabyte of HTML.
  */
 const ABS_URL = "https://baseballsavant.mlb.com/leaderboard/abs-challenges";
