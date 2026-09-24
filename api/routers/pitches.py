@@ -6,6 +6,7 @@ from sqlalchemy import text
 
 from api.schemas import Pitch, Pitcher, PitcherPitches
 from src.stat_sightline.db.connection import get_engine
+from src.stat_sightline.query.run import search_pitchers as _search
 
 router = APIRouter(prefix="/api/pitchers", tags=["pitchers"])
 
@@ -16,18 +17,11 @@ def search_pitchers(
     limit: int = Query(25, le=200),
 ) -> list[Pitcher]:
     """Typeahead search for pitchers, ordered by workload."""
-    sql = text("""
-        SELECT p.player_id, p.full_name, p.throws, COUNT(*) AS pitches
-        FROM savant.pitches pi
-        JOIN savant.players p ON p.player_id = pi.pitcher
-        WHERE (:q = '' OR p.full_name ILIKE '%' || :q || '%')
-        GROUP BY p.player_id, p.full_name, p.throws
-        ORDER BY pitches DESC
-        LIMIT :limit
-    """)
-    with get_engine().connect() as conn:
-        rows = conn.execute(sql, {"q": q, "limit": limit}).mappings().all()
-    return [Pitcher(**row) for row in rows]
+    return [
+        Pitcher(player_id=r["player_id"], full_name=r["full_name"],
+                throws=r["throws"], pitches=r["pit_n"])
+        for r in _search(q, limit)
+    ]
 
 
 @router.get("/{pitcher_id}/pitches", response_model=PitcherPitches)

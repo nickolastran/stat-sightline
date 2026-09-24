@@ -59,7 +59,7 @@ def _roster() -> list[dict]:
     frequent enough to notice.
     """
     sql = text("""
-        SELECT pl.player_id, pl.full_name,
+        SELECT pl.player_id, pl.full_name, pl.throws,
                COALESCE(b.n, 0) AS bat_n, COALESCE(t.n, 0) AS pit_n
         FROM savant.players pl
         LEFT JOIN (SELECT batter  AS id, COUNT(*) n FROM savant.pitches GROUP BY 1) b
@@ -69,12 +69,31 @@ def _roster() -> list[dict]:
         WHERE pl.full_name IS NOT NULL
     """)
     with get_engine().connect() as conn:
-        rows = [dict(r) for r in conn.execute(sql).mappings()]
+        return _index([dict(r) for r in conn.execute(sql).mappings()])
+
+
+def _index(rows: list[dict]) -> list[dict]:
+    """Add the folded forms every name match reads: the display name, the
+    stored 'Last, First', and the surname alone."""
     for r in rows:
         r["display"] = display_name(r["full_name"])
         r["folded"] = _fold(r["display"])
+        r["stored"] = _fold(r["full_name"])
         r["last"] = _fold(r["full_name"].partition(",")[0])
     return rows
+
+
+def search_pitchers(q: str, limit: int, roster: list[dict] | None = None) -> list[dict]:
+    """Pitcher typeahead: everyone who has thrown a pitch whose name contains
+    the typed text — as stored ('skenes, p') or as read ('paul skenes') —
+    heaviest workload first. Off the cached roster, so a keystroke costs no
+    query."""
+    f = _fold(q)
+    hits = [
+        r for r in (_roster() if roster is None else roster)
+        if r["pit_n"] and (f in r["stored"] or f in r["folded"])
+    ]
+    return sorted(hits, key=lambda r: r["pit_n"], reverse=True)[:limit]
 
 
 def resolve_player(name: str) -> tuple[dict | None, list[str]]:
