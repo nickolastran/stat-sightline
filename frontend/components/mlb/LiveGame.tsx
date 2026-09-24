@@ -1,6 +1,7 @@
 import Link from "next/link";
 import DivisionTable from "@/components/mlb/DivisionTable";
 import { MiniBox } from "@/components/mlb/BoxScoreView";
+import Notice from "@/components/ui/Notice";
 import Panel from "@/components/ui/Panel";
 import WinProbChart from "@/components/mlb/WinProbChart";
 import PlayerLink from "@/components/mlb/PlayerLink";
@@ -41,14 +42,6 @@ import {
 /** The page re-renders on this beat whichever tab is open — the page owns the
  *  timer, this view owns the number. */
 export const REFRESH_SECONDS = 20;
-
-function Notice({ what }: { what: string }) {
-  return (
-    <p className="border border-line bg-bg px-3 py-6 text-center text-xs text-ink-3">
-      {what}
-    </p>
-  );
-}
 
 /* ── The count ──────────────────────────────────────────────────────── */
 

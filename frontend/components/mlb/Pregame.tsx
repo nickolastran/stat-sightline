@@ -1,6 +1,7 @@
 import DivisionTable from "@/components/mlb/DivisionTable";
 import FirstPitch from "@/components/mlb/FirstPitch";
 import LineupCard from "@/components/mlb/LineupCard";
+import Notice from "@/components/ui/Notice";
 import Panel from "@/components/ui/Panel";
 import ResultTable from "@/components/mlb/ResultTable";
 import SeriesPanel from "@/components/mlb/SeriesPanel";
@@ -42,14 +43,6 @@ import {
  */
 
 const RECENT = 5;
-
-function Notice({ what }: { what: string }) {
-  return (
-    <p className="border border-line bg-bg px-3 py-6 text-center text-xs text-ink-3">
-      {what}
-    </p>
-  );
-}
 
 /* ── Matchup predictor ──────────────────────────────────────────────── */
 

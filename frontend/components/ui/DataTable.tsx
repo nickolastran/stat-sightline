@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { sortRows } from "@/lib/sortTable";
 
 /*
  * Generic sortable table with a sticky header. Large datasets are handled
@@ -65,15 +66,7 @@ export default function DataTable<T>({
     if (!sort) return rows;
     const col = columns.find((c) => c.key === sort.key);
     if (!col?.sortValue) return rows;
-    const dir = sort.dir === "asc" ? 1 : -1;
-    return [...rows].sort((a, b) => {
-      const va = col.sortValue!(a);
-      const vb = col.sortValue!(b);
-      if (va === null && vb === null) return 0;
-      if (va === null) return 1; // nulls last regardless of direction
-      if (vb === null) return -1;
-      return va < vb ? -dir : va > vb ? dir : 0;
-    });
+    return sortRows(rows, sort.dir, col.sortValue);
   }, [rows, sort, columns]);
 
   /* Clamped rather than reset: filtering 600 rows down to 20 while page 5 is
