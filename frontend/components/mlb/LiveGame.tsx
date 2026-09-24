@@ -504,7 +504,7 @@ function SeasonSeries({ game, games }: { game: Game; games: Game[] }) {
           : `${game.home.abbr} LEADS ${homeWins}-${awayWins}`;
 
   return (
-    <Panel title="SEASON SERIES">
+    <Panel title="Season Series" tight>
       {games.length === 0 ? (
         <Notice what="NO SERIES SCHEDULED" />
       ) : (
@@ -635,7 +635,7 @@ const withDistance = (p: PlayProb) =>
 export function ScoringSummary({ plays }: { plays: PlayProb[] }) {
   const scored = scoringPlays(plays);
   return (
-    <Panel title="SCORING SUMMARY">
+    <Panel title="Scoring Summary" tight>
       {scored.length === 0 ? (
         <Notice what="NOBODY HAS SCORED" />
       ) : (
@@ -782,10 +782,10 @@ export default async function LiveGame({
     <div className="bento gap-2">
       <div className="space-y-2">
         <MiniBox box={box} pk={game.pk} />
-        <Panel title="TEAM TOTALS">
+        <Panel title="Team Totals" tight>
           <TeamTotals box={box} />
         </Panel>
-        <Panel title="WIN PROBABILITY">
+        <Panel title="Win Probability" tight>
           {live.plays.length === 0 ? (
             <Notice what="NO PLAYS YET" />
           ) : (
@@ -798,7 +798,7 @@ export default async function LiveGame({
           middle column is the game's runs and nothing else. */}
       <div className="space-y-2">
         {inProgress(game) && (
-          <Panel title="AT BAT">
+          <Panel title="At Bat" tight>
             {live.atBat ? (
               <AtBatPanel game={game} box={box} live={live} zones={zones} />
             ) : (
@@ -831,7 +831,7 @@ export default async function LiveGame({
                 full
               />
             ) : (
-              <Panel key={s.id} title={`${s.abbr} STANDINGS`}>
+              <Panel key={s.id} title={`${s.abbr} Standings`} tight>
                 <Notice what="NO STANDINGS FOR THIS SEASON YET" />
               </Panel>
             );

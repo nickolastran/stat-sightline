@@ -1,7 +1,7 @@
 import Link from "next/link";
 import Panel from "@/components/ui/Panel";
 import TeamLink from "@/components/mlb/TeamLink";
-import { gamesBack, type Division } from "@/lib/mlb";
+import { divisionName, gamesBack, type Division } from "@/lib/mlb";
 
 /*
  * One division's table, with the club being read highlighted in it — the
@@ -31,7 +31,14 @@ export default function DivisionTable({
 
   return (
     <Panel
-      title={`${division.name} STANDINGS`}
+      /* Only the game page passes `full`, and its headings are set in mixed
+         case; the team and minors pages keep their capitals. */
+      title={
+        full
+          ? `${divisionName(division.id) || division.name} Standings`
+          : `${division.name} STANDINGS`
+      }
+      tight={full}
       right={
         <span className="text-[10px] text-ink-3">{division.league}</span>
       }

@@ -40,7 +40,8 @@ export default function SeriesPanel({
 
   return (
     <Panel
-      title="SERIES"
+      title="Series"
+      tight
       right={
         <SegmentedControl
           ariaLabel="Series range"

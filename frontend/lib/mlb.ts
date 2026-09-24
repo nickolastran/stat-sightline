@@ -2885,7 +2885,7 @@ export interface TeamLogGameInfo {
 
 /** "AL East" — MLB's own name for a division, set the way a split line is
     rather than in the capitals the standings are read in. */
-const divisionName = (id: number): string =>
+export const divisionName = (id: number): string =>
   (DIVISIONS[id] ?? "").replace(
     /\s(\w+)$/,
     (_, w: string) => ` ${w[0]}${w.slice(1).toLowerCase()}`,
