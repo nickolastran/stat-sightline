@@ -9,14 +9,14 @@ export default function Panel({
   right,
   children,
   className = "",
-  tight = false,
+  tight = title !== title.toUpperCase(),
 }: {
   title: string;
   right?: React.ReactNode;
   children: React.ReactNode;
   className?: string;
-  /** For a heading set in mixed case, where the spacing capitals are given
-   *  reads as a gap rather than as spacing. */
+  /** Tighter letter-spacing — the default for a heading set in mixed case,
+   *  where the spacing capitals are given reads as a gap rather than as spacing. */
   tight?: boolean;
 }) {
   return (

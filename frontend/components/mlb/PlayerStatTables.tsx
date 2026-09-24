@@ -33,9 +33,9 @@ const DEFAULT_SORT: Record<StatGroup, string> = {
 };
 
 const TITLES: Record<StatGroup, string> = {
-  hitting: "BATTING",
-  pitching: "PITCHING",
-  fielding: "FIELDING",
+  hitting: "Batting",
+  pitching: "Pitching",
+  fielding: "Fielding",
 };
 
 /** Games the club has played, as its busiest player has seen them. */
@@ -134,7 +134,7 @@ export default function PlayerStatTables({
   ];
 
   return (
-    <Panel title={`${TITLES[group]} STATS — ${season}`}>
+    <Panel title={`${TITLES[group]} Stats — ${season}`}>
       <LeaderTiles group={group} rows={rows} />
       <DataTable<PlayerStatRow>
         columns={cols}

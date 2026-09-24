@@ -31,14 +31,7 @@ export default function DivisionTable({
 
   return (
     <Panel
-      /* Only the game page passes `full`, and its headings are set in mixed
-         case; the team and minors pages keep their capitals. */
-      title={
-        full
-          ? `${divisionName(division.id) || division.name} Standings`
-          : `${division.name} STANDINGS`
-      }
-      tight={full}
+      title={`${divisionName(division.id) || division.name} Standings`}
       right={
         <span className="text-[10px] text-ink-3">{division.league}</span>
       }

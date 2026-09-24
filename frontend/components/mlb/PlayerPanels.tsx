@@ -32,6 +32,7 @@ import {
   type StatLine,
   type TeamStatCol,
   type TeamStatValue,
+  titleCase,
 } from "@/lib/mlb";
 
 /*
@@ -484,7 +485,7 @@ export function CareerPanel({ sections }: { sections: CareerSection[] }) {
         const columns = careerCols(group);
         return (
           <Fragment key={group}>
-            <Panel title={`CAREER ${STAT_GROUP_LABEL[group]}`}>
+            <Panel title={titleCase(`CAREER ${STAT_GROUP_LABEL[group]}`)}>
               <CareerTableBody
                 table={regular}
                 group={group}
@@ -492,7 +493,7 @@ export function CareerPanel({ sections }: { sections: CareerSection[] }) {
               />
             </Panel>
             {postseason.rows.length > 0 && (
-              <Panel title={`POSTSEASON ${STAT_GROUP_LABEL[group]}`}>
+              <Panel title={titleCase(`POSTSEASON ${STAT_GROUP_LABEL[group]}`)}>
                 <CareerTableBody
                   table={postseason}
                   group={group}
@@ -555,7 +556,7 @@ export function BioPanel({
 }) {
   return (
     <div className="space-y-3">
-      <Panel title="BIOGRAPHY">
+      <Panel title="Biography">
         <dl className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
           <Fact
             label="TEAM"
@@ -589,7 +590,7 @@ export function BioPanel({
         </dl>
       </Panel>
 
-      <Panel title="CAREER HISTORY">
+      <Panel title="Career History">
         {bio.stops.length === 0 ? (
           <p className="border border-line bg-bg px-3 py-6 text-center text-xs text-ink-3">
             NO MAJOR-LEAGUE SEASONS ON RECORD
@@ -624,7 +625,7 @@ export function BioPanel({
         )}
       </Panel>
 
-      <Panel title="CAREER HIGHLIGHTS">
+      <Panel title="Career Highlights">
         {bio.awards.length === 0 ? (
           <p className="border border-line bg-bg px-3 py-6 text-center text-xs text-ink-3">
             NO MAJOR-LEAGUE AWARDS ON RECORD

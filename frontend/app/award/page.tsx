@@ -30,10 +30,10 @@ export default function AwardIndexPage() {
     <div className="mx-auto max-w-[110rem] px-4">
       <section className="space-y-3 border-x border-line px-4 py-8 sm:px-8">
         <h1 className="text-2xl tracking-[0.15em] text-ink">
-          MLB AWARDS AND HONORS
+          MLB Awards and Honors
         </h1>
 
-        <Panel title="AWARDS">
+        <Panel title="Awards">
           <ul className="border border-line px-3 py-2">
             {AWARD_PAGES.map((a) => (
               <li key={a.id}>
@@ -48,7 +48,7 @@ export default function AwardIndexPage() {
           </ul>
         </Panel>
 
-        <Panel title="AWARD VOTING SUMMARIES">
+        <Panel title="Award Voting Summaries">
           <div className="flex flex-wrap gap-x-3 gap-y-1.5 border border-line px-3 py-2.5">
             {years.map(({ season }) => (
               <Link

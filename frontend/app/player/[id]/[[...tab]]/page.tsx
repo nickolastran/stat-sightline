@@ -347,7 +347,7 @@ async function TabBody({
             bands={bands}
             totals={post ? seriesTotals(group, bands) : undefined}
             group={group}
-            title={post ? "POSTSEASON GAME LOG" : `GAME LOG — ${season}`}
+            title={post ? "Postseason Game Log" : `Game Log — ${season}`}
             empty={post ? "NO POSTSEASON GAMES ON RECORD" : "NO GAMES IN THIS SEASON"}
             columns={game}
             running={running}

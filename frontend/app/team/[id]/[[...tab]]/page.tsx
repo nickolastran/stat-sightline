@@ -188,7 +188,7 @@ async function TeamSchedule({
       id={id}
       games={range}
       records={records}
-      title={`SCHEDULE — ${season}`}
+      title={`Schedule — ${season}`}
       controls={
         <ParamSelect param="half" label="SHOW" value={shown} options={HALVES} />
       }

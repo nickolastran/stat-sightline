@@ -184,7 +184,7 @@ export default async function AdvancedPage({
   return (
     <div className="mx-auto max-w-[110rem] space-y-3 p-3">
       <Panel
-        title={index ? `${found.title} — BY SEASON` : found.title}
+        title={titleCase(index ? `${found.title} — BY SEASON` : found.title)}
         right={
           index ? (
             <span className="text-[10px] text-ink-3">

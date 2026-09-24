@@ -101,7 +101,7 @@ export default async function PlayoffsPage({
   return (
     <div className="mx-auto max-w-[100rem] space-y-3 p-3">
       <Panel
-        title="PLAYOFFS"
+        title="Playoffs"
         right={
           <SeasonSelect value={season} first={FIRST_SEASON} last={current} />
         }

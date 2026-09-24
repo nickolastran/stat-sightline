@@ -36,7 +36,7 @@ async function Body() {
 export default function InjuriesPage() {
   return (
     <div className="mx-auto max-w-[88rem] space-y-3 p-3">
-      <Panel title="INJURY REPORT">
+      <Panel title="Injury Report">
         <Suspense fallback={<SkeletonTable rows={12} heading={false} />}>
           <Body />
         </Suspense>

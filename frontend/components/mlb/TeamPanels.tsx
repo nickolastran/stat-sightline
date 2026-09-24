@@ -379,7 +379,7 @@ export function Glossary({
   title?: string;
 }) {
   return (
-    <Panel title={title} tight={title !== title.toUpperCase()}>
+    <Panel title={title}>
       <dl className="grid gap-x-6 gap-y-1 text-xs sm:grid-cols-2">
         {columns.map((c) => (
           <div key={c.key} className="flex gap-2">
@@ -407,7 +407,7 @@ export function RosterPanel({ groups }: { groups: RosterGroup[] }) {
 
   return (
     <Panel
-      title="ACTIVE ROSTER"
+      title="Active Roster"
       right={<span className="text-[10px] text-ink-3">{total} PLAYERS</span>}
     >
       {total === 0 ? (
@@ -505,7 +505,7 @@ export function InjuriesPanel({ players }: { players: InjuryEntry[] }) {
   );
 
   return (
-    <Panel title="INJURY REPORT">
+    <Panel title="Injury Report">
       <Table
         head={["PLAYER", "STATUS", "NOTE"]}
         align="lcl"
@@ -573,7 +573,7 @@ export function TransactionsPanel({
   const months = transactionMonths(moves);
 
   return (
-    <Panel title="TRANSACTIONS" right={controls}>
+    <Panel title="Transactions" right={controls}>
       <Table
         head={["DATE", "TRANSACTION"]}
         align="ll"

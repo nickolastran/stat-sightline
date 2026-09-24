@@ -16,6 +16,7 @@ import {
   playerCols,
   seasonOf,
   teamStatText,
+  titleCase,
   todayPT,
   type StatGroup,
 } from "@/lib/mlb";
@@ -284,7 +285,7 @@ export default async function MinorsPage({
   return (
     <div className="mx-auto max-w-[88rem] space-y-3 p-3">
       <Panel
-        title={`MINOR LEAGUES — ${level.label}`}
+        title={titleCase(`MINOR LEAGUES — ${level.label}`)}
         right={
           <div className="flex flex-wrap items-center gap-3">
             <ParamSelect

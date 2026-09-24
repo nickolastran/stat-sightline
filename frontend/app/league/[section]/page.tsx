@@ -336,7 +336,7 @@ export default async function LeagueSectionPage({
   const carried = pickGameType(sp.type);
   const title = probables
     ? `Probable Pitchers for ${shortDate(date)}`
-    : found.title;
+    : titleCase(found.title);
   const viewQuery =
     season === current && carried === "R"
       ? ""
@@ -350,7 +350,6 @@ export default async function LeagueSectionPage({
            that isn't shouted takes the tighter spacing with it — capitals
            need the letter-spacing, mixed case reads as a gap in the word. */
         title={title}
-        tight={title !== title.toUpperCase()}
         right={
           dated ? (
             <ScoreboardDate
