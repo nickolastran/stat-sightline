@@ -4,6 +4,7 @@
  * CORS or key concern. Everything here normalizes the raw payloads into the
  * small shapes the dashboard/games pages actually render.
  */
+import { unstable_cache } from "next/cache";
 import awardVotes from "@/data/award-votes.json";
 
 const BASE = "https://statsapi.mlb.com/api/v1";
@@ -3647,6 +3648,10 @@ export interface PlayProb {
   homeProb: number;
   /** How far a home run carried, in feet — null on every other play. */
   distance: number | null;
+  /** How many of the 30 parks the ball would have left, off Statcast — a
+   *  double off the wall has one too. Null for a play with none, and until
+   *  Savant has measured it. */
+  parks: number | null;
 }
 
 export interface LiveGame {
@@ -3672,7 +3677,7 @@ const PLAY_FIELDS =
 
 const PROB_FIELDS =
   "about,inning,halfInning,result,description,awayScore,homeScore," +
-  "homeTeamWinProbability,eventType,matchup,pitcher,id,fullName," +
+  "homeTeamWinProbability,eventType,matchup,pitcher,id,fullName,atBatIndex," +
   "playEvents,isPitch,hitData,totalDistance";
 
 const livePerson = (p: any) =>
@@ -3697,6 +3702,35 @@ function livePitch(e: any): LivePitch {
 }
 
 /**
+ * How many parks each of a game's batted balls would have cleared, by at-bat
+ * index — only the ones that would have cleared any. MLB's own feeds don't
+ * carry it; Savant's game feed does, but runs to megabytes — past what the
+ * fetch cache will hold — so that fetch goes uncached and it is these few
+ * numbers that get cached instead. The play count is in the key so a new
+ * at-bat is looked up straight away.
+ */
+const homeRunParks = unstable_cache(
+  async (pk: number, _plays: number): Promise<Record<number, number>> => {
+    const res = await fetch(`https://baseballsavant.mlb.com/gf?game_pk=${pk}`, {
+      cache: "no-store",
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+    });
+    if (!res.ok) throw new Error(`Savant ${res.status}: gf ${pk}`);
+    const gf = await res.json();
+    const parks: Record<number, number> = {};
+    for (const p of [...(gf.team_home ?? []), ...(gf.team_away ?? [])] as any[])
+      if (p.contextMetrics?.homeRunBallparks > 0)
+        /* Savant counts at-bats from one, MLB from zero. */
+        parks[p.ab_number - 1] = p.contextMetrics.homeRunBallparks;
+    return parks;
+  },
+  ["savant-hr-parks"],
+  /* Savant's own edge holds the feed ten minutes; a home run it hadn't
+     measured yet at the last look gets another within five. */
+  { revalidate: 300 },
+);
+
+/**
  * The state of a game being played: the at-bat under way pitch by pitch, who
  * is on base and on deck, and every at-bat so far with what it did to the
  * home club's chances.
@@ -3712,6 +3746,11 @@ export async function getLive(pk: number): Promise<LiveGame> {
     /* Win probability is the one MLB can be missing on a young game. */
     mlb(`/game/${pk}/winProbability?fields=${PROB_FIELDS}`, 15).catch(() => []),
   ]);
+
+  const played = ((prob ?? []) as any[]).length;
+  const parks = played
+    ? await homeRunParks(pk, played).catch(() => ({}) as Record<number, number>)
+    : {};
 
   const cur = play.currentPlay;
   const thrown = ((cur?.playEvents ?? []) as any[]).filter((e) => e.isPitch);
@@ -3767,6 +3806,7 @@ export async function getLive(pk: number): Promise<LiveGame> {
                 .map((e) => e.hitData?.totalDistance)
                 .find((d) => typeof d === "number") ?? null)
             : null,
+        parks: parks[p.about?.atBatIndex] ?? null,
       }),
     ),
   };
@@ -3820,6 +3860,21 @@ export function scoringPlays(plays: PlayProb[]): PlayProb[] {
       p.homeScore !== (before?.homeScore ?? 0)
     );
   });
+}
+
+/**
+ * What sets a ball hit for distance apart, when anything does: a home run
+ * that never left the park, and — whatever became of the ball — one that was
+ * a home run in only one park (a unicorn), in every park but one (a reverse
+ * unicorn: a double off the wall here, most likely), or in every park.
+ */
+export function homerKind(p: PlayProb): string | null {
+  if (p.event === "home_run" && /inside-the-park/i.test(p.description))
+    return "Inside-the-park home run";
+  if (p.parks === 1) return "Unicorn · HR in 1/30 parks";
+  if (p.parks === 29) return "Reverse unicorn · HR in 29/30 parks";
+  if (p.parks === 30) return "No-doubter · HR in 30/30 parks";
+  return null;
 }
 
 /** One half-inning of the play log, in the order it was played. */

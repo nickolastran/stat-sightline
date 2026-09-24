@@ -15,6 +15,7 @@ import {
   halfInnings,
   immaculatePlays,
   headToHead,
+  homerKind,
   inProgress,
   scoringPlays,
   seasonOf,
@@ -620,6 +621,15 @@ export function Situation({
   );
 }
 
+/** The line under a play that was something rarer than its description says. */
+function Tag({ text }: { text: string | null }) {
+  return text ? (
+    <span className="mt-0.5 block text-[10px] tracking-widest text-accent">
+      {text}
+    </span>
+  ) : null;
+}
+
 /* ── Scoring summary ────────────────────────────────────────────────── */
 
 /* MLB writes a home run as "homers (18)" — the hitter's season total, which
@@ -648,7 +658,10 @@ export function ScoringSummary({ plays }: { plays: PlayProb[] }) {
               <span className="w-14 shrink-0 text-[10px] tracking-wider text-ink-3">
                 {p.half === "top" ? "TOP" : "BOT"} {p.inning}
               </span>
-              <span className="min-w-0 flex-1 text-ink-2">{withDistance(p)}</span>
+              <span className="min-w-0 flex-1 text-ink-2">
+                {withDistance(p)}
+                <Tag text={homerKind(p)} />
+              </span>
               <span className="shrink-0 tabular-nums text-ink">
                 {p.awayScore}-{p.homeScore}
               </span>
@@ -724,11 +737,7 @@ export function PlayByPlay({
                       {/* The at-bat under way is in the log with nothing to
                           say about itself yet. */}
                       {p.description || "AT BAT"}
-                      {immaculate.has(p) && (
-                        <span className="mt-0.5 block text-[10px] tracking-widest text-accent">
-                          {immaculate.get(p)}
-                        </span>
-                      )}
+                      <Tag text={immaculate.get(p) ?? homerKind(p)} />
                     </span>
                     <span className="shrink-0 tabular-nums text-ink-3">
                       {p.awayScore}-{p.homeScore}

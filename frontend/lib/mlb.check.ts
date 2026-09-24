@@ -22,6 +22,7 @@ import {
   gameStatus,
   gamesBack,
   halfInnings,
+  homerKind,
   immaculatePlays,
   inRotation,
   lastSevenDays,
@@ -1630,3 +1631,37 @@ assert.equal(addDays("2026-12-31", 1), "2027-01-01", "and over the year's");
 assert.equal(addDays("2024-02-28", 1), "2024-02-29", "a leap day is a day");
 assert.equal(addDays("2026-09-19", 0), "2026-09-19", "and today is today");
 console.log("addDays ok");
+
+/* A batted ball's tag: inside-the-park off MLB's own wording, which wins over
+   whatever Savant counted for it; the unicorn, its reverse and the no-doubter
+   at exactly one, twenty-nine and thirty parks — whatever the ball became, so
+   a double off the wall and a flyout at the fence are tagged too; nothing for
+   the ordinary home run, nor for one not yet measured. */
+{
+  const hr = (description: string, parks: number | null, event = "home_run") =>
+    homerKind({ event, description, parks } as any);
+  assert.equal(
+    hr("Bobby Witt Jr. hits an inside-the-park home run (10) on a line drive.", 0),
+    "Inside-the-park home run",
+  );
+  assert.equal(hr("Jose Altuve homers (16).", 1), "Unicorn · HR in 1/30 parks");
+  assert.equal(hr("Alec Burleson homers (22).", 30), "No-doubter · HR in 30/30 parks");
+  assert.equal(hr("Pete Alonso homers (39).", 21), null, "an ordinary one");
+  assert.equal(hr("Pete Alonso homers (40).", null), null, "nor one not yet measured");
+  assert.equal(
+    hr("Rafael Devers doubles (35) on a fly ball.", 29, "double"),
+    "Reverse unicorn · HR in 29/30 parks",
+    "a double off the wall",
+  );
+  assert.equal(
+    hr("Nolan Gorman flies out sharply to center fielder.", 1, "field_out"),
+    "Unicorn · HR in 1/30 parks",
+    "and a flyout at the fence",
+  );
+  assert.equal(
+    hr("Someone hits an inside-the-park home run (1).", 0, "double"),
+    null,
+    "inside-the-park only on a home run — a double's description never says it",
+  );
+}
+console.log("homerKind ok");
