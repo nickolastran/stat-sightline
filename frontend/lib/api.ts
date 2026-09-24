@@ -6,6 +6,21 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
    it is a live query that legitimately runs long, and never prerenders. */
 const FETCH_TIMEOUT_MS = 8000;
 
+/** GET one API path as JSON, throwing on a non-2xx status. Passing
+ *  `timeout = false` is the one opt-out, for `ask`. */
+async function api<T>(
+  path: string,
+  init: RequestInit,
+  timeout = true
+): Promise<T> {
+  const res = await fetch(`${API_URL}${path}`, {
+    ...init,
+    ...(timeout && { signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) }),
+  });
+  if (!res.ok) throw new Error(`API ${res.status}: ${path}`);
+  return res.json();
+}
+
 export interface Pitcher {
   player_id: number;
   full_name: string | null;
@@ -89,12 +104,9 @@ export interface StandingsProjection {
 export async function getProjections(
   season: number
 ): Promise<StandingsProjection> {
-  const res = await fetch(`${API_URL}/api/standings/projections?season=${season}`, {
+  return api(`/api/standings/projections?season=${season}`, {
     next: { revalidate: 1800 },
-    signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
   });
-  if (!res.ok) throw new Error(`getProjections failed: ${res.status}`);
-  return res.json();
 }
 
 /* ── Playoff odds ───────────────────────────────────────────────────── */
@@ -144,12 +156,9 @@ export interface PlayoffOdds {
  * go final. Called from server components.
  */
 export async function getPlayoffOdds(season: number): Promise<PlayoffOdds> {
-  const res = await fetch(`${API_URL}/api/standings/odds?season=${season}`, {
+  return api(`/api/standings/odds?season=${season}`, {
     next: { revalidate: 1800 },
-    signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
   });
-  if (!res.ok) throw new Error(`getPlayoffOdds failed: ${res.status}`);
-  return res.json();
 }
 
 /** `revalidate` seconds turns the lookup into a cached read — for the fixed
@@ -160,12 +169,10 @@ export async function searchPitchers(
   revalidate?: number
 ): Promise<Pitcher[]> {
   const params = new URLSearchParams({ q, limit: String(limit) });
-  const res = await fetch(`${API_URL}/api/pitchers?${params}`, {
-    ...(revalidate ? { next: { revalidate } } : { cache: "no-store" as const }),
-    signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
-  });
-  if (!res.ok) throw new Error(`searchPitchers failed: ${res.status}`);
-  return res.json();
+  return api(
+    `/api/pitchers?${params}`,
+    revalidate ? { next: { revalidate } } : { cache: "no-store" }
+  );
 }
 
 export async function getPitcherPitches(
@@ -176,12 +183,9 @@ export async function getPitcherPitches(
   if (opts.pitchType) params.set("pitch_type", opts.pitchType);
   if (opts.stand) params.set("stand", opts.stand);
   if (opts.limit) params.set("limit", String(opts.limit));
-  const res = await fetch(
-    `${API_URL}/api/pitchers/${pitcherId}/pitches?${params.toString()}`,
-    { cache: "no-store", signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) }
-  );
-  if (!res.ok) throw new Error(`getPitcherPitches failed: ${res.status}`);
-  return res.json();
+  return api(`/api/pitchers/${pitcherId}/pitches?${params}`, {
+    cache: "no-store",
+  });
 }
 
 /* ── Natural-language query ("ask") ─────────────────────────────────── */
@@ -262,9 +266,9 @@ export interface AskResponse {
  * same handful of questions get asked repeatedly.
  */
 export async function ask(q: string): Promise<AskResponse> {
-  const res = await fetch(`${API_URL}/api/ask?q=${encodeURIComponent(q)}`, {
-    next: { revalidate: 3600 },
-  });
-  if (!res.ok) throw new Error(`ask failed: ${res.status}`);
-  return res.json();
+  return api(
+    `/api/ask?q=${encodeURIComponent(q)}`,
+    { next: { revalidate: 3600 } },
+    false
+  );
 }
