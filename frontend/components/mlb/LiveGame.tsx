@@ -1,6 +1,7 @@
 import Link from "next/link";
 import DivisionTable from "@/components/mlb/DivisionTable";
 import { MiniBox } from "@/components/mlb/BoxScoreView";
+import Notice from "@/components/ui/Notice";
 import Panel from "@/components/ui/Panel";
 import WinProbChart from "@/components/mlb/WinProbChart";
 import PlayerLink from "@/components/mlb/PlayerLink";
@@ -15,6 +16,7 @@ import {
   halfInnings,
   immaculatePlays,
   headToHead,
+  homerKind,
   inProgress,
   scoringPlays,
   seasonOf,
@@ -40,14 +42,6 @@ import {
 /** The page re-renders on this beat whichever tab is open — the page owns the
  *  timer, this view owns the number. */
 export const REFRESH_SECONDS = 20;
-
-function Notice({ what }: { what: string }) {
-  return (
-    <p className="border border-line bg-bg px-3 py-6 text-center text-xs text-ink-3">
-      {what}
-    </p>
-  );
-}
 
 /* ── The count ──────────────────────────────────────────────────────── */
 
@@ -504,7 +498,7 @@ function SeasonSeries({ game, games }: { game: Game; games: Game[] }) {
           : `${game.home.abbr} LEADS ${homeWins}-${awayWins}`;
 
   return (
-    <Panel title="SEASON SERIES">
+    <Panel title="Season Series" tight>
       {games.length === 0 ? (
         <Notice what="NO SERIES SCHEDULED" />
       ) : (
@@ -620,6 +614,15 @@ export function Situation({
   );
 }
 
+/** The line under a play that was something rarer than its description says. */
+function Tag({ text }: { text: string | null }) {
+  return text ? (
+    <span className="mt-0.5 block text-[10px] tracking-widest text-accent">
+      {text}
+    </span>
+  ) : null;
+}
+
 /* ── Scoring summary ────────────────────────────────────────────────── */
 
 /* MLB writes a home run as "homers (18)" — the hitter's season total, which
@@ -635,7 +638,7 @@ const withDistance = (p: PlayProb) =>
 export function ScoringSummary({ plays }: { plays: PlayProb[] }) {
   const scored = scoringPlays(plays);
   return (
-    <Panel title="SCORING SUMMARY">
+    <Panel title="Scoring Summary" tight>
       {scored.length === 0 ? (
         <Notice what="NOBODY HAS SCORED" />
       ) : (
@@ -648,7 +651,10 @@ export function ScoringSummary({ plays }: { plays: PlayProb[] }) {
               <span className="w-14 shrink-0 text-[10px] tracking-wider text-ink-3">
                 {p.half === "top" ? "TOP" : "BOT"} {p.inning}
               </span>
-              <span className="min-w-0 flex-1 text-ink-2">{withDistance(p)}</span>
+              <span className="min-w-0 flex-1 text-ink-2">
+                {withDistance(p)}
+                <Tag text={homerKind(p)} />
+              </span>
               <span className="shrink-0 tabular-nums text-ink">
                 {p.awayScore}-{p.homeScore}
               </span>
@@ -724,11 +730,7 @@ export function PlayByPlay({
                       {/* The at-bat under way is in the log with nothing to
                           say about itself yet. */}
                       {p.description || "AT BAT"}
-                      {immaculate.has(p) && (
-                        <span className="mt-0.5 block text-[10px] tracking-widest text-accent">
-                          {immaculate.get(p)}
-                        </span>
-                      )}
+                      <Tag text={immaculate.get(p) ?? homerKind(p)} />
                     </span>
                     <span className="shrink-0 tabular-nums text-ink-3">
                       {p.awayScore}-{p.homeScore}
@@ -782,10 +784,10 @@ export default async function LiveGame({
     <div className="bento gap-2">
       <div className="space-y-2">
         <MiniBox box={box} pk={game.pk} />
-        <Panel title="TEAM TOTALS">
+        <Panel title="Team Totals" tight>
           <TeamTotals box={box} />
         </Panel>
-        <Panel title="WIN PROBABILITY">
+        <Panel title="Win Probability" tight>
           {live.plays.length === 0 ? (
             <Notice what="NO PLAYS YET" />
           ) : (
@@ -798,7 +800,7 @@ export default async function LiveGame({
           middle column is the game's runs and nothing else. */}
       <div className="space-y-2">
         {inProgress(game) && (
-          <Panel title="AT BAT">
+          <Panel title="At Bat" tight>
             {live.atBat ? (
               <AtBatPanel game={game} box={box} live={live} zones={zones} />
             ) : (
@@ -831,7 +833,7 @@ export default async function LiveGame({
                 full
               />
             ) : (
-              <Panel key={s.id} title={`${s.abbr} STANDINGS`}>
+              <Panel key={s.id} title={`${s.abbr} Standings`} tight>
                 <Notice what="NO STANDINGS FOR THIS SEASON YET" />
               </Panel>
             );

@@ -48,12 +48,21 @@ def _cached_odds(season: int, day: str, games_at: float, model_at: float, sims: 
     return playoff_odds(season, load_games(), load_model(), sims=sims)
 
 
-def _artifacts() -> tuple[float, float]:
-    """Fingerprints of the two files every answer here is built from."""
+def _serve(cached, season: int, *extra) -> dict:
+    """Run one cached answer for `season`, with the errors both endpoints share:
+    503 before the pipeline has run, 502 when the MLB schedule is unreachable,
+    404 for a season with no games on record."""
     try:
-        return _mtime(GAMES_CSV), _mtime(MODEL_PKL)
+        games_at, model_at = _mtime(GAMES_CSV), _mtime(MODEL_PKL)
     except FileNotFoundError:
         raise HTTPException(status_code=503, detail=MISSING_ARTIFACTS) from None
+    try:
+        payload = cached(season, today_et().isoformat(), games_at, model_at, *extra)
+    except requests.RequestException as exc:
+        raise HTTPException(status_code=502, detail=f"MLB schedule unreachable: {exc}") from exc
+    if not payload["teams"]:
+        raise HTTPException(status_code=404, detail=f"no games on record for {season}")
+    return payload
 
 
 @router.get("/projections", response_model=StandingsProjection)
@@ -66,15 +75,7 @@ def projections(
     it has played, so wins above pace means it is outperforming the model.
     `pace_162` is the plainer figure — today's win rate over a full season.
     """
-    games_at, model_at = _artifacts()
-    try:
-        payload = _cached_projection(season, today_et().isoformat(), games_at, model_at)
-    except requests.RequestException as exc:
-        raise HTTPException(status_code=502, detail=f"MLB schedule unreachable: {exc}") from exc
-
-    if not payload["teams"]:
-        raise HTTPException(status_code=404, detail=f"no games on record for {season}")
-    return StandingsProjection(**payload)
+    return StandingsProjection(**_serve(_cached_projection, season))
 
 
 @router.get("/odds", response_model=PlayoffOdds)
@@ -88,12 +89,4 @@ def odds(
     seasons and plays the bracket out, which is the only way to answer "how
     likely" rather than "how many".
     """
-    games_at, model_at = _artifacts()
-    try:
-        payload = _cached_odds(season, today_et().isoformat(), games_at, model_at, sims)
-    except requests.RequestException as exc:
-        raise HTTPException(status_code=502, detail=f"MLB schedule unreachable: {exc}") from exc
-
-    if not payload["teams"]:
-        raise HTTPException(status_code=404, detail=f"no games on record for {season}")
-    return PlayoffOdds(**payload)
+    return PlayoffOdds(**_serve(_cached_odds, season, sims))

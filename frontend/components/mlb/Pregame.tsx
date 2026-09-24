@@ -1,6 +1,7 @@
 import DivisionTable from "@/components/mlb/DivisionTable";
 import FirstPitch from "@/components/mlb/FirstPitch";
 import LineupCard from "@/components/mlb/LineupCard";
+import Notice from "@/components/ui/Notice";
 import Panel from "@/components/ui/Panel";
 import ResultTable from "@/components/mlb/ResultTable";
 import SeriesPanel from "@/components/mlb/SeriesPanel";
@@ -42,14 +43,6 @@ import {
  */
 
 const RECENT = 5;
-
-function Notice({ what }: { what: string }) {
-  return (
-    <p className="border border-line bg-bg px-3 py-6 text-center text-xs text-ink-3">
-      {what}
-    </p>
-  );
-}
 
 /* ── Matchup predictor ──────────────────────────────────────────────── */
 
@@ -192,7 +185,7 @@ export default async function Pregame({ game }: { game: Game }) {
        breakpoint the three stack at the full width of the page. */
     <div className="mt-3 bento gap-2">
       <div className="space-y-2">
-        <Panel title="MATCHUP PREDICTOR">
+        <Panel title="Matchup Predictor" tight>
           {odds ? (
             <Donut game={game} odds={odds} />
           ) : (
@@ -212,7 +205,7 @@ export default async function Pregame({ game }: { game: Game }) {
           caption={`${game.home.abbr} LAST ${RECENT}`}
         />
 
-        <Panel title="GAME INFORMATION">
+        <Panel title="Game Information" tight>
           <dl className="space-y-1.5 text-xs">
             {[
               ["VENUE", game.venue || "—"],
@@ -248,7 +241,7 @@ export default async function Pregame({ game }: { game: Game }) {
       </div>
 
       <div className="space-y-2">
-        <Panel title="PROBABLE PITCHERS">
+        <Panel title="Probable Pitchers" tight>
           <div className="overflow-x-auto border border-line">
             <table className="w-full border-collapse text-xs">
               <thead>
@@ -278,7 +271,7 @@ export default async function Pregame({ game }: { game: Game }) {
           </div>
         </Panel>
 
-        <Panel title="LINEUPS">
+        <Panel title="Lineups" tight>
           {pre ? (
             <LineupCard
               away={{
@@ -309,7 +302,7 @@ export default async function Pregame({ game }: { game: Game }) {
             homeAbbr={game.home.abbr}
           />
         ) : (
-          <Panel title="TEAM LEADERS">
+          <Panel title="Team Leaders" tight>
             <Notice what="LEADERS UNAVAILABLE — MLB API UNREACHABLE" />
           </Panel>
         )}
@@ -345,7 +338,7 @@ export default async function Pregame({ game }: { game: Game }) {
                 full
               />
             ) : (
-              <Panel key={s.id} title={`${s.abbr} STANDINGS`}>
+              <Panel key={s.id} title={`${s.abbr} Standings`} tight>
                 <Notice what="NO STANDINGS FOR THIS SEASON YET" />
               </Panel>
             );

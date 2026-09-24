@@ -28,7 +28,7 @@ pybaseball ──► ETL (pandas) ──► PostgreSQL ──► FastAPI ──�
 | `src/stat_sightline/db/` | Cached SQLAlchemy engine |
 | `sql/` | `01_schema.sql` (tables + indexes), `02_feature_views.sql` (barrel, attack-zone, swing-take views) |
 | `api/` | FastAPI app + `/api/ask`, `/api/pitchers` and `/api/standings` routers |
-| `frontend/` | Next.js 16 app (App Router, Tailwind v4, Recharts, Framer Motion); `lib/mlb.ts` is the MLB Stats API client every league / team / player / game page reads through |
+| `frontend/` | Next.js 16 app (App Router, Tailwind v4, Recharts, Framer Motion); `lib/mlb/` is the MLB Stats API client every league / team / player / game page reads through |
 | `scripts/` | `init_db.py`, `run_etl.py`, `train_standings.py` |
 | `tests/` | pytest for cleaning, feature math, question parsing, and projection leakage |
 
@@ -258,11 +258,11 @@ every remaining game to answer, and a retrain invalidates it without a restart.
 - `/pitcher/[id]` — pitch-level analysis: strike-zone scatter, filter panel,
   summary metrics. A non-numeric id falls back to the highest-workload pitcher.
 - `/api/games`, `/api/search` — same-origin proxies for the day's schedule and
-  the header typeahead, both reusing `lib/mlb.ts`'s cached server fetch so the
+  the header typeahead, both reusing `lib/mlb/`'s cached server fetch so the
   client scoreboard bar and search box never hit statsapi cross-origin
 
 Everything under `/league`, `/team`, `/player` and `/game` comes from the public
-MLB Stats API through `lib/mlb.ts`; only `/ask`, `/pitcher` and the projection
+MLB Stats API through `lib/mlb/`; only `/ask`, `/pitcher` and the projection
 columns touch our own API.
 
 ## Tests

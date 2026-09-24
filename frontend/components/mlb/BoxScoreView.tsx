@@ -382,7 +382,8 @@ export function MiniBox({ box, pk }: { box: BoxScore; pk: number }) {
   const [side, setSide] = useState<"away" | "home">("away");
   return (
     <Panel
-      title="BOX SCORE"
+      title="Box Score"
+      tight
       right={
         <SegmentedControl
           ariaLabel="Team"

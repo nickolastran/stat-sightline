@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Notice from "@/components/ui/Notice";
 import Panel from "@/components/ui/Panel";
 import GameCard from "@/components/mlb/GameCard";
 import PlayerLink from "@/components/mlb/PlayerLink";
@@ -22,14 +23,6 @@ import {
  */
 
 const RECENT = 5;
-
-function Notice({ what }: { what: string }) {
-  return (
-    <p className="border border-line bg-bg px-3 py-6 text-center text-xs text-ink-3">
-      {what}
-    </p>
-  );
-}
 
 /* ── Recent games ───────────────────────────────────────────────────── */
 

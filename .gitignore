@@ -40,3 +40,5 @@ data/standings/
 #claude 
 .agents
 .claude
+# Next build output (the app lives in frontend/, which ignores its own)
+.next/
