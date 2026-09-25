@@ -6,6 +6,7 @@ import Panel from "@/components/ui/Panel";
 import Glossary from "@/components/mlb/Glossary";
 import {
   leaderBoard,
+  qualifiesForTitle,
   teamStatNum,
   teamStatText,
   PLAYER_LEADER_SPECS,
@@ -38,6 +39,12 @@ const TITLES: Record<StatGroup, string> = {
   fielding: "Fielding",
 };
 
+/* What a bold name means — fielding has no title, so nothing is bolded there. */
+const TITLE_BAR: Partial<Record<StatGroup, string>> = {
+  hitting: "Qualified for batting title (3.1 plate appearances per team game)",
+  pitching: "Qualified for ERA title (1 inning pitched per team game)",
+};
+
 /** Games the club has played, as its busiest player has seen them. */
 const teamGamesOf = (group: StatGroup, rows: PlayerStatRow[]) =>
   Math.max(
@@ -45,18 +52,19 @@ const teamGamesOf = (group: StatGroup, rows: PlayerStatRow[]) =>
     ...rows.map(
       (r) =>
         teamStatNum(r.values[group === "fielding" ? "games" : "gamesPlayed"]) ??
-        0
-    )
+        0,
+    ),
   );
 
 function LeaderTiles({
   group,
   rows,
+  teamGames,
 }: {
   group: StatGroup;
   rows: PlayerStatRow[];
+  teamGames: number;
 }) {
-  const teamGames = teamGamesOf(group, rows);
   const boards = PLAYER_LEADER_SPECS[group]
     .map((spec) => leaderBoard(spec, rows, teamGames))
     .filter((b) => b.leaders.length > 0);
@@ -88,6 +96,7 @@ export default function PlayerStatTables({
   rows,
   season,
   traded: tradedList,
+  teamGames,
 }: {
   group: StatGroup;
   columns: TeamStatCol[];
@@ -95,7 +104,15 @@ export default function PlayerStatTables({
   season: number;
   /** Everyone a trade moved this season — marked in the table, listed under it. */
   traded: TradedPlayer[];
+  /** Regular-season games the club has played — null outside one, where no
+   *  title is at stake and nobody is bolded. */
+  teamGames: number | null;
 }) {
+  /* The busiest player's count stands in when the record is missing — the
+     tiles still need a bar, even if nothing is bolded by it. */
+  const games = teamGames ?? teamGamesOf(group, rows);
+  const qualified = (r: PlayerStatRow) =>
+    teamGames !== null && qualifiesForTitle(group, r.values, teamGames);
   /* Only the ones who actually appear in this table are worth a mark or a
      line: a club trades for prospects who never take an at-bat. */
   const onTeam = new Set(rows.map((r) => r.id));
@@ -108,9 +125,16 @@ export default function PlayerStatTables({
       sortValue: (r) => r.name,
       render: (r) => (
         <span className="flex min-w-0 items-center gap-2">
-          <PlayerLink id={r.id}>{r.name}</PlayerLink>
+          <PlayerLink
+            id={r.id}
+            className={qualified(r) ? "font-bold text-ink" : ""}
+          >
+            {r.name}
+          </PlayerLink>
           {traded.has(r.id) && (
-            <span title="Traded mid-season — see the note below the table">*</span>
+            <span title="Traded mid-season — see the note below the table">
+              *
+            </span>
           )}
           {/* The position rides with the name the way a box score prints it;
               a fielder who moved around carries a star (see mergeFielding). */}
@@ -128,14 +152,16 @@ export default function PlayerStatTables({
         label: c.label,
         align: "center",
         sortValue: (r) => teamStatNum(r.values[c.key]),
-        render: (r) => <span title={c.title}>{teamStatText(r.values[c.key])}</span>,
-      })
+        render: (r) => (
+          <span title={c.title}>{teamStatText(r.values[c.key])}</span>
+        ),
+      }),
     ),
   ];
 
   return (
     <Panel title={`${TITLES[group]} Stats — ${season}`}>
-      <LeaderTiles group={group} rows={rows} />
+      <LeaderTiles group={group} rows={rows} teamGames={games} />
       <DataTable<PlayerStatRow>
         columns={cols}
         rows={rows}
@@ -164,6 +190,9 @@ export default function PlayerStatTables({
         <Glossary
           entries={[
             ...columns.map((c) => ({ label: c.label, title: c.title })),
+            ...(teamGames !== null && group in TITLE_BAR
+              ? [{ label: "Bold", title: TITLE_BAR[group]!, wide: true }]
+              : []),
             ...(moved.length > 0
               ? [{ label: "*", title: "Traded mid-season" }]
               : []),

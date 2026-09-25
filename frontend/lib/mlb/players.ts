@@ -275,6 +275,23 @@ export const inningsOf = (outs: number): string =>
   `${Math.floor(outs / 3)}.${outs % 3}`;
 
 /**
+ * MLB's title qualification: 3.1 plate appearances per team game for the
+ * batting title (502 over 162, so the bar rounds), an inning per team game
+ * for the ERA title. Fielding has no title bar.
+ */
+export function qualifiesForTitle(
+  group: StatGroup,
+  values: Record<string, TeamStatValue>,
+  teamGames: number,
+): boolean {
+  if (teamGames <= 0) return false;
+  if (group === "hitting")
+    return (teamStatNum(values.plateAppearances) ?? 0) >= Math.round(3.1 * teamGames);
+  if (group === "pitching") return outsOf(values.inningsPitched) >= 3 * teamGames;
+  return false;
+}
+
+/**
  * One row per player rather than one per position. MLB reports fielding per
  * position, so a shortstop who filled in at second arrives twice and neither
  * line is his season; the counting stats add up, the rates are recomputed from

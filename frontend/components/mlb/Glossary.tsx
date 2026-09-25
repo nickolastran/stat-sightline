@@ -7,6 +7,8 @@
 export interface GlossaryEntry {
   label: string;
   title: string;
+  /** Takes two columns, for a definition too long for one. */
+  wide?: boolean;
 }
 
 export default function Glossary({
@@ -38,14 +40,12 @@ function Section({
 }) {
   return (
     <section className="space-y-1.5">
-      <h4 className="text-[10px] tracking-[0.2em] text-ink-3">
-        {name}
-      </h4>
+      <h4 className="text-[10px] tracking-[0.2em] text-ink-3">{name}</h4>
       <dl className="grid grid-cols-[repeat(auto-fill,16rem)] justify-center gap-x-6 gap-y-1 text-[10px] leading-relaxed">
         {entries.map((e) => (
           <div
             key={e.label}
-            className="grid grid-cols-[3rem_1fr] items-baseline gap-2"
+            className={`grid grid-cols-[3rem_1fr] items-baseline gap-2 ${e.wide ? "sm:col-span-2" : ""}`}
           >
             <dt className="font-bold tracking-wider text-ink">{e.label}</dt>
             <dd className="text-ink-3">{e.title}</dd>

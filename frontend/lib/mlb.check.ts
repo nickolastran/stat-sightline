@@ -25,6 +25,7 @@ import {
   homerKind,
   immaculatePlays,
   inRotation,
+  qualifiesForTitle,
   lastSevenDays,
   projectStatLine,
   overviewSplitCodes,
@@ -1665,3 +1666,12 @@ console.log("addDays ok");
   );
 }
 console.log("homerKind ok");
+
+/* ── qualifiesForTitle: MLB's batting and ERA title bars ───────────── */
+assert.equal(qualifiesForTitle("hitting", { plateAppearances: 502 }, 162), true, "502 PA over 162 is the bar");
+assert.equal(qualifiesForTitle("hitting", { plateAppearances: 501 }, 162), false, "one short");
+assert.equal(qualifiesForTitle("pitching", { inningsPitched: "162.0" }, 162), true, "an inning a game");
+assert.equal(qualifiesForTitle("pitching", { inningsPitched: "161.2" }, 162), false, "two outs short");
+assert.equal(qualifiesForTitle("fielding", { chances: 999 }, 162), false, "no fielding title");
+assert.equal(qualifiesForTitle("hitting", { plateAppearances: 5 }, 0), false, "no games, no title");
+console.log("qualifiesForTitle ok");
