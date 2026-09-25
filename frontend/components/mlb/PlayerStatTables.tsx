@@ -162,19 +162,12 @@ export default function PlayerStatTables({
       )}
       <div className="mt-3">
         <Glossary
-          entries={columns.map((c) => ({ label: c.label, title: c.title }))}
-          groups={
-            moved.length > 0
-              ? [
-                  {
-                    name: "MARKS",
-                    entries: [
-                      { label: "*", title: "Traded mid-season — this line is only what the player did here" },
-                    ],
-                  },
-                ]
-              : []
-          }
+          entries={[
+            ...columns.map((c) => ({ label: c.label, title: c.title })),
+            ...(moved.length > 0
+              ? [{ label: "*", title: "Traded mid-season" }]
+              : []),
+          ]}
         />
       </div>
     </Panel>
