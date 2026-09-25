@@ -8,6 +8,7 @@ The work is cached per (season, day, artifact mtime): a projection scores every
 remaining game on the schedule, which is wasted effort on every page load, and
 the inputs only change when a day turns over or the pipeline is re-run.
 """
+
 from __future__ import annotations
 
 from functools import lru_cache

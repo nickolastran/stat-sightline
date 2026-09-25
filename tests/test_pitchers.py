@@ -4,6 +4,7 @@ The search runs over the roster `run._roster` caches for /ask, so these build
 that roster from rows shaped like its query and check the matching and order
 the endpoint returned when it was a SQL `ILIKE` over the stored name.
 """
+
 from __future__ import annotations
 
 from src.stat_sightline.query import run as R

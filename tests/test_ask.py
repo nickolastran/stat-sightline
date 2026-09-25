@@ -4,6 +4,7 @@ Only the pure half is exercised here: parse.py in full, plus the formatting
 helpers run.py keeps out of SQL. The SQL itself is covered by hitting the
 endpoint against a loaded warehouse.
 """
+
 from __future__ import annotations
 
 from datetime import date

@@ -1,4 +1,5 @@
 """Pitcher + pitch-level endpoints that feed the strike-zone scatter chart."""
+
 from __future__ import annotations
 
 from fastapi import APIRouter, HTTPException, Query

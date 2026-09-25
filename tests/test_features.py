@@ -1,4 +1,5 @@
 """Offline tests for Phase 2 feature math (no DB, no sklearn)."""
+
 from __future__ import annotations
 
 import pandas as pd

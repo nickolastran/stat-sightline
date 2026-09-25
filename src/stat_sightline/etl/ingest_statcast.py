@@ -1,10 +1,11 @@
 """Fetch raw Statcast data via pybaseball, with on-disk parquet caching.
 
-We pull in N-day windows (ETL_CHUNK_DAYS) and cache each window so that
+Pulled in N-day windows (ETL_CHUNK_DAYS) and cache each window so that
 re-running an interrupted long pull is cheap and we stay friendly to the
 Baseball Savant servers. pybaseball is imported lazily so the rest of the
 package (and the offline tests) don't require it.
 """
+
 from __future__ import annotations
 
 from datetime import date, datetime, timedelta

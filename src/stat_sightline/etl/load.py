@@ -4,6 +4,7 @@ Load order respects foreign keys: players + games first, then pitches.
 All upserts key on the natural unique constraint so re-running a date range
 never duplicates rows (it refreshes them).
 """
+
 from __future__ import annotations
 
 import pandas as pd
