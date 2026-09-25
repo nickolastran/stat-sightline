@@ -4,6 +4,7 @@ The leakage check is the important one: if a game's features could see its own
 result, the chronological holdout in train.py would report a score the live
 projection can never reproduce.
 """
+
 from __future__ import annotations
 
 import pandas as pd

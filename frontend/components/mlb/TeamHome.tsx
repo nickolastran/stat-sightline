@@ -35,7 +35,7 @@ function RecentGames({ games }: { games: Game[] }) {
     : games.filter((g) => g.state !== "Final").slice(0, RECENT);
 
   return (
-    <Panel title={played.length ? "RECENT GAMES" : "UPCOMING GAMES"}>
+    <Panel title={played.length ? "Recent Games" : "Upcoming Games"}>
       {shown.length === 0 ? (
         <Notice what="NO GAMES ON THE SCHEDULE" />
       ) : (
@@ -68,7 +68,7 @@ function TeamLeaders({
   const filled = boards.filter((b) => b.leaders.length > 0);
 
   return (
-    <Panel title={`${season} TEAM LEADERS`}>
+    <Panel title={`${season} Team Leaders`}>
       {filled.length === 0 ? (
         <Notice what="NO LEADERS FOR THIS SEASON YET" />
       ) : (
@@ -123,7 +123,7 @@ export default async function TeamHome({
       {schedule ? (
         <RecentGames games={schedule} />
       ) : (
-        <Panel title="RECENT GAMES">
+        <Panel title="Recent Games">
           <Notice what="SCHEDULE UNAVAILABLE — MLB API UNREACHABLE" />
         </Panel>
       )}
@@ -133,14 +133,14 @@ export default async function TeamHome({
           {division ? (
             <DivisionTable division={division} teamId={id} />
           ) : (
-            <Panel title="DIVISION STANDINGS">
+            <Panel title="Division Standings">
               <Notice what="NO STANDINGS FOR THIS SEASON YET" />
             </Panel>
           )}
           {leaders ? (
             <TeamLeaders boards={leaders} season={season} />
           ) : (
-            <Panel title={`${season} TEAM LEADERS`}>
+            <Panel title={`${season} Team Leaders`}>
               <Notice what="LEADERS UNAVAILABLE — MLB API UNREACHABLE" />
             </Panel>
           )}
@@ -153,7 +153,7 @@ export default async function TeamHome({
               pitching={card.pitching}
             />
           ) : (
-            <Panel title={`${season} TEAM STATS`}>
+            <Panel title={`${season} Team Stats`}>
               <Notice what="TEAM STATS UNAVAILABLE" />
             </Panel>
           )}

@@ -5,6 +5,7 @@ It is the single source of truth for which columns land in each table and
 what type each column is — `load.py` reads these constants to build the
 staging tables.
 """
+
 from __future__ import annotations
 
 import pandas as pd

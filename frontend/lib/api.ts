@@ -154,11 +154,24 @@ export interface PlayoffOdds {
  * Thousands of simulated seasons behind one call, so this is cached for half
  * an hour like the projection it sits beside — the answer only moves as games
  * go final. Called from server components.
+ *
+ * The deployed site has no API behind it, so an unreachable one falls back to
+ * the snapshot `scripts/snapshot_playoff_odds.py` writes and a daily GitHub
+ * Action refreshes — a day stale at worst, rather than no odds at all.
  */
 export async function getPlayoffOdds(season: number): Promise<PlayoffOdds> {
-  return api(`/api/standings/odds?season=${season}`, {
-    next: { revalidate: 1800 },
-  });
+  try {
+    return await api(`/api/standings/odds?season=${season}`, {
+      next: { revalidate: 1800 },
+    });
+  } catch (err) {
+    // Imported here, not at the top: a client component pulls this module in
+    // for the pitcher search, and shouldn't carry the snapshot along with it.
+    const { default: all } = await import("@/data/playoff-odds.json");
+    const snap = (all as Record<string, PlayoffOdds>)[season];
+    if (snap) return snap;
+    throw err;
+  }
 }
 
 /** `revalidate` seconds turns the lookup into a cached read — for the fixed

@@ -56,7 +56,7 @@ export default async function SalariesPage({
   return (
     <div className="mx-auto max-w-[88rem] space-y-3 p-3">
       <Panel
-        title={year ? `SALARIES — ${year}` : "SALARIES"}
+        title={year ? `Salaries — ${year}` : "Salaries"}
         right={
           years.length > 0 && (
             <ParamSelect

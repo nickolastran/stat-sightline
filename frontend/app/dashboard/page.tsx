@@ -77,7 +77,7 @@ async function StandingsSection({ season }: { season: number }) {
     getProjections(season).catch(() => null),
   ]);
   return (
-    <Panel title="STANDINGS">
+    <Panel title="Standings">
       <Standings divisions={divisions} projection={projection} />
     </Panel>
   );
@@ -86,7 +86,7 @@ async function StandingsSection({ season }: { season: number }) {
 async function LeadersSection({ season }: { season: number }) {
   const boards = await getLeaderboards(season).catch(() => []);
   return (
-    <Panel title="STAT LEADERS">
+    <Panel title="Stat Leaders">
       <Leaderboards boards={boards} season={season} />
     </Panel>
   );

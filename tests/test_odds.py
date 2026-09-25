@@ -8,6 +8,7 @@ percentages is the one bug you cannot see by reading it.
 Everything here builds a `Field` by hand, so nothing touches the MLB API or
 the pickle.
 """
+
 from __future__ import annotations
 
 import numpy as np

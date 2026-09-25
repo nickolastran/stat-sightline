@@ -66,7 +66,7 @@ export default function TeamLeaders({
 
   return (
     <Panel
-      title="TEAM LEADERS"
+      title="Team Leaders"
       right={
         <SegmentedControl
           ariaLabel="Leader board"

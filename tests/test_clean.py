@@ -1,4 +1,5 @@
 """Offline tests for the cleaning/shaping logic (no network, no DB)."""
+
 from __future__ import annotations
 
 import pandas as pd

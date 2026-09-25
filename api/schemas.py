@@ -1,4 +1,5 @@
 """Pydantic response models for the Stat Sightline API."""
+
 from __future__ import annotations
 
 from datetime import date

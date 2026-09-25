@@ -6,7 +6,7 @@ import { Skeleton, SkeletonTable } from "@/components/ui/Skeleton";
 export default function Loading() {
   return (
     <div className="mx-auto max-w-[100rem] space-y-3 p-3">
-      <Panel title="PLAYOFFS" right={<Skeleton className="h-4 w-24" />}>
+      <Panel title="Playoffs" right={<Skeleton className="h-4 w-24" />}>
         <div className="mb-3 flex gap-px">
           {Array.from({ length: 3 }).map((_, i) => (
             <Skeleton key={i} className="h-8 w-32" delay={i * 0.05} />

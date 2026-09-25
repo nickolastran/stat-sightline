@@ -22,6 +22,7 @@ import {
   getTeamIdentity,
   getTeamInjuries,
   getTeamPlayerStats,
+  getTeamRecord,
   getTeamRosterGroups,
   getTeamSchedule,
   getTeamSplits,
@@ -188,7 +189,7 @@ async function TeamSchedule({
       id={id}
       games={range}
       records={records}
-      title={`SCHEDULE — ${season}`}
+      title={`Schedule — ${season}`}
       controls={
         <ParamSelect param="half" label="SHOW" value={shown} options={HALVES} />
       }
@@ -232,11 +233,13 @@ async function PlayerStats({
   gameType: PlayerGameType;
   group: StatGroup;
 }) {
-  const [rows, moves] = await Promise.all([
+  const [rows, moves, record] = await Promise.all([
     getTeamPlayerStats(id, season, group, gameType),
     /* The marks beside the names are a nicety — a slow transaction log
        shouldn't cost the reader their stats. */
     getTeamTransactions(id, season).catch(() => []),
+    /* The title bars are per regular-season game; October has no title. */
+    gameType === "R" ? getTeamRecord(id, season).catch(() => null) : null,
   ]);
 
   return (
@@ -246,6 +249,7 @@ async function PlayerStats({
       rows={rows}
       season={season}
       traded={tradedPlayers(moves)}
+      teamGames={record ? record.wins + record.losses : null}
     />
   );
 }

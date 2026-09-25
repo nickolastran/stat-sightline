@@ -1,7 +1,7 @@
-"""Natural-language query endpoint — the StatMuse-style answer card.
-
+"""Natural-language query endpoint
 Thin: parsing lives in src/stat_sightline/query/parse.py, the SQL in run.py.
 """
+
 from __future__ import annotations
 
 from fastapi import APIRouter, HTTPException, Query

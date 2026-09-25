@@ -25,8 +25,8 @@ export default function TeamStatCard({
   return (
     <div className="border border-line bg-surface">
       <header className="flex flex-wrap items-center justify-between gap-2 border-b border-line px-3 py-2">
-        <h2 className="text-[10px] tracking-[0.25em] text-ink-3">
-          {season} TEAM STATS
+        <h2 className="text-[10px] tracking-wider text-ink-3">
+          {season} Team Stats
         </h2>
         <SegmentedControl<"hitting" | "pitching">
           ariaLabel="Stat group"

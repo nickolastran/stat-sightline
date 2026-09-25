@@ -1,10 +1,8 @@
 """SQLAlchemy engine factory shared across ETL, features, and dashboard."""
+
 from __future__ import annotations
-
 from functools import lru_cache
-
 from sqlalchemy import Engine, create_engine
-
 from config.settings import database_url
 
 
