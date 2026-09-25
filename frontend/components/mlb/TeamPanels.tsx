@@ -559,9 +559,7 @@ const monthOf = (iso: string) =>
   new Intl.DateTimeFormat("en-US", {
     month: "long",
     timeZone: FALLBACK_TZ,
-  })
-    .format(new Date(`${iso}T12:00:00Z`))
-    .toUpperCase();
+  }).format(new Date(`${iso}T12:00:00Z`));
 
 export function TransactionsPanel({
   moves,
@@ -586,7 +584,7 @@ export function TransactionsPanel({
             <tr>
               <td
                 colSpan={2}
-                className="border-y border-line bg-surface px-3 py-2 text-xs tracking-[0.25em] text-ink"
+                className="border-y border-line bg-surface px-3 py-2 text-xs text-ink"
               >
                 {monthOf(m.days[0].date)}
               </td>
