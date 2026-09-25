@@ -3,6 +3,7 @@ import {
   mlb,
 } from "./core";
 import {
+  inRotation,
   type TeamStatCol,
   teamStatNum,
   type TeamStatValue,
@@ -361,17 +362,23 @@ export async function getTeamPlayerStats(
 ): Promise<PlayerStatRow[]> {
   const data = await mlb(
     `/stats?stats=season&group=${group}&season=${season}&teamId=${id}` +
-      `&gameType=${gameType}&sportId=1&playerPool=ALL&limit=200`,
+      `&gameType=${gameType}&sportId=1&playerPool=ALL&limit=200&hydrate=person`,
     1800,
   );
   const columns = playerCols(group);
   const rows = ((data.stats?.[0]?.splits ?? []) as any[]).map(
     (s): PlayerStatRow => {
       const stat = s.stat ?? {};
+      /* A player who hasn't taken the field yet (a pinch hitter, a September
+         call-up) is filed under "X", Unknown — his listed position says more. */
+      const pos = s.position?.abbreviation;
       return {
         id: s.player?.id,
         name: s.player?.fullName ?? "—",
-        position: s.position?.abbreviation ?? "",
+        position:
+          pos && pos !== "X"
+            ? pos
+            : (s.player?.primaryPosition?.abbreviation ?? pos ?? ""),
         values: Object.fromEntries(
           columns.map((c) => [c.key, stat[c.key] ?? null]),
         ),
@@ -379,6 +386,18 @@ export async function getTeamPlayerStats(
     },
   );
   if (group === "fielding") return mergeFielding(rows);
+  /* Every arm arrives as "P"; the pitching table names his job instead, read
+     the same way the roster splits rotation from bullpen. */
+  if (group === "pitching")
+    return rows.map((r) => ({
+      ...r,
+      position: inRotation(
+        teamStatNum(r.values.gamesStarted) ?? 0,
+        teamStatNum(r.values.gamesPlayed) ?? 0,
+      )
+        ? "SP"
+        : "RP",
+    }));
   /* `playerPool=ALL` answers with every pitcher who ever appeared, each with an
      empty batting line. A pitcher belongs on a hitting table only if he
      actually hit — a pinch-hit appearance in a blowout counts, a row of zeros
