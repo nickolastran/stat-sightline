@@ -32,6 +32,10 @@ export interface HeadlineStat {
   label: string;
   /** True where a lower figure is the better one — ERA, losses, errors. */
   low?: boolean;
+  /** Long form, for the tooltip in the stat dropdown. */
+  title?: string;
+  /** The dropdown's label, where its section already says the group. */
+  name?: string;
 }
 
 /** Identity photos across the top, then one row per headline stat with the
@@ -54,10 +58,10 @@ export function CompareHeadline({
 
   const head = cols.map((e) =>
     e ? (
-      <div key={e.id} className="flex flex-col items-center gap-1.5 py-1 normal-case tracking-normal">
+      <div key={e.id} className="flex flex-col items-center gap-2 py-2 normal-case tracking-normal">
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={e.image} alt="" width={40} height={40} className="h-10 w-10" />
-        <Link href={e.href} className="max-w-[8rem] truncate text-ink hover:text-accent">
+        <img src={e.image} alt="" width={64} height={64} className="h-16 w-16" />
+        <Link href={e.href} className="max-w-[12rem] truncate text-sm font-bold text-ink hover:text-accent">
           {e.name}
         </Link>
       </div>
@@ -72,7 +76,7 @@ export function CompareHeadline({
       head={head}
       maxHeight="none"
       align={"c".repeat(cols.length)}
-      widths={cols.map((e) => (e ? "10rem" : "7rem"))}
+      widths={cols.map((e) => (e ? "14rem" : "9rem"))}
     >
       {stats.map((s) => {
         const nums = entities.map((e) => teamStatNum(values[e.id]?.[s.key] ?? null));
@@ -90,7 +94,7 @@ export function CompareHeadline({
                 return (
                   <td
                     key="label"
-                    className={`px-3 py-1.5 text-center text-[10px] tracking-[0.15em] whitespace-nowrap text-ink ${LINE}`}
+                    className={`px-3 py-2 text-center text-[11px] tracking-[0.15em] whitespace-nowrap text-ink ${LINE}`}
                   >
                     {s.label}
                   </td>
@@ -99,7 +103,7 @@ export function CompareHeadline({
               return (
                 <td
                   key={e.id}
-                  className={`px-3 py-1.5 text-center tabular-nums ${LINE} ${
+                  className={`px-3 py-2 text-center text-sm tabular-nums ${LINE} ${
                     win ? "font-bold text-good" : "text-ink-2"
                   }`}
                 >
@@ -206,6 +210,9 @@ function EntityTable({
   return (
     <Table
       fit={fit}
+      /* A fitted table gets one even width per figure, so a short section
+         reads as a tidy block rather than columns sized to their contents. */
+      widths={fit ? ["10rem", ...columns.map(() => "3.75rem")] : undefined}
       head={["", ...columns.map((c) => c.label)]}
       maxHeight="none"
       align={"l" + "r".repeat(columns.length)}
@@ -252,5 +259,73 @@ export function CompareSection({
     <Panel title={title}>
       <EntityTable fit columns={columns} entities={entities} values={values} />
     </Panel>
+  );
+}
+
+/** One titled block of the stat dropdown. */
+export interface StatSection {
+  title: string;
+  stats: HeadlineStat[];
+}
+
+/** The headline's stat chooser: everything comparable, in sections, as one
+ *  tall list. Written to `h` in the URL; the main line when it is absent. */
+export function CompareStatPicker({
+  sections,
+  selected,
+  defaults,
+}: {
+  sections: StatSection[];
+  selected: string[];
+  defaults: string[];
+}) {
+  const setParam = useSetParam();
+  const write = (next: string[]) =>
+    setParam({ h: next.length === 0 || next.join(",") === defaults.join(",") ? null : next.join(",") });
+  const toggle = (key: string) =>
+    write(selected.includes(key) ? selected.filter((k) => k !== key) : [...selected, key]);
+
+  return (
+    <details className="group relative w-fit">
+      <summary className="flex cursor-pointer list-none items-center gap-3 border border-line bg-surface px-3 py-2 text-xs tracking-wider text-ink hover:border-accent">
+        STATS
+        <span className="text-[10px] text-ink-3">{selected.length} SHOWN</span>
+        <span className="text-ink-3 transition-transform group-open:rotate-180">▾</span>
+      </summary>
+      <div className="absolute z-30 mt-px max-h-[70vh] w-80 overflow-y-auto border border-line bg-surface shadow-lg">
+        {sections.map((sec) => (
+          <section key={sec.title}>
+            <h3 className="sticky top-0 border-y border-line bg-surface-2 px-3 py-1.5 text-[10px] font-bold tracking-widest text-ink">
+              {sec.title.toUpperCase()}
+            </h3>
+            <ul className="grid grid-cols-2 gap-x-3 gap-y-1.5 px-3 py-2">
+              {sec.stats.map((st) => (
+                <li key={st.key}>
+                  <label
+                    className="flex cursor-pointer items-center gap-2 text-[11px] text-ink-2 hover:text-ink"
+                    title={st.title}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={selected.includes(st.key)}
+                      onChange={() => toggle(st.key)}
+                      className={CHECKBOX}
+                    />
+                    {st.name ?? st.label}
+                  </label>
+                </li>
+              ))}
+            </ul>
+          </section>
+        ))}
+        <button
+          type="button"
+          onClick={() => write(defaults)}
+          className="sticky bottom-0 w-full border-t border-line bg-surface px-3 py-2 text-[10px] tracking-widest text-ink-3 hover:text-accent"
+        >
+          RESET TO MAIN STATS
+        </button>
+      </div>
+    </details>
   );
 }

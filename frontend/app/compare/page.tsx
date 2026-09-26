@@ -5,9 +5,11 @@ import ComparePicker from "@/components/mlb/ComparePicker";
 import {
   CompareHeadline,
   CompareSection,
+  CompareStatPicker,
   CompareTable,
   type CompareEntity,
   type HeadlineStat,
+  type StatSection,
 } from "@/components/mlb/ComparePanels";
 import {
   EMPTY_CAREER,
@@ -15,14 +17,15 @@ import {
   careerCols,
   getPlayer,
   getPlayerCareer,
+  getPlayerAwards,
   getPlayerGroups,
-  groupOptions,
-  pickPlayerGroup,
   playerHeadshot,
   seasonOf,
   teamStatNum,
   todayPT,
   wholeSeasonRow,
+  type CareerTable,
+  type PlayerAward,
   type PlayerSummary,
   type StatGroup,
   type TeamStatCol,
@@ -45,70 +48,45 @@ export const metadata: Metadata = { title: "Compare Players" };
 const MAX = 4;
 const GROUP_ORDER: StatGroup[] = ["hitting", "pitching", "fielding"];
 
-/* The headline figures per group — a short, hand-picked list rather than the
-   whole column set, since only a known direction (higher or lower is better)
-   can be highlighted safely. Mirrors the fuller CAREER_*_COLS in lib/mlb. */
-const HEADLINE: Record<StatGroup, HeadlineStat[]> = {
-  hitting: [
-    { key: "war", label: "WAR" },
-    { key: "gamesPlayed", label: "G" },
-    { key: "plateAppearances", label: "PA" },
-    { key: "hits", label: "H" },
-    { key: "homeRuns", label: "HR" },
-    { key: "rbi", label: "RBI" },
-    { key: "stolenBases", label: "SB" },
-    { key: "avg", label: "BA" },
-    { key: "obp", label: "OBP" },
-    { key: "slg", label: "SLG" },
-    { key: "ops", label: "OPS" },
-    { key: "opsPlus", label: "OPS+" },
-  ],
-  pitching: [
-    { key: "war", label: "WAR" },
-    { key: "wins", label: "W" },
-    { key: "losses", label: "L", low: true },
-    { key: "era", label: "ERA", low: true },
-    { key: "whip", label: "WHIP", low: true },
-    { key: "gamesPlayed", label: "G" },
-    { key: "gamesStarted", label: "GS" },
-    { key: "saves", label: "SV" },
-    { key: "inningsPitched", label: "IP" },
-    { key: "strikeOuts", label: "SO" },
-    { key: "baseOnBalls", label: "BB", low: true },
-    { key: "eraPlus", label: "ERA+" },
-  ],
-  fielding: [
-    { key: "games", label: "G" },
-    { key: "putOuts", label: "PO" },
-    { key: "assists", label: "A" },
-    { key: "errors", label: "E", low: true },
-    { key: "doublePlays", label: "DP" },
-    { key: "fielding", label: "FPCT" },
-  ],
+/* The headline's default figures per group — the main line. Anything else
+   the page can compare is one pick away in the stat dropdown. */
+const HEADLINE: Record<StatGroup, string[]> = {
+  hitting: ["war", "gamesPlayed", "plateAppearances", "hits", "homeRuns", "rbi", "stolenBases", "avg", "obp", "slg", "ops", "opsPlus"],
+  pitching: ["war", "wins", "losses", "era", "whip", "gamesPlayed", "gamesStarted", "saves", "inningsPitched", "strikeOuts", "baseOnBalls", "eraPlus"],
+  fielding: ["games", "putOuts", "assists", "errors", "doublePlays", "fielding"],
 };
 
-/* The advanced view's own headline. On a career line the rates here read "—"
-   — see getPlayerCareer on why a wRC+ cannot be added up. */
-const ADV_HEADLINE: Record<StatGroup, HeadlineStat[]> = {
-  hitting: [
-    { key: "war", label: "WAR" },
-    { key: "rar", label: "RAR" },
-    { key: "woba", label: "wOBA" },
-    { key: "wRcPlus", label: "wRC+" },
-    { key: "wRaa", label: "wRAA" },
-    { key: "batting", label: "Rbat" },
-    { key: "baseRunning", label: "Rbaser" },
-  ],
-  pitching: [
-    { key: "war", label: "WAR" },
-    { key: "ra9War", label: "RA9-WAR" },
-    { key: "rar", label: "RAR" },
-    { key: "fip", label: "FIP", low: true },
-    { key: "xfip", label: "xFIP", low: true },
-    { key: "fipMinus", label: "FIP-", low: true },
-    { key: "eraMinus", label: "ERA-", low: true },
-  ],
-  fielding: [],
+/* Where a lower figure is the better one. The headline marks the leader of
+   whatever is picked, so it has to know which way each figure runs. */
+const LOW: Record<StatGroup, Set<string>> = {
+  hitting: new Set(["strikeOuts", "caughtStealing", "groundIntoDoublePlay", "kPct", "abPerHr"]),
+  pitching: new Set([
+    "losses", "era", "hits", "runs", "earnedRuns", "homeRuns", "baseOnBalls", "intentionalWalks",
+    "hitBatsmen", "balks", "wildPitches", "whip", "fip", "xfip", "fipMinus", "eraMinus",
+    "hitsPer9Inn", "homeRunsPer9", "walksPer9Inn", "babip", "bbPct", "md",
+  ]),
+  fielding: new Set(["errors"]),
+};
+
+/* Award counts, AL and NL together. A season comparison counts that year's. */
+const AWARD_STATS = [
+  { key: "allStar", label: "All-Star", ids: ["ALAS", "NLAS"] },
+  { key: "mvp", label: "MVP", ids: ["ALMVP", "NLMVP"] },
+  { key: "cy", label: "Cy Young", ids: ["ALCY", "NLCY"] },
+  { key: "roy", label: "ROY", ids: ["ALROY", "NLROY"] },
+  { key: "ss", label: "Silver Slugger", ids: ["ALSS", "NLSS"] },
+  { key: "gg", label: "Gold Glove", ids: ["ALGG", "NLGG"] },
+  { key: "pg", label: "Platinum Glove", ids: ["ALPG", "NLPG"] },
+  { key: "allMlb1", label: "All-MLB 1st", ids: ["MLBAFIRST"] },
+  { key: "allMlb2", label: "All-MLB 2nd", ids: ["MLBSECOND"] },
+  { key: "ws", label: "WS Champion", ids: ["WSCHAMP"] },
+  { key: "wsMvp", label: "WS MVP", ids: ["WSMVP"] },
+];
+
+const GROUP_TITLE: Record<StatGroup, string> = {
+  hitting: "Batting",
+  pitching: "Pitching",
+  fielding: "Fielding",
 };
 
 /* ── The sections under the stats table ──────────────────────────────── */
@@ -149,9 +127,35 @@ const LEAD_KEYS = {
   pitching: ["age", "from", "to", "gamesPlayed", "inningsPitched"],
 };
 
-function sectionCols(group: "hitting" | "pitching", keys: string[]): TeamStatCol[] {
+function colsOf(group: StatGroup, keys: string[]): TeamStatCol[] {
   const all = [...DERIVED_COLS, ...careerCols(group), ...advancedCols(group)];
-  return [...LEAD_KEYS[group], ...keys].map((k) => all.find((c) => c.key === k)!);
+  return keys.map((k) => all.find((c) => c.key === k)!);
+}
+
+const sectionCols = (group: "hitting" | "pitching", keys: string[]) =>
+  colsOf(group, [...LEAD_KEYS[group], ...keys]);
+
+/** One player's line in one group — career or the picked season — with the
+ *  derived figures and the who-and-when columns on it. */
+function lineOf(
+  group: StatGroup,
+  career: CareerTable,
+  p: PlayerSummary,
+  scope: "career" | "season",
+  season: number
+): Record<string, TeamStatValue> | null {
+  const row = scope === "season" ? wholeSeasonRow(career, season) : null;
+  const base = scope === "career" ? career.total : (row?.values ?? null);
+  if (!base) return null;
+  const years = career.rows.map((r) => Number(r.season)).filter(Boolean);
+  return {
+    ...base,
+    ...(group === "fielding" ? {} : derive(group, base)),
+    age: scope === "career" ? p.age : (row?.age ?? null),
+    /* Strings, so a year isn't printed with a thousands comma. */
+    from: String(scope === "career" ? Math.min(...years) : season),
+    to: String(scope === "career" ? Math.max(...years) : season),
+  };
 }
 
 const rate3 = (a: number, b: number) =>
@@ -211,11 +215,10 @@ export default async function ComparePage({
 }: {
   searchParams: Promise<{
     ids?: string;
-    group?: string;
     scope?: string;
     season?: string;
     stats?: string;
-    adv?: string;
+    h?: string;
   }>;
 }) {
   const sp = await searchParams;
@@ -231,34 +234,75 @@ export default async function ComparePage({
     )
   );
   const availableGroups = GROUP_ORDER.filter((g) => groupsByPlayer.some((gs) => gs.includes(g)));
-  const group = availableGroups.length
-    ? pickPlayerGroup(sp.group, availableGroups)
-    : "hitting";
+  /* The main line is batting unless every player is a pitcher; the other
+     groups are still there, one pick away in the stat dropdown. */
+  const group: StatGroup = availableGroups[0] ?? "hitting";
 
-  const careers = await Promise.all(
-    players.map((p) => getPlayerCareer(p.id, group).catch(() => EMPTY_CAREER))
-  );
+  const [careerLists, awards] = await Promise.all([
+    Promise.all(
+      availableGroups.map((g) =>
+        Promise.all(players.map((p) => getPlayerCareer(p.id, g).catch(() => EMPTY_CAREER)))
+      )
+    ),
+    Promise.all(players.map((p) => getPlayerAwards(p.id).catch((): PlayerAward[] => []))),
+  ]);
+  const careersOf = (g: StatGroup) =>
+    careerLists[availableGroups.indexOf(g)] ?? players.map(() => EMPTY_CAREER);
 
   const scope = sp.scope === "season" ? "season" : "career";
   const allSeasons = [
-    ...new Set(careers.flatMap((c) => c.rows.map((r) => Number(r.season)))),
+    ...new Set(careerLists.flat().flatMap((c) => c.rows.map((r) => Number(r.season)))),
   ].sort((a, b) => b - a);
   const season = pickSeason(sp.season, allSeasons, current);
 
+  /* The tables below read the main group's line under its own keys; the
+     headline reads every group at once, so its keys carry the group. */
   const values: Record<number, Record<string, TeamStatValue> | null> = {};
+  const picked: Record<number, Record<string, TeamStatValue> | null> = {};
   players.forEach((p, i) => {
-    const row = scope === "season" ? wholeSeasonRow(careers[i], season) : null;
-    const base = scope === "career" ? careers[i].total : (row?.values ?? null);
-    const years = careers[i].rows.map((r) => Number(r.season)).filter(Boolean);
-    values[p.id] = base && {
-      ...base,
-      ...derive(group, base),
-      age: scope === "career" ? p.age : (row?.age ?? null),
-      /* Strings, so a year isn't printed with a thousands comma. */
-      from: String(scope === "career" ? Math.min(...years) : season),
-      to: String(scope === "career" ? Math.max(...years) : season),
-    };
+    values[p.id] = lineOf(group, careersOf(group)[i], p, scope, season);
+    const out: Record<string, TeamStatValue> = {};
+    for (const g of availableGroups) {
+      const line = lineOf(g, careersOf(g)[i], p, scope, season);
+      for (const [k, v] of Object.entries(line ?? {})) out[`${g}:${k}`] = v;
+    }
+    const won = awards[i].filter((a) => scope === "career" || a.season === String(season));
+    for (const a of AWARD_STATS) out[`awards:${a.key}`] = won.filter((w) => a.ids.includes(w.id)).length;
+    picked[p.id] = out;
   });
+
+  /* Everything the headline can compare, in the dropdown's sections. A figure
+     from outside the main group says which group it is — "H (P)" is hits
+     allowed, not hits. */
+  const tag = (g: StatGroup) => (g === group ? "" : ` (${GROUP_TITLE[g][0]})`);
+  const opt = (g: StatGroup, c: TeamStatCol): HeadlineStat => ({
+    key: `${g}:${c.key}`,
+    label: c.label + tag(g),
+    name: c.label,
+    title: c.title,
+    low: LOW[g].has(c.key),
+  });
+  const bp = availableGroups.filter((g): g is "hitting" | "pitching" => g !== "fielding");
+  const sub = (g: StatGroup) => (bp.length > 1 ? ` · ${GROUP_TITLE[g]}` : "");
+  const sections: StatSection[] = [
+    ...availableGroups.map((g) => ({ title: GROUP_TITLE[g], stats: careerCols(g).map((c) => opt(g, c)) })),
+    ...bp.map((g) => ({
+      title: `Sabermetrics${sub(g)}`,
+      stats: colsOf(g, SECTION_KEYS[g].saber).map((c) => opt(g, c)),
+    })),
+    ...bp.map((g) => ({
+      title: `Value${sub(g)}`,
+      stats: colsOf(g, SECTION_KEYS[g].value).map((c) => opt(g, c)),
+    })),
+    {
+      title: "Awards",
+      stats: AWARD_STATS.map((a) => ({ key: `awards:${a.key}`, label: a.label, title: a.label })),
+    },
+  ];
+  const byKey = new Map(sections.flatMap((sec) => sec.stats.map((st) => [st.key, st])));
+  const defaults = HEADLINE[group].map((k) => `${group}:${k}`);
+  const chosen = (sp.h ? sp.h.split(",") : defaults).filter((k) => byKey.has(k));
+  const headline = (chosen.length ? chosen : defaults).map((k) => byKey.get(k)!).filter(Boolean);
 
   const entities: CompareEntity[] = players.map((p) => ({
     id: p.id,
@@ -268,10 +312,6 @@ export default async function ComparePage({
   }));
   const slots = entities;
   const selectedStats = sp.stats ? sp.stats.split(",").filter(Boolean) : [];
-  /* There is no advanced fielding line to switch to, so that tab never offers
-     the toggle — and a URL asking for one anyway reads as the standard view. */
-  const hasAdvanced = advancedCols(group).length > 0;
-  const advanced = hasAdvanced && sp.adv === "1";
 
   return (
     <div className="mx-auto max-w-[96rem] space-y-3 p-3">
@@ -303,37 +343,14 @@ export default async function ComparePage({
         </p>
       ) : (
         <>
-          {(availableGroups.length > 1 || hasAdvanced) && (
-            <div className="flex flex-wrap items-center gap-3 border border-line bg-surface px-3 py-2">
-              {availableGroups.length > 1 && (
-                <ParamTabs
-                  param="group"
-                  ariaLabel="Stat group"
-                  value={group}
-                  options={groupOptions(availableGroups)}
-                />
-              )}
-              {hasAdvanced && (
-                <ParamTabs
-                  param="adv"
-                  ariaLabel="Standard or advanced stats"
-                  value={advanced ? "1" : "0"}
-                  options={[
-                    { value: "0", label: "STANDARD" },
-                    { value: "1", label: "ADVANCED" },
-                  ]}
-                />
-              )}
-            </div>
-          )}
-
-          <CompareHeadline
-            entities={entities}
-            stats={advanced ? ADV_HEADLINE[group] : HEADLINE[group]}
-            values={values}
+          <CompareStatPicker
+            sections={sections}
+            selected={headline.map((st) => st.key)}
+            defaults={defaults}
           />
+          <CompareHeadline entities={entities} stats={headline} values={picked} />
           <CompareTable
-            columns={advanced ? advancedCols(group) : careerCols(group)}
+            columns={careerCols(group)}
             selected={selectedStats}
             entities={entities}
             values={values}
