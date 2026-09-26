@@ -4,6 +4,7 @@ import SeasonSelect from "@/components/mlb/SeasonSelect";
 import ComparePicker from "@/components/mlb/ComparePicker";
 import {
   CompareHeadline,
+  CompareSection,
   CompareTable,
   type CompareEntity,
   type HeadlineStat,
@@ -19,10 +20,12 @@ import {
   pickPlayerGroup,
   playerHeadshot,
   seasonOf,
+  teamStatNum,
   todayPT,
   wholeSeasonRow,
   type PlayerSummary,
   type StatGroup,
+  type TeamStatCol,
   type TeamStatValue,
 } from "@/lib/mlb";
 
@@ -108,6 +111,85 @@ const ADV_HEADLINE: Record<StatGroup, HeadlineStat[]> = {
   fielding: [],
 };
 
+/* ── The sections under the stats table ──────────────────────────────── */
+
+/* Baseball-Reference's comparison layout: who and when, then one block of
+   value figures and one of sabermetric ones. Its fourth block, win
+   probability, has no feed behind it here — MLB serves no WPA or RE24. */
+const DERIVED_COLS: TeamStatCol[] = [
+  { key: "age", label: "Age", title: "Age — now on a career line, that season's on one year" },
+  { key: "from", label: "From", title: "First season on the line" },
+  { key: "to", label: "To", title: "Last season on the line" },
+  { key: "xbh", label: "XBH", title: "Extra-base hits" },
+  { key: "tob", label: "TOB", title: "Times on base — hits, walks and hit-by-pitches" },
+  { key: "iso", label: "ISO", title: "Isolated power — slugging less batting average" },
+  { key: "babip", label: "BAbip", title: "Batting average on balls in play" },
+  { key: "kPct", label: "SO%", title: "Strikeouts per plate appearance" },
+  { key: "bbPct", label: "BB%", title: "Walks per plate appearance" },
+  { key: "kMinusBb", label: "SO-BB%", title: "Strikeout rate less walk rate" },
+  { key: "abPerSo", label: "AB/SO", title: "At-bats per strikeout" },
+  { key: "abPerHr", label: "AB/HR", title: "At-bats per home run" },
+  { key: "sbPct", label: "SB%", title: "Stolen-base success rate" },
+];
+
+const SECTION_KEYS: Record<"hitting" | "pitching", { value: string[]; saber: string[] }> = {
+  hitting: {
+    value: ["war", "rar", "wRaa", "batting", "baseRunning", "positional", "replacement", "ubr", "wSb", "wGdp"],
+    saber: ["xbh", "tob", "iso", "babip", "kPct", "bbPct", "abPerSo", "abPerHr", "sbPct", "woba", "wRc", "wRcPlus", "spd"],
+  },
+  pitching: {
+    value: ["war", "ra9War", "rar"],
+    saber: ["fip", "xfip", "fipMinus", "eraMinus", "babip", "kPct", "bbPct", "kMinusBb", "pli", "gmli", "sd", "md"],
+  },
+};
+
+/** Who and when, ahead of every section — BR's Age / From / To / G / PA. */
+const LEAD_KEYS = {
+  hitting: ["age", "from", "to", "gamesPlayed", "plateAppearances"],
+  pitching: ["age", "from", "to", "gamesPlayed", "inningsPitched"],
+};
+
+function sectionCols(group: "hitting" | "pitching", keys: string[]): TeamStatCol[] {
+  const all = [...DERIVED_COLS, ...careerCols(group), ...advancedCols(group)];
+  return [...LEAD_KEYS[group], ...keys].map((k) => all.find((c) => c.key === k)!);
+}
+
+const rate3 = (a: number, b: number) =>
+  b > 0 ? (a / b).toFixed(3).replace(/^(-?)0\./, "$1.") : null;
+const pct = (a: number, b: number) => (b > 0 ? ((100 * a) / b).toFixed(1) : null);
+const per = (a: number, b: number) => (b > 0 ? (a / b).toFixed(1) : null);
+
+/** The sabermetric figures that are plain arithmetic on the counting line —
+ *  worked out here rather than fetched, so a career line gets them too. */
+function derive(group: StatGroup, v: Record<string, TeamStatValue>): Record<string, TeamStatValue> {
+  const n = (k: string) => teamStatNum(v[k] ?? null) ?? 0;
+  const babip = rate3(
+    n("hits") - n("homeRuns"),
+    n("atBats") - n("strikeOuts") - n("homeRuns") + n("sacFlies")
+  );
+  if (group === "pitching") {
+    const bf = n("battersFaced");
+    return {
+      babip,
+      kPct: pct(n("strikeOuts"), bf),
+      bbPct: pct(n("baseOnBalls"), bf),
+      kMinusBb: pct(n("strikeOuts") - n("baseOnBalls"), bf),
+    };
+  }
+  const pa = n("plateAppearances");
+  return {
+    xbh: n("doubles") + n("triples") + n("homeRuns"),
+    tob: n("hits") + n("baseOnBalls") + n("hitByPitch"),
+    iso: rate3(n("totalBases") - n("hits"), n("atBats")),
+    babip,
+    kPct: pct(n("strikeOuts"), pa),
+    bbPct: pct(n("baseOnBalls"), pa),
+    abPerSo: per(n("atBats"), n("strikeOuts")),
+    abPerHr: per(n("atBats"), n("homeRuns")),
+    sbPct: pct(n("stolenBases"), n("stolenBases") + n("caughtStealing")),
+  };
+}
+
 function parseIds(raw: string | undefined): number[] {
   const ids = (raw ?? "")
     .split(",")
@@ -165,8 +247,17 @@ export default async function ComparePage({
 
   const values: Record<number, Record<string, TeamStatValue> | null> = {};
   players.forEach((p, i) => {
-    values[p.id] =
-      scope === "career" ? careers[i].total : (wholeSeasonRow(careers[i], season)?.values ?? null);
+    const row = scope === "season" ? wholeSeasonRow(careers[i], season) : null;
+    const base = scope === "career" ? careers[i].total : (row?.values ?? null);
+    const years = careers[i].rows.map((r) => Number(r.season)).filter(Boolean);
+    values[p.id] = base && {
+      ...base,
+      ...derive(group, base),
+      age: scope === "career" ? p.age : (row?.age ?? null),
+      /* Strings, so a year isn't printed with a thousands comma. */
+      from: String(scope === "career" ? Math.min(...years) : season),
+      to: String(scope === "career" ? Math.max(...years) : season),
+    };
   });
 
   const entities: CompareEntity[] = players.map((p) => ({
@@ -247,6 +338,22 @@ export default async function ComparePage({
             entities={entities}
             values={values}
           />
+          {group !== "fielding" && (
+            <>
+              <CompareSection
+                title="Value"
+                columns={sectionCols(group, SECTION_KEYS[group].value)}
+                entities={entities}
+                values={values}
+              />
+              <CompareSection
+                title="Sabermetric"
+                columns={sectionCols(group, SECTION_KEYS[group].saber)}
+                entities={entities}
+                values={values}
+              />
+            </>
+          )}
         </>
       )}
     </div>

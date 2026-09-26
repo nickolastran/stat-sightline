@@ -154,7 +154,7 @@ export function CompareTable({
 
   return (
     <Panel
-      title="STATS"
+      title="Stats"
       right={
         <button
           type="button"
@@ -185,36 +185,72 @@ export function CompareTable({
           ))}
         </ul>
       )}
-      <Table
-        head={["", ...shown.map((c) => c.label)]}
-        maxHeight="none"
-        align={"l" + "r".repeat(shown.length)}
-        dense
-      >
-        {entities.length === 0 && (
-          <Empty what="ADD ENTITIES TO COMPARE" cols={shown.length + 1} />
-        )}
-        {entities.map((e) => (
-          <Row key={e.id}>
-            <td className="border-r border-grid px-1 py-1 whitespace-nowrap">
-              <Link href={e.href} className="flex items-center gap-1.5 text-ink hover:text-accent">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={e.image} alt="" width={18} height={18} className="h-[18px] w-[18px] shrink-0" />
-                <span className="truncate">{e.name}</span>
-              </Link>
+      <EntityTable columns={shown} entities={entities} values={values} />
+    </Panel>
+  );
+}
+
+/** One row per entity under a fixed set of columns — the stats table's body,
+ *  and on its own the value and sabermetric sections under it. */
+function EntityTable({
+  columns,
+  entities,
+  values,
+  fit = false,
+}: {
+  fit?: boolean;
+  columns: TeamStatCol[];
+  entities: CompareEntity[];
+  values: Record<number, Record<string, TeamStatValue> | null>;
+}) {
+  return (
+    <Table
+      fit={fit}
+      head={["", ...columns.map((c) => c.label)]}
+      maxHeight="none"
+      align={"l" + "r".repeat(columns.length)}
+      dense
+    >
+      {entities.length === 0 && <Empty what="ADD ENTITIES TO COMPARE" cols={columns.length + 1} />}
+      {entities.map((e) => (
+        <Row key={e.id}>
+          <td className="border-r border-grid px-1 py-1 whitespace-nowrap">
+            <Link href={e.href} className="flex items-center gap-1.5 text-ink hover:text-accent">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={e.image} alt="" width={18} height={18} className="h-[18px] w-[18px] shrink-0" />
+              <span className="truncate">{e.name}</span>
+            </Link>
+          </td>
+          {columns.map((c) => (
+            <td
+              key={c.key}
+              title={c.title}
+              className="border-r border-grid pl-0.5 pr-2 py-1 text-right text-[12px] tabular-nums text-ink-2 last:border-r-0"
+            >
+              {values[e.id] ? teamStatText(values[e.id]![c.key] ?? null) : "—"}
             </td>
-            {shown.map((c) => (
-              <td
-                key={c.key}
-                title={c.title}
-                className="border-r border-grid pl-0.5 pr-2 py-1 text-right text-[12px] tabular-nums text-ink-2 last:border-r-0"
-              >
-                {values[e.id] ? teamStatText(values[e.id]![c.key]) : "—"}
-              </td>
-            ))}
-          </Row>
-        ))}
-      </Table>
+          ))}
+        </Row>
+      ))}
+    </Table>
+  );
+}
+
+/** A titled table with no column picker — the fixed sections under the stats. */
+export function CompareSection({
+  title,
+  columns,
+  entities,
+  values,
+}: {
+  title: string;
+  columns: TeamStatCol[];
+  entities: CompareEntity[];
+  values: Record<number, Record<string, TeamStatValue> | null>;
+}) {
+  return (
+    <Panel title={title}>
+      <EntityTable fit columns={columns} entities={entities} values={values} />
     </Panel>
   );
 }
