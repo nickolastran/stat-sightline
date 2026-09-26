@@ -3,7 +3,6 @@
 import { useState } from "react";
 import Link from "next/link";
 import Panel from "@/components/ui/Panel";
-import Glossary from "@/components/mlb/Glossary";
 import { Table, Row, Empty } from "@/components/ui/StatTable";
 import { useSetParam } from "@/lib/useSetParam";
 import {
@@ -33,6 +32,10 @@ export interface HeadlineStat {
   label: string;
   /** True where a lower figure is the better one — ERA, losses, errors. */
   low?: boolean;
+  /** Long form, for the tooltip in the stat dropdown. */
+  title?: string;
+  /** The dropdown's label, where its section already says the group. */
+  name?: string;
 }
 
 /** Identity photos across the top, then one row per headline stat with the
@@ -47,24 +50,34 @@ export function CompareHeadline({
   stats: HeadlineStat[];
   values: Record<number, Record<string, TeamStatValue> | null>;
 }) {
-  const head = [
-    "",
-    ...entities.map((e) => (
-      <Link
-        key={e.id}
-        href={e.href}
-        className="flex flex-col items-center gap-1.5 py-1 normal-case tracking-normal hover:text-accent"
-      >
+  /* Column order: a head-to-head pair reads either side of the labels, any
+     other count lines the labels up down the left. `null` is the label. */
+  const cols: (CompareEntity | null)[] =
+    entities.length === 2 ? [entities[0], null, entities[1]] : [null, ...entities];
+  const LINE = "border-r border-grid last:border-r-0";
+
+  const head = cols.map((e) =>
+    e ? (
+      <div key={e.id} className="flex flex-col items-center gap-2 py-2 normal-case tracking-normal">
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={e.image} alt="" width={40} height={40} className="h-10 w-10" />
-        <span className="max-w-[8rem] truncate text-ink">{e.name}</span>
-      </Link>
-    )),
-  ];
+        <img src={e.image} alt="" width={64} height={64} className="h-16 w-16" />
+        <Link href={e.href} className="max-w-[12rem] truncate text-sm font-bold text-ink hover:text-accent">
+          {e.name}
+        </Link>
+      </div>
+    ) : (
+      ""
+    )
+  );
 
   return (
-    <Table head={head} maxHeight="none" align={"l" + "c".repeat(entities.length)}>
-      {entities.length === 0 && <Empty what="ADD ENTITIES TO COMPARE" cols={1} />}
+    <Table
+      fit
+      head={head}
+      maxHeight="none"
+      align={"c".repeat(cols.length)}
+      widths={cols.map((e) => (e ? "14rem" : "9rem"))}
+    >
       {stats.map((s) => {
         const nums = entities.map((e) => teamStatNum(values[e.id]?.[s.key] ?? null));
         const present = nums.filter((n): n is number => n !== null);
@@ -76,15 +89,21 @@ export function CompareHeadline({
 
         return (
           <Row key={s.key}>
-            <td className="px-3 py-1.5 text-[10px] tracking-[0.15em] whitespace-nowrap text-ink-3">
-              {s.label}
-            </td>
-            {entities.map((e, i) => {
-              const win = split && nums[i] === best;
+            {cols.map((e) => {
+              if (!e)
+                return (
+                  <td
+                    key="label"
+                    className={`px-3 py-2 text-center text-[11px] tracking-[0.15em] whitespace-nowrap text-ink ${LINE}`}
+                  >
+                    {s.label}
+                  </td>
+                );
+              const win = split && nums[entities.indexOf(e)] === best;
               return (
                 <td
                   key={e.id}
-                  className={`px-3 py-1.5 text-center tabular-nums ${
+                  className={`px-3 py-2 text-center text-sm tabular-nums ${LINE} ${
                     win ? "font-bold text-good" : "text-ink-2"
                   }`}
                 >
@@ -138,71 +157,175 @@ export function CompareTable({
   };
 
   return (
-    <div className="space-y-3">
-      <Panel
-        title="STATS"
-        right={
-          <button
-            type="button"
-            onClick={() => setOpen((o) => !o)}
-            className="rounded border border-line px-1.5 py-0.5 text-[10px] tracking-wider text-ink-3 hover:border-accent hover:text-ink"
-          >
-            {open ? "HIDE COLUMNS" : "CHOOSE COLUMNS"}
-          </button>
-        }
-      >
-        {open && (
-          <ul className="mb-3 grid grid-cols-2 gap-1.5 border-b border-line pb-3 sm:grid-cols-3 lg:grid-cols-4">
-            {columns.map((c) => (
-              <li key={c.key}>
-                <label
-                  className="flex cursor-pointer items-center gap-2 text-[11px] text-ink-2 hover:text-ink"
-                  title={c.title}
-                >
-                  <input
-                    type="checkbox"
-                    checked={shown.includes(c)}
-                    onChange={() => toggle(c.key)}
-                    className={CHECKBOX}
-                  />
-                  {c.label}
-                </label>
-              </li>
-            ))}
-          </ul>
-        )}
-        <Table
-          head={["", ...shown.map((c) => c.label)]}
-          maxHeight="none"
-          align={"l" + "r".repeat(shown.length)}
-          dense
+    <Panel
+      title="Stats"
+      right={
+        <button
+          type="button"
+          onClick={() => setOpen((o) => !o)}
+          className="rounded border border-line px-1.5 py-0.5 text-[10px] tracking-wider text-ink-3 hover:border-accent hover:text-ink"
         >
-          {entities.length === 0 && (
-            <Empty what="ADD ENTITIES TO COMPARE" cols={shown.length + 1} />
-          )}
-          {entities.map((e) => (
-            <Row key={e.id}>
-              <td className="px-1 py-1 whitespace-nowrap">
-                <Link href={e.href} className="flex items-center gap-1.5 text-ink hover:text-accent">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={e.image} alt="" width={18} height={18} className="h-[18px] w-[18px] shrink-0" />
-                  <span className="truncate">{e.name}</span>
-                </Link>
-              </td>
-              {shown.map((c) => (
-                <td
-                  key={c.key}
-                  title={c.title}
-                  className="border-r border-grid pl-0.5 pr-2 py-1 text-right text-[12px] tabular-nums text-ink-2 last:border-r-0"
-                >
-                  {values[e.id] ? teamStatText(values[e.id]![c.key]) : "—"}
-                </td>
-              ))}
-            </Row>
+          {open ? "HIDE COLUMNS" : "CHOOSE COLUMNS"}
+        </button>
+      }
+    >
+      {open && (
+        <ul className="mb-3 grid grid-cols-2 gap-1.5 border-b border-line pb-3 sm:grid-cols-3 lg:grid-cols-4">
+          {columns.map((c) => (
+            <li key={c.key}>
+              <label
+                className="flex cursor-pointer items-center gap-2 text-[11px] text-ink-2 hover:text-ink"
+                title={c.title}
+              >
+                <input
+                  type="checkbox"
+                  checked={shown.includes(c)}
+                  onChange={() => toggle(c.key)}
+                  className={CHECKBOX}
+                />
+                {c.label}
+              </label>
+            </li>
           ))}
-        </Table>
-      </Panel>
-      <Glossary entries={shown.map((c) => ({ label: c.label, title: c.title }))} />
-    </div>
+        </ul>
+      )}
+      <EntityTable columns={shown} entities={entities} values={values} />
+    </Panel>
+  );
+}
+
+/** One row per entity under a fixed set of columns — the stats table's body,
+ *  and on its own the value and sabermetric sections under it. */
+function EntityTable({
+  columns,
+  entities,
+  values,
+  fit = false,
+}: {
+  fit?: boolean;
+  columns: TeamStatCol[];
+  entities: CompareEntity[];
+  values: Record<number, Record<string, TeamStatValue> | null>;
+}) {
+  return (
+    <Table
+      fit={fit}
+      /* A fitted table gets one even width per figure, so a short section
+         reads as a tidy block rather than columns sized to their contents. */
+      widths={fit ? ["10rem", ...columns.map(() => "3.75rem")] : undefined}
+      head={["", ...columns.map((c) => c.label)]}
+      maxHeight="none"
+      align={"l" + "r".repeat(columns.length)}
+      dense
+    >
+      {entities.length === 0 && <Empty what="ADD ENTITIES TO COMPARE" cols={columns.length + 1} />}
+      {entities.map((e) => (
+        <Row key={e.id}>
+          <td className="border-r border-grid px-1 py-1 whitespace-nowrap">
+            <Link href={e.href} className="flex items-center gap-1.5 text-ink hover:text-accent">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={e.image} alt="" width={18} height={18} className="h-[18px] w-[18px] shrink-0" />
+              <span className="truncate">{e.name}</span>
+            </Link>
+          </td>
+          {columns.map((c) => (
+            <td
+              key={c.key}
+              title={c.title}
+              className="border-r border-grid pl-0.5 pr-2 py-1 text-right text-[12px] tabular-nums text-ink-2 last:border-r-0"
+            >
+              {values[e.id] ? teamStatText(values[e.id]![c.key] ?? null) : "—"}
+            </td>
+          ))}
+        </Row>
+      ))}
+    </Table>
+  );
+}
+
+/** A titled table with no column picker — the fixed sections under the stats. */
+export function CompareSection({
+  title,
+  columns,
+  entities,
+  values,
+}: {
+  title: string;
+  columns: TeamStatCol[];
+  entities: CompareEntity[];
+  values: Record<number, Record<string, TeamStatValue> | null>;
+}) {
+  return (
+    <Panel title={title}>
+      <EntityTable fit columns={columns} entities={entities} values={values} />
+    </Panel>
+  );
+}
+
+/** One titled block of the stat dropdown. */
+export interface StatSection {
+  title: string;
+  stats: HeadlineStat[];
+}
+
+/** The headline's stat chooser: everything comparable, in sections, as one
+ *  tall list. Written to `h` in the URL; the main line when it is absent. */
+export function CompareStatPicker({
+  sections,
+  selected,
+  defaults,
+}: {
+  sections: StatSection[];
+  selected: string[];
+  defaults: string[];
+}) {
+  const setParam = useSetParam();
+  const write = (next: string[]) =>
+    setParam({ h: next.length === 0 || next.join(",") === defaults.join(",") ? null : next.join(",") });
+  const toggle = (key: string) =>
+    write(selected.includes(key) ? selected.filter((k) => k !== key) : [...selected, key]);
+
+  return (
+    <details className="group relative w-fit">
+      <summary className="flex cursor-pointer list-none items-center gap-3 border border-line bg-surface px-3 py-2 text-xs tracking-wider text-ink hover:border-accent">
+        STATS
+        <span className="text-[10px] text-ink-3">{selected.length} SHOWN</span>
+        <span className="text-ink-3 transition-transform group-open:rotate-180">▾</span>
+      </summary>
+      <div className="absolute z-30 mt-px max-h-[70vh] w-80 overflow-y-auto border border-line bg-surface shadow-lg">
+        {sections.map((sec) => (
+          <section key={sec.title}>
+            <h3 className="sticky top-0 border-y border-line bg-surface-2 px-3 py-1.5 text-[10px] font-bold tracking-widest text-ink">
+              {sec.title.toUpperCase()}
+            </h3>
+            <ul className="grid grid-cols-2 gap-x-3 gap-y-1.5 px-3 py-2">
+              {sec.stats.map((st) => (
+                <li key={st.key}>
+                  <label
+                    className="flex cursor-pointer items-center gap-2 text-[11px] text-ink-2 hover:text-ink"
+                    title={st.title}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={selected.includes(st.key)}
+                      onChange={() => toggle(st.key)}
+                      className={CHECKBOX}
+                    />
+                    {st.name ?? st.label}
+                  </label>
+                </li>
+              ))}
+            </ul>
+          </section>
+        ))}
+        <button
+          type="button"
+          onClick={() => write(defaults)}
+          className="sticky bottom-0 w-full border-t border-line bg-surface px-3 py-2 text-[10px] tracking-widest text-ink-3 hover:text-accent"
+        >
+          RESET TO MAIN STATS
+        </button>
+      </div>
+    </details>
   );
 }

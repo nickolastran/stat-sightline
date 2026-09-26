@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useTypeahead } from "@/lib/useTypeahead";
 import { useSetParam } from "@/lib/useSetParam";
-import type { SearchHit } from "@/lib/mlb";
+import { playerHeadshot, teamLogo, type SearchHit } from "@/lib/mlb";
 
 /*
  * Up to `max` slots of one kind — players or teams — read and written as the
@@ -41,7 +41,9 @@ export default function ComparePicker({
   const remove = (id: number) => setIds(ids.filter((i) => i !== id));
 
   async function search(query: string): Promise<SearchHit[]> {
-    const res = await fetch(`/api/search?q=${encodeURIComponent(query)}`);
+    /* Players only from those with an MLB game — a prospect has no line here. */
+    const mlbOnly = kind === "player" ? "&mlb" : "";
+    const res = await fetch(`/api/search?q=${encodeURIComponent(query)}${mlbOnly}`);
     if (!res.ok) throw new Error(String(res.status));
     const hits = ((await res.json()).hits ?? []) as SearchHit[];
     return hits.filter((h) => h.kind === kind && !ids.includes(h.id));
@@ -112,6 +114,15 @@ export default function ComparePicker({
                       i === t.active ? "bg-surface-2 text-ink" : "text-ink-2"
                     }`}
                   >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={kind === "team" ? teamLogo(hit.id) : playerHeadshot(hit.id)}
+                      alt=""
+                      width={20}
+                      height={20}
+                      loading="lazy"
+                      className="h-5 w-5 shrink-0"
+                    />
                     <span className="truncate">{hit.name}</span>
                     {hit.detail && (
                       <span className="ml-auto shrink-0 truncate text-[10px] text-ink-3">

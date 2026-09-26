@@ -6,9 +6,10 @@ import { searchAll } from "@/lib/mlb";
  * cross-origin surface while reusing lib/mlb's cached server fetch.
  */
 export async function GET(req: Request) {
-  const q = new URL(req.url).searchParams.get("q") ?? "";
+  const params = new URL(req.url).searchParams;
+  const q = params.get("q") ?? "";
   try {
-    return Response.json({ hits: await searchAll(q) });
+    return Response.json({ hits: await searchAll(q, 8, params.has("mlb")) });
   } catch {
     return Response.json({ hits: [], error: true }, { status: 502 });
   }
