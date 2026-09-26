@@ -47,24 +47,34 @@ export function CompareHeadline({
   stats: HeadlineStat[];
   values: Record<number, Record<string, TeamStatValue> | null>;
 }) {
-  const head = [
-    "",
-    ...entities.map((e) => (
-      <Link
-        key={e.id}
-        href={e.href}
-        className="flex flex-col items-center gap-1.5 py-1 normal-case tracking-normal hover:text-accent"
-      >
+  /* Column order: a head-to-head pair reads either side of the labels, any
+     other count lines the labels up down the left. `null` is the label. */
+  const cols: (CompareEntity | null)[] =
+    entities.length === 2 ? [entities[0], null, entities[1]] : [null, ...entities];
+  const LINE = "border-r border-grid last:border-r-0";
+
+  const head = cols.map((e) =>
+    e ? (
+      <div key={e.id} className="flex flex-col items-center gap-1.5 py-1 normal-case tracking-normal">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={e.image} alt="" width={40} height={40} className="h-10 w-10" />
-        <span className="max-w-[8rem] truncate text-ink">{e.name}</span>
-      </Link>
-    )),
-  ];
+        <Link href={e.href} className="max-w-[8rem] truncate text-ink hover:text-accent">
+          {e.name}
+        </Link>
+      </div>
+    ) : (
+      ""
+    )
+  );
 
   return (
-    <Table head={head} maxHeight="none" align={"l" + "c".repeat(entities.length)}>
-      {entities.length === 0 && <Empty what="ADD ENTITIES TO COMPARE" cols={1} />}
+    <Table
+      fit
+      head={head}
+      maxHeight="none"
+      align={"c".repeat(cols.length)}
+      widths={cols.map((e) => (e ? "10rem" : "7rem"))}
+    >
       {stats.map((s) => {
         const nums = entities.map((e) => teamStatNum(values[e.id]?.[s.key] ?? null));
         const present = nums.filter((n): n is number => n !== null);
@@ -76,15 +86,21 @@ export function CompareHeadline({
 
         return (
           <Row key={s.key}>
-            <td className="px-3 py-1.5 text-[10px] tracking-[0.15em] whitespace-nowrap text-ink-3">
-              {s.label}
-            </td>
-            {entities.map((e, i) => {
-              const win = split && nums[i] === best;
+            {cols.map((e) => {
+              if (!e)
+                return (
+                  <td
+                    key="label"
+                    className={`px-3 py-1.5 text-center text-[10px] tracking-[0.15em] whitespace-nowrap text-ink ${LINE}`}
+                  >
+                    {s.label}
+                  </td>
+                );
+              const win = split && nums[entities.indexOf(e)] === best;
               return (
                 <td
                   key={e.id}
-                  className={`px-3 py-1.5 text-center tabular-nums ${
+                  className={`px-3 py-1.5 text-center tabular-nums ${LINE} ${
                     win ? "font-bold text-good" : "text-ink-2"
                   }`}
                 >

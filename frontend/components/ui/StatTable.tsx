@@ -20,6 +20,7 @@ export function Table({
   widths,
   groups,
   dense = false,
+  fit = false,
 }: {
   /** Column labels; anything after the first is right-aligned. Empty for a
       table that heads its own sections and would only repeat itself. A plain
@@ -39,11 +40,14 @@ export function Table({
   /** Tighter padding and letter-spacing, for a table with enough columns that
       the ordinary chrome would push it off the page — the career line. */
   dense?: boolean;
+  /** Size to the columns rather than the page — the compare headline, which
+      should grow a column at a time as players are added. */
+  fit?: boolean;
 }) {
   return (
-    <div className="overflow-auto border border-line" style={{ maxHeight }}>
+    <div className={`overflow-auto border border-line ${fit ? "w-fit max-w-full" : ""}`} style={{ maxHeight }}>
       <table
-        className={`w-full border-collapse text-xs ${widths ? "table-fixed" : ""}`}
+        className={`${fit ? "w-max" : "w-full"} border-collapse text-xs ${widths ? "table-fixed" : ""}`}
       >
         {widths && (
           <colgroup>
