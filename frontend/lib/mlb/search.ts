@@ -66,8 +66,10 @@ export async function getClubs(): Promise<Club[]> {
  * minor leaguers and long-retired players alongside the major leaguer almost
  * everyone means. Current major leaguers are floated to the top rather than
  * filtered out, since a search for a retired great should still find him.
+ * `mlbOnly` drops anyone without a big-league debut — the compare page, where
+ * a prospect with no MLB line has nothing to compare.
  */
-export async function searchAll(q: string, limit = 8): Promise<SearchHit[]> {
+export async function searchAll(q: string, limit = 8, mlbOnly = false): Promise<SearchHit[]> {
   const needle = q.trim().toLowerCase();
   if (!needle) return [];
 
@@ -98,6 +100,7 @@ export async function searchAll(q: string, limit = 8): Promise<SearchHit[]> {
 
   const major = new Set(teams.map((t) => t.id));
   const playerHits = people
+    .filter((p) => !mlbOnly || p.mlbDebutDate)
     .map((p) => ({
       kind: "player" as const,
       id: p.id,

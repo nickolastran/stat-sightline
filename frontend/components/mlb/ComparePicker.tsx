@@ -41,7 +41,9 @@ export default function ComparePicker({
   const remove = (id: number) => setIds(ids.filter((i) => i !== id));
 
   async function search(query: string): Promise<SearchHit[]> {
-    const res = await fetch(`/api/search?q=${encodeURIComponent(query)}`);
+    /* Players only from those with an MLB game — a prospect has no line here. */
+    const mlbOnly = kind === "player" ? "&mlb" : "";
+    const res = await fetch(`/api/search?q=${encodeURIComponent(query)}${mlbOnly}`);
     if (!res.ok) throw new Error(String(res.status));
     const hits = ((await res.json()).hits ?? []) as SearchHit[];
     return hits.filter((h) => h.kind === kind && !ids.includes(h.id));
