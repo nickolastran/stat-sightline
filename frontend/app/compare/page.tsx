@@ -184,7 +184,25 @@ export default async function ComparePage({
 
   return (
     <div className="mx-auto max-w-[96rem] space-y-3 p-3">
-      <h1 className="text-base font-bold tracking-wider text-ink">COMPARE PLAYERS</h1>
+      <div className="flex flex-wrap items-center gap-3">
+        <h1 className="text-base font-bold tracking-wider text-ink">COMPARE PLAYERS</h1>
+        {/* Up top so the scope is set before anyone is picked. The season tab
+            reads as the year it shows — the current one unless changed. */}
+        <span className="ml-auto flex flex-wrap items-center gap-3">
+          <ParamTabs
+            param="scope"
+            ariaLabel="Career or season"
+            value={scope}
+            options={[
+              { value: "career", label: "CAREER" },
+              { value: "season", label: String(season) },
+            ]}
+          />
+          {scope === "season" && allSeasons.length > 1 && (
+            <SeasonSelect value={season} seasons={allSeasons} />
+          )}
+        </span>
+      </div>
 
       <ComparePicker kind="player" slots={slots} max={MAX} />
 
@@ -194,41 +212,29 @@ export default async function ComparePage({
         </p>
       ) : (
         <>
-          <div className="flex flex-wrap items-center gap-3 border border-line bg-surface px-3 py-2">
-            {availableGroups.length > 1 && (
-              <ParamTabs
-                param="group"
-                ariaLabel="Stat group"
-                value={group}
-                options={groupOptions(availableGroups)}
-              />
-            )}
-            {hasAdvanced && (
-              <ParamTabs
-                param="adv"
-                ariaLabel="Standard or advanced stats"
-                value={advanced ? "1" : "0"}
-                options={[
-                  { value: "0", label: "STANDARD" },
-                  { value: "1", label: "ADVANCED" },
-                ]}
-              />
-            )}
-            <span className="ml-auto flex flex-wrap items-center gap-3">
-              <ParamTabs
-                param="scope"
-                ariaLabel="Career or season"
-                value={scope}
-                options={[
-                  { value: "career", label: "CAREER" },
-                  { value: "season", label: "SEASON" },
-                ]}
-              />
-              {scope === "season" && (
-                <SeasonSelect value={season} seasons={allSeasons.length ? allSeasons : [current]} />
+          {(availableGroups.length > 1 || hasAdvanced) && (
+            <div className="flex flex-wrap items-center gap-3 border border-line bg-surface px-3 py-2">
+              {availableGroups.length > 1 && (
+                <ParamTabs
+                  param="group"
+                  ariaLabel="Stat group"
+                  value={group}
+                  options={groupOptions(availableGroups)}
+                />
               )}
-            </span>
-          </div>
+              {hasAdvanced && (
+                <ParamTabs
+                  param="adv"
+                  ariaLabel="Standard or advanced stats"
+                  value={advanced ? "1" : "0"}
+                  options={[
+                    { value: "0", label: "STANDARD" },
+                    { value: "1", label: "ADVANCED" },
+                  ]}
+                />
+              )}
+            </div>
+          )}
 
           <CompareHeadline
             entities={entities}
