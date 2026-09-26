@@ -3,7 +3,6 @@
 import { useState } from "react";
 import Link from "next/link";
 import Panel from "@/components/ui/Panel";
-import Glossary from "@/components/mlb/Glossary";
 import { Table, Row, Empty } from "@/components/ui/StatTable";
 import { useSetParam } from "@/lib/useSetParam";
 import {
@@ -154,71 +153,68 @@ export function CompareTable({
   };
 
   return (
-    <div className="space-y-3">
-      <Panel
-        title="STATS"
-        right={
-          <button
-            type="button"
-            onClick={() => setOpen((o) => !o)}
-            className="rounded border border-line px-1.5 py-0.5 text-[10px] tracking-wider text-ink-3 hover:border-accent hover:text-ink"
-          >
-            {open ? "HIDE COLUMNS" : "CHOOSE COLUMNS"}
-          </button>
-        }
-      >
-        {open && (
-          <ul className="mb-3 grid grid-cols-2 gap-1.5 border-b border-line pb-3 sm:grid-cols-3 lg:grid-cols-4">
-            {columns.map((c) => (
-              <li key={c.key}>
-                <label
-                  className="flex cursor-pointer items-center gap-2 text-[11px] text-ink-2 hover:text-ink"
-                  title={c.title}
-                >
-                  <input
-                    type="checkbox"
-                    checked={shown.includes(c)}
-                    onChange={() => toggle(c.key)}
-                    className={CHECKBOX}
-                  />
-                  {c.label}
-                </label>
-              </li>
-            ))}
-          </ul>
-        )}
-        <Table
-          head={["", ...shown.map((c) => c.label)]}
-          maxHeight="none"
-          align={"l" + "r".repeat(shown.length)}
-          dense
+    <Panel
+      title="STATS"
+      right={
+        <button
+          type="button"
+          onClick={() => setOpen((o) => !o)}
+          className="rounded border border-line px-1.5 py-0.5 text-[10px] tracking-wider text-ink-3 hover:border-accent hover:text-ink"
         >
-          {entities.length === 0 && (
-            <Empty what="ADD ENTITIES TO COMPARE" cols={shown.length + 1} />
-          )}
-          {entities.map((e) => (
-            <Row key={e.id}>
-              <td className="px-1 py-1 whitespace-nowrap">
-                <Link href={e.href} className="flex items-center gap-1.5 text-ink hover:text-accent">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={e.image} alt="" width={18} height={18} className="h-[18px] w-[18px] shrink-0" />
-                  <span className="truncate">{e.name}</span>
-                </Link>
-              </td>
-              {shown.map((c) => (
-                <td
-                  key={c.key}
-                  title={c.title}
-                  className="border-r border-grid pl-0.5 pr-2 py-1 text-right text-[12px] tabular-nums text-ink-2 last:border-r-0"
-                >
-                  {values[e.id] ? teamStatText(values[e.id]![c.key]) : "—"}
-                </td>
-              ))}
-            </Row>
+          {open ? "HIDE COLUMNS" : "CHOOSE COLUMNS"}
+        </button>
+      }
+    >
+      {open && (
+        <ul className="mb-3 grid grid-cols-2 gap-1.5 border-b border-line pb-3 sm:grid-cols-3 lg:grid-cols-4">
+          {columns.map((c) => (
+            <li key={c.key}>
+              <label
+                className="flex cursor-pointer items-center gap-2 text-[11px] text-ink-2 hover:text-ink"
+                title={c.title}
+              >
+                <input
+                  type="checkbox"
+                  checked={shown.includes(c)}
+                  onChange={() => toggle(c.key)}
+                  className={CHECKBOX}
+                />
+                {c.label}
+              </label>
+            </li>
           ))}
-        </Table>
-      </Panel>
-      <Glossary entries={shown.map((c) => ({ label: c.label, title: c.title }))} />
-    </div>
+        </ul>
+      )}
+      <Table
+        head={["", ...shown.map((c) => c.label)]}
+        maxHeight="none"
+        align={"l" + "r".repeat(shown.length)}
+        dense
+      >
+        {entities.length === 0 && (
+          <Empty what="ADD ENTITIES TO COMPARE" cols={shown.length + 1} />
+        )}
+        {entities.map((e) => (
+          <Row key={e.id}>
+            <td className="border-r border-grid px-1 py-1 whitespace-nowrap">
+              <Link href={e.href} className="flex items-center gap-1.5 text-ink hover:text-accent">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={e.image} alt="" width={18} height={18} className="h-[18px] w-[18px] shrink-0" />
+                <span className="truncate">{e.name}</span>
+              </Link>
+            </td>
+            {shown.map((c) => (
+              <td
+                key={c.key}
+                title={c.title}
+                className="border-r border-grid pl-0.5 pr-2 py-1 text-right text-[12px] tabular-nums text-ink-2 last:border-r-0"
+              >
+                {values[e.id] ? teamStatText(values[e.id]![c.key]) : "—"}
+              </td>
+            ))}
+          </Row>
+        ))}
+      </Table>
+    </Panel>
   );
 }
