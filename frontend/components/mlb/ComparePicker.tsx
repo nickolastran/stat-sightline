@@ -89,7 +89,7 @@ export default function ComparePicker({
             onKeyDown={t.onKeyDown}
             onFocus={() => t.results.length && t.setOpen(true)}
             placeholder={`+ ADD ${kind.toUpperCase()}`}
-            className="h-[52px] w-56 rounded border border-dashed border-line bg-bg px-3 text-xs tracking-wide text-ink placeholder:text-ink-3 focus:border-accent focus:border-solid focus:outline-none"
+            className="h-[52px] w-56 rounded border border-dashed border-line bg-bg px-3 text-center text-xs tracking-wide text-ink placeholder:text-ink-3 focus:border-accent focus:border-solid focus:outline-none"
           />
           {t.error && (
             <p className="absolute z-30 mt-px border border-crit bg-surface px-2 py-1 text-[10px] text-crit">
@@ -121,6 +121,7 @@ export default function ComparePicker({
                       width={20}
                       height={20}
                       loading="lazy"
+                      onError={(e) => (e.currentTarget.style.visibility = "hidden")}
                       className="h-5 w-5 shrink-0"
                     />
                     <span className="truncate">{hit.name}</span>

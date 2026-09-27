@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import Link from "next/link";
 import Panel from "@/components/ui/Panel";
 import { Table, Row, Empty } from "@/components/ui/StatTable";
@@ -36,6 +36,8 @@ export interface HeadlineStat {
   title?: string;
   /** The dropdown's label, where its section already says the group. */
   name?: string;
+  /** A labelled band the headline draws above this row — where awards start. */
+  band?: string;
 }
 
 /** Identity photos across the top, then one row per headline stat with the
@@ -88,30 +90,43 @@ export function CompareHeadline({
         const split = best !== null && present.some((n) => n !== best);
 
         return (
-          <Row key={s.key}>
-            {cols.map((e) => {
-              if (!e)
+          <Fragment key={s.key}>
+            {s.band && (
+              <tr className="border-y border-line bg-surface">
+                <th
+                  scope="colgroup"
+                  colSpan={cols.length}
+                  className="px-3 py-1.5 text-center text-[10px] tracking-widest text-ink"
+                >
+                  {s.band.toUpperCase()}
+                </th>
+              </tr>
+            )}
+            <Row>
+              {cols.map((e) => {
+                if (!e)
+                  return (
+                    <td
+                      key="label"
+                      className={`px-3 py-2 text-center text-[11px] tracking-[0.15em] whitespace-nowrap text-ink ${LINE}`}
+                    >
+                      {s.label}
+                    </td>
+                  );
+                const win = split && nums[entities.indexOf(e)] === best;
                 return (
                   <td
-                    key="label"
-                    className={`px-3 py-2 text-center text-[11px] tracking-[0.15em] whitespace-nowrap text-ink ${LINE}`}
+                    key={e.id}
+                    className={`px-3 py-2 text-center text-sm tabular-nums ${LINE} ${
+                      win ? "font-bold text-good" : "text-ink-2"
+                    }`}
                   >
-                    {s.label}
+                    {teamStatText(values[e.id]?.[s.key] ?? null)}
                   </td>
                 );
-              const win = split && nums[entities.indexOf(e)] === best;
-              return (
-                <td
-                  key={e.id}
-                  className={`px-3 py-2 text-center text-sm tabular-nums ${LINE} ${
-                    win ? "font-bold text-good" : "text-ink-2"
-                  }`}
-                >
-                  {teamStatText(values[e.id]?.[s.key] ?? null)}
-                </td>
-              );
-            })}
-          </Row>
+              })}
+            </Row>
+          </Fragment>
         );
       })}
     </Table>
@@ -121,75 +136,19 @@ export function CompareHeadline({
 const CHECKBOX =
   "h-3.5 w-3.5 shrink-0 appearance-none border border-line bg-surface checked:border-accent checked:bg-accent";
 
-/** The full stat table: one row per entity, columns narrowed to whichever
- *  keys `selected` names (every column of the group when empty). The picker
- *  writes `stats` back to the URL, same as the rest of the page's controls. */
+/** The full stat table: one row per entity, every column of the group. */
 export function CompareTable({
   columns,
-  selected,
   entities,
   values,
 }: {
   columns: TeamStatCol[];
-  /** Column keys checked in the URL's `stats` param — every column when empty. */
-  selected: string[];
   entities: CompareEntity[];
   values: Record<number, Record<string, TeamStatValue> | null>;
 }) {
-  const setParam = useSetParam();
-  const [open, setOpen] = useState(false);
-  /* Read off the result, not off `selected`: switching between the standard
-     and advanced views carries a selection of keys the other set has none of,
-     and a table of no columns at all is worse than the full one. */
-  const picked = columns.filter((c) => selected.includes(c.key));
-  const shown = picked.length ? picked : columns;
-
-  const toggle = (key: string) => {
-    const all = columns.map((c) => c.key);
-    const current = selected.length ? selected : all;
-    const next = current.includes(key)
-      ? current.filter((k) => k !== key)
-      : [...current, key];
-    // Checking everything (or unchecking down to nothing) is the same as no filter.
-    setParam({
-      stats: next.length === all.length || next.length === 0 ? null : next.join(","),
-    });
-  };
-
   return (
-    <Panel
-      title="Stats"
-      right={
-        <button
-          type="button"
-          onClick={() => setOpen((o) => !o)}
-          className="rounded border border-line px-1.5 py-0.5 text-[10px] tracking-wider text-ink-3 hover:border-accent hover:text-ink"
-        >
-          {open ? "HIDE COLUMNS" : "CHOOSE COLUMNS"}
-        </button>
-      }
-    >
-      {open && (
-        <ul className="mb-3 grid grid-cols-2 gap-1.5 border-b border-line pb-3 sm:grid-cols-3 lg:grid-cols-4">
-          {columns.map((c) => (
-            <li key={c.key}>
-              <label
-                className="flex cursor-pointer items-center gap-2 text-[11px] text-ink-2 hover:text-ink"
-                title={c.title}
-              >
-                <input
-                  type="checkbox"
-                  checked={shown.includes(c)}
-                  onChange={() => toggle(c.key)}
-                  className={CHECKBOX}
-                />
-                {c.label}
-              </label>
-            </li>
-          ))}
-        </ul>
-      )}
-      <EntityTable columns={shown} entities={entities} values={values} />
+    <Panel title="Stats">
+      <EntityTable columns={columns} entities={entities} values={values} />
     </Panel>
   );
 }
@@ -269,7 +228,9 @@ export interface StatSection {
 }
 
 /** The headline's stat chooser: everything comparable, in sections, as one
- *  tall list. Written to `h` in the URL; the main line when it is absent. */
+ *  tall list. Ticks collect in a draft until UPDATE writes them to `h` in the
+ *  URL — the main line when it is absent — so a handful of picks is one
+ *  reload, not one each. The caller keys it on `selected` to resync. */
 export function CompareStatPicker({
   sections,
   selected,
@@ -282,8 +243,10 @@ export function CompareStatPicker({
   const setParam = useSetParam();
   const write = (next: string[]) =>
     setParam({ h: next.length === 0 || next.join(",") === defaults.join(",") ? null : next.join(",") });
+  const [draft, setDraft] = useState(selected);
   const toggle = (key: string) =>
-    write(selected.includes(key) ? selected.filter((k) => k !== key) : [...selected, key]);
+    setDraft(draft.includes(key) ? draft.filter((k) => k !== key) : [...draft, key]);
+  const dirty = draft.join(",") !== selected.join(",");
 
   return (
     <details className="group relative w-fit">
@@ -307,7 +270,7 @@ export function CompareStatPicker({
                   >
                     <input
                       type="checkbox"
-                      checked={selected.includes(st.key)}
+                      checked={draft.includes(st.key)}
                       onChange={() => toggle(st.key)}
                       className={CHECKBOX}
                     />
@@ -318,13 +281,23 @@ export function CompareStatPicker({
             </ul>
           </section>
         ))}
-        <button
-          type="button"
-          onClick={() => write(defaults)}
-          className="sticky bottom-0 w-full border-t border-line bg-surface px-3 py-2 text-[10px] tracking-widest text-ink-3 hover:text-accent"
-        >
-          RESET TO MAIN STATS
-        </button>
+        <div className="sticky bottom-0 flex border-t border-line bg-surface text-[10px] tracking-widest">
+          <button
+            type="button"
+            onClick={() => setDraft(defaults)}
+            className="flex-1 px-3 py-2 text-ink-3 hover:text-accent"
+          >
+            RESET TO MAIN STATS
+          </button>
+          <button
+            type="button"
+            disabled={!dirty}
+            onClick={() => write(draft)}
+            className="flex-1 border-l border-line bg-accent px-3 py-2 font-bold text-white disabled:bg-surface disabled:font-normal disabled:text-ink-3"
+          >
+            UPDATE
+          </button>
+        </div>
       </div>
     </details>
   );
