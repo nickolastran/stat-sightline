@@ -89,6 +89,7 @@ export default function PlayerSearch({
                     width={20}
                     height={20}
                     loading="lazy"
+                    onError={(e) => (e.currentTarget.style.visibility = "hidden")}
                     className="h-5 w-5 shrink-0"
                   />
                   <span className="truncate">

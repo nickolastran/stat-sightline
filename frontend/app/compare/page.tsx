@@ -249,7 +249,7 @@ export default async function ComparePage({
   const careersOf = (g: StatGroup) =>
     careerLists[availableGroups.indexOf(g)] ?? players.map(() => EMPTY_CAREER);
 
-  const scope = sp.scope === "season" ? "season" : "career";
+  const scope = sp.scope === "career" ? "career" : "season";
   const allSeasons = [
     ...new Set(careerLists.flat().flatMap((c) => c.rows.map((r) => Number(r.season)))),
   ].sort((a, b) => b - a);
