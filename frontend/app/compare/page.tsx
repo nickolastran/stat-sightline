@@ -68,7 +68,9 @@ const LOW: Record<StatGroup, Set<string>> = {
   fielding: new Set(["errors"]),
 };
 
-/* Award counts, AL and NL together. A season comparison counts that year's. */
+/* Award counts, AL and NL together. A season comparison counts that year's.
+   The headline shows them as one pick — only the ones somebody won, and a
+   blank for everybody who didn't. */
 const AWARD_STATS = [
   { key: "allStar", label: "All-Star", ids: ["ALAS", "NLAS"] },
   { key: "mvp", label: "MVP", ids: ["ALMVP", "NLMVP"] },
@@ -81,6 +83,8 @@ const AWARD_STATS = [
   { key: "allMlb2", label: "All-MLB 2nd", ids: ["MLBSECOND"] },
   { key: "ws", label: "WS Champion", ids: ["WSCHAMP"] },
   { key: "wsMvp", label: "WS MVP", ids: ["WSMVP"] },
+  { key: "lcsMvp", label: "LCS MVP", ids: ["ALCSMVP", "NLCSMVP"] },
+  { key: "asMvp", label: "All-Star MVP", ids: ["ASMVP"] },
 ];
 
 const GROUP_TITLE: Record<StatGroup, string> = {
@@ -267,7 +271,10 @@ export default async function ComparePage({
       for (const [k, v] of Object.entries(line ?? {})) out[`${g}:${k}`] = v;
     }
     const won = awards[i].filter((a) => scope === "career" || a.season === String(season));
-    for (const a of AWARD_STATS) out[`awards:${a.key}`] = won.filter((w) => a.ids.includes(w.id)).length;
+    for (const a of AWARD_STATS) {
+      const n = won.filter((w) => a.ids.includes(w.id)).length;
+      out[`awards:${a.key}`] = n || "";
+    }
     picked[p.id] = out;
   });
 
@@ -294,15 +301,20 @@ export default async function ComparePage({
       title: `Value${sub(g)}`,
       stats: colsOf(g, SECTION_KEYS[g].value).map((c) => opt(g, c)),
     })),
-    {
-      title: "Awards",
-      stats: AWARD_STATS.map((a) => ({ key: `awards:${a.key}`, label: a.label, title: a.label })),
-    },
+    { title: "Awards", stats: [{ key: "awards", label: "Awards", title: "Every award anyone here won" }] },
   ];
   const byKey = new Map(sections.flatMap((sec) => sec.stats.map((st) => [st.key, st])));
-  const defaults = HEADLINE[group].map((k) => `${group}:${k}`);
+  const defaults = [...HEADLINE[group].map((k) => `${group}:${k}`), "awards"];
   const chosen = (sp.h ? sp.h.split(",") : defaults).filter((k) => byKey.has(k));
-  const headline = (chosen.length ? chosen : defaults).map((k) => byKey.get(k)!).filter(Boolean);
+  const shown = chosen.length ? chosen : defaults;
+  const won: HeadlineStat[] = AWARD_STATS.filter((a) =>
+    players.some((p) => picked[p.id]?.[`awards:${a.key}`])
+  ).map((a, i) => ({ key: `awards:${a.key}`, label: a.label, title: a.label, band: i ? undefined : "Awards" }));
+  /* Awards always close the table, whenever they were ticked. */
+  const headline = [
+    ...shown.filter((k) => k !== "awards").map((k) => byKey.get(k)!),
+    ...(shown.includes("awards") ? won : []),
+  ].map((st, i) => (i || st.band ? st : { ...st, band: "Stats" }));
 
   const entities: CompareEntity[] = players.map((p) => ({
     id: p.id,
@@ -344,8 +356,9 @@ export default async function ComparePage({
       ) : (
         <>
           <CompareStatPicker
+            key={shown.join(",")}
             sections={sections}
-            selected={headline.map((st) => st.key)}
+            selected={shown}
             defaults={defaults}
           />
           <CompareHeadline entities={entities} stats={headline} values={picked} />

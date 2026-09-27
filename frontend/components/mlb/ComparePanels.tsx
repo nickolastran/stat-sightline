@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import Link from "next/link";
 import Panel from "@/components/ui/Panel";
 import { Table, Row, Empty } from "@/components/ui/StatTable";
@@ -36,6 +36,8 @@ export interface HeadlineStat {
   title?: string;
   /** The dropdown's label, where its section already says the group. */
   name?: string;
+  /** A labelled band the headline draws above this row — where awards start. */
+  band?: string;
 }
 
 /** Identity photos across the top, then one row per headline stat with the
@@ -88,30 +90,43 @@ export function CompareHeadline({
         const split = best !== null && present.some((n) => n !== best);
 
         return (
-          <Row key={s.key}>
-            {cols.map((e) => {
-              if (!e)
+          <Fragment key={s.key}>
+            {s.band && (
+              <tr className="border-y border-line bg-surface">
+                <th
+                  scope="colgroup"
+                  colSpan={cols.length}
+                  className="px-3 py-1.5 text-center text-[10px] tracking-widest text-ink"
+                >
+                  {s.band.toUpperCase()}
+                </th>
+              </tr>
+            )}
+            <Row>
+              {cols.map((e) => {
+                if (!e)
+                  return (
+                    <td
+                      key="label"
+                      className={`px-3 py-2 text-center text-[11px] tracking-[0.15em] whitespace-nowrap text-ink ${LINE}`}
+                    >
+                      {s.label}
+                    </td>
+                  );
+                const win = split && nums[entities.indexOf(e)] === best;
                 return (
                   <td
-                    key="label"
-                    className={`px-3 py-2 text-center text-[11px] tracking-[0.15em] whitespace-nowrap text-ink ${LINE}`}
+                    key={e.id}
+                    className={`px-3 py-2 text-center text-sm tabular-nums ${LINE} ${
+                      win ? "font-bold text-good" : "text-ink-2"
+                    }`}
                   >
-                    {s.label}
+                    {teamStatText(values[e.id]?.[s.key] ?? null)}
                   </td>
                 );
-              const win = split && nums[entities.indexOf(e)] === best;
-              return (
-                <td
-                  key={e.id}
-                  className={`px-3 py-2 text-center text-sm tabular-nums ${LINE} ${
-                    win ? "font-bold text-good" : "text-ink-2"
-                  }`}
-                >
-                  {teamStatText(values[e.id]?.[s.key] ?? null)}
-                </td>
-              );
-            })}
-          </Row>
+              })}
+            </Row>
+          </Fragment>
         );
       })}
     </Table>
@@ -269,7 +284,9 @@ export interface StatSection {
 }
 
 /** The headline's stat chooser: everything comparable, in sections, as one
- *  tall list. Written to `h` in the URL; the main line when it is absent. */
+ *  tall list. Ticks collect in a draft until UPDATE writes them to `h` in the
+ *  URL — the main line when it is absent — so a handful of picks is one
+ *  reload, not one each. The caller keys it on `selected` to resync. */
 export function CompareStatPicker({
   sections,
   selected,
@@ -282,8 +299,10 @@ export function CompareStatPicker({
   const setParam = useSetParam();
   const write = (next: string[]) =>
     setParam({ h: next.length === 0 || next.join(",") === defaults.join(",") ? null : next.join(",") });
+  const [draft, setDraft] = useState(selected);
   const toggle = (key: string) =>
-    write(selected.includes(key) ? selected.filter((k) => k !== key) : [...selected, key]);
+    setDraft(draft.includes(key) ? draft.filter((k) => k !== key) : [...draft, key]);
+  const dirty = draft.join(",") !== selected.join(",");
 
   return (
     <details className="group relative w-fit">
@@ -307,7 +326,7 @@ export function CompareStatPicker({
                   >
                     <input
                       type="checkbox"
-                      checked={selected.includes(st.key)}
+                      checked={draft.includes(st.key)}
                       onChange={() => toggle(st.key)}
                       className={CHECKBOX}
                     />
@@ -318,13 +337,23 @@ export function CompareStatPicker({
             </ul>
           </section>
         ))}
-        <button
-          type="button"
-          onClick={() => write(defaults)}
-          className="sticky bottom-0 w-full border-t border-line bg-surface px-3 py-2 text-[10px] tracking-widest text-ink-3 hover:text-accent"
-        >
-          RESET TO MAIN STATS
-        </button>
+        <div className="sticky bottom-0 flex border-t border-line bg-surface text-[10px] tracking-widest">
+          <button
+            type="button"
+            onClick={() => setDraft(defaults)}
+            className="flex-1 px-3 py-2 text-ink-3 hover:text-accent"
+          >
+            RESET TO MAIN STATS
+          </button>
+          <button
+            type="button"
+            disabled={!dirty}
+            onClick={() => write(draft)}
+            className="flex-1 border-l border-line bg-accent px-3 py-2 font-bold text-white disabled:bg-surface disabled:font-normal disabled:text-ink-3"
+          >
+            UPDATE
+          </button>
+        </div>
       </div>
     </details>
   );
