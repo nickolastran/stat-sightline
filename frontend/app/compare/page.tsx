@@ -39,7 +39,7 @@ import {
  * and directly with `?ids=`.
  *
  * Everything the controls touch lives in the URL, the same as the rest of
- * the site — `ids`, `group`, `scope`, `season`, `stats` — so a comparison is
+ * the site — `ids`, `group`, `scope`, `season`, `h` — so a comparison is
  * a link, not a session.
  */
 
@@ -221,7 +221,6 @@ export default async function ComparePage({
     ids?: string;
     scope?: string;
     season?: string;
-    stats?: string;
     h?: string;
   }>;
 }) {
@@ -323,7 +322,6 @@ export default async function ComparePage({
     href: `/player/${p.id}`,
   }));
   const slots = entities;
-  const selectedStats = sp.stats ? sp.stats.split(",").filter(Boolean) : [];
 
   return (
     <div className="mx-auto max-w-[96rem] space-y-3 p-3">
@@ -364,7 +362,6 @@ export default async function ComparePage({
           <CompareHeadline entities={entities} stats={headline} values={picked} />
           <CompareTable
             columns={careerCols(group)}
-            selected={selectedStats}
             entities={entities}
             values={values}
           />

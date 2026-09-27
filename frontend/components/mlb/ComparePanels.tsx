@@ -136,75 +136,19 @@ export function CompareHeadline({
 const CHECKBOX =
   "h-3.5 w-3.5 shrink-0 appearance-none border border-line bg-surface checked:border-accent checked:bg-accent";
 
-/** The full stat table: one row per entity, columns narrowed to whichever
- *  keys `selected` names (every column of the group when empty). The picker
- *  writes `stats` back to the URL, same as the rest of the page's controls. */
+/** The full stat table: one row per entity, every column of the group. */
 export function CompareTable({
   columns,
-  selected,
   entities,
   values,
 }: {
   columns: TeamStatCol[];
-  /** Column keys checked in the URL's `stats` param — every column when empty. */
-  selected: string[];
   entities: CompareEntity[];
   values: Record<number, Record<string, TeamStatValue> | null>;
 }) {
-  const setParam = useSetParam();
-  const [open, setOpen] = useState(false);
-  /* Read off the result, not off `selected`: switching between the standard
-     and advanced views carries a selection of keys the other set has none of,
-     and a table of no columns at all is worse than the full one. */
-  const picked = columns.filter((c) => selected.includes(c.key));
-  const shown = picked.length ? picked : columns;
-
-  const toggle = (key: string) => {
-    const all = columns.map((c) => c.key);
-    const current = selected.length ? selected : all;
-    const next = current.includes(key)
-      ? current.filter((k) => k !== key)
-      : [...current, key];
-    // Checking everything (or unchecking down to nothing) is the same as no filter.
-    setParam({
-      stats: next.length === all.length || next.length === 0 ? null : next.join(","),
-    });
-  };
-
   return (
-    <Panel
-      title="Stats"
-      right={
-        <button
-          type="button"
-          onClick={() => setOpen((o) => !o)}
-          className="rounded border border-line px-1.5 py-0.5 text-[10px] tracking-wider text-ink-3 hover:border-accent hover:text-ink"
-        >
-          {open ? "HIDE COLUMNS" : "CHOOSE COLUMNS"}
-        </button>
-      }
-    >
-      {open && (
-        <ul className="mb-3 grid grid-cols-2 gap-1.5 border-b border-line pb-3 sm:grid-cols-3 lg:grid-cols-4">
-          {columns.map((c) => (
-            <li key={c.key}>
-              <label
-                className="flex cursor-pointer items-center gap-2 text-[11px] text-ink-2 hover:text-ink"
-                title={c.title}
-              >
-                <input
-                  type="checkbox"
-                  checked={shown.includes(c)}
-                  onChange={() => toggle(c.key)}
-                  className={CHECKBOX}
-                />
-                {c.label}
-              </label>
-            </li>
-          ))}
-        </ul>
-      )}
-      <EntityTable columns={shown} entities={entities} values={values} />
+    <Panel title="Stats">
+      <EntityTable columns={columns} entities={entities} values={values} />
     </Panel>
   );
 }

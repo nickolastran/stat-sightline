@@ -48,7 +48,7 @@ function pickSeason(raw: string | undefined, current: number): number {
 export default async function CompareTeamsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ ids?: string; group?: string; season?: string; stats?: string }>;
+  searchParams: Promise<{ ids?: string; group?: string; season?: string }>;
 }) {
   const sp = await searchParams;
   const current = seasonOf(todayPT());
@@ -69,7 +69,6 @@ export default async function CompareTeamsPage({
   }));
   const values: Record<number, Record<string, TeamStatValue>> = {};
   found.forEach((r) => (values[r.id] = r.values));
-  const selectedStats = sp.stats ? sp.stats.split(",").filter(Boolean) : [];
   const columns = group === "hitting" ? TEAM_HITTING_COLS : TEAM_PITCHING_COLS;
 
   return (
@@ -102,7 +101,6 @@ export default async function CompareTeamsPage({
           <CompareHeadline entities={entities} stats={TEAM_CARD_STATS[group]} values={values} />
           <CompareTable
             columns={columns}
-            selected={selectedStats}
             entities={entities}
             values={values}
           />
