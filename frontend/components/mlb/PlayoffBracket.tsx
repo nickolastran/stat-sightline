@@ -1,6 +1,14 @@
 import Link from "next/link";
 import { teamColor, teamHref, teamLogo, type Division } from "@/lib/mlb";
-import { isSeeded, leagueBracket, seedField, type Seed } from "@/lib/playoffs";
+import {
+  isSeeded,
+  leagueBracket,
+  realSeeds,
+  seedField,
+  seriesLine,
+  type PostSeries,
+  type Seed,
+} from "@/lib/playoffs";
 import type { TeamOdds } from "@/lib/api";
 
 /*
@@ -21,6 +29,10 @@ import type { TeamOdds } from "@/lib/api";
  * says so underneath rather than passing itself off as a result. The seeding
  * rule doesn't know whether the season is over, so the same component draws
  * the real bracket once it is.
+ *
+ * Once MLB has scheduled the postseason, its series take over: the seeds are
+ * MLB's own, each winner moves into the slot it has reached, the clubs
+ * knocked out fade, and every series prints where it stands.
  */
 
 /* ── The canvas, and everything positioned on it ─────────────────────── */
@@ -135,6 +147,7 @@ function Club({
   seed,
   badge,
   odds,
+  out = false,
 }: {
   cx: number;
   cy: number;
@@ -142,12 +155,14 @@ function Club({
   /** Which corner the seed number sits on — away from the bracket's centre. */
   badge: 1 | -1;
   odds?: number;
+  /** Knocked out, and drawn faded. */
+  out?: boolean;
 }) {
   const color = teamColor(seed.team.id);
   const short = nickname(seed.team.name, seed.team.city);
   const record = `${seed.team.wins}-${seed.team.losses}`;
   return (
-    <a href={teamHref(seed.team.id, seed.team.name)}>
+    <a href={teamHref(seed.team.id, seed.team.name)} style={out ? { opacity: 0.35 } : undefined}>
       <title>
         {`${short} · ${seed.seed} seed · ${record}${
           odds !== undefined ? ` · ${(odds * 100).toFixed(1)}% to win the World Series` : ""
@@ -252,6 +267,24 @@ const RoundLabel = ({
   </>
 );
 
+/** Where a series stands, printed in the gap under the pair it joins. */
+const Score = ({ x, y, s }: { x: number; y: number; s?: PostSeries }) => {
+  const line = s && seriesLine(s);
+  return line ? (
+    <text
+      x={x}
+      y={y}
+      textAnchor="middle"
+      fontSize={9}
+      letterSpacing={0.5}
+      fontWeight={s.winner ? "bold" : "normal"}
+      fill={s.winner ? "var(--color-accent)" : "var(--color-ink-3)"}
+    >
+      {line}
+    </text>
+  ) : null;
+};
+
 /* ── The bracket ────────────────────────────────────────────────────── */
 
 /** One league's eleven positions, left half or right half. */
@@ -260,15 +293,32 @@ function Half({
   league,
   dir,
   ws,
+  series,
+  out,
 }: {
   seeds: Seed[];
   league: string;
   dir: 1 | -1;
   ws: Map<number, number>;
+  /** MLB's series by id, empty before the postseason is scheduled. */
+  series: Map<string, PostSeries>;
+  /** Clubs knocked out. */
+  out: Set<number>;
 }) {
   const at = (i: number) => (dir === 1 ? COL[i] : mirror(COL[i]));
   const { wc } = leagueBracket(seeds);
   const odds = (s: Seed) => ws.get(s.team.id);
+  const badge = -dir as 1 | -1;
+  /* The AL is the left half and takes the odd series ids — see SLOTS. */
+  const n = dir === 1 ? 1 : 3;
+  const club = (cx: number, cy: number, seed: Seed) => (
+    <Club cx={cx} cy={cy} seed={seed} badge={badge} odds={odds(seed)} out={out.has(seed.team.id)} />
+  );
+  /** A slot a series feeds: its winner once there is one, else empty. */
+  const slot = (cx: number, cy: number, s?: PostSeries) => {
+    const won = s?.winner ? seeds.find((x) => x.team.id === s.winner) : undefined;
+    return won ? club(cx, cy, won) : <Empty cx={cx} cy={cy} />;
+  };
 
   /* Top group is the 3/6 series and the 2 seed that meets its winner; bottom
      is 4/5 and the 1 seed. MLB doesn't reseed, and that pairing is the whole
@@ -277,6 +327,8 @@ function Half({
     {
       pair: wc[0],
       bye: seeds[1],
+      wcSeries: series.get(`F_${n}`),
+      dsSeries: series.get(`D_${n + 1}`),
       wcWinner: rows.wcWinnerTop,
       byeRow: rows.byeTop,
       ds: dsTop,
@@ -284,6 +336,8 @@ function Half({
     {
       pair: wc[1],
       bye: seeds[0],
+      wcSeries: series.get(`F_${n + 1}`),
+      dsSeries: series.get(`D_${n}`),
       wcWinner: rows.wcWinnerBottom,
       byeRow: rows.byeBottom,
       ds: dsBottom,
@@ -302,17 +356,21 @@ function Half({
             <Elbow x={at(0)} yA={upper} yB={lower} toX={at(1)} toY={g.wcWinner} dir={dir} />
             <Elbow x={at(1)} yA={g.wcWinner} yB={g.byeRow} toX={at(2)} toY={g.ds} dir={dir} />
             {/* The higher seed number goes on top, as every bracket prints it. */}
-            {away && <Club cx={at(0)} cy={upper} seed={away} badge={-dir as 1 | -1} odds={odds(away)} />}
-            {home && <Club cx={at(0)} cy={lower} seed={home} badge={-dir as 1 | -1} odds={odds(home)} />}
-            <Empty cx={at(1)} cy={g.wcWinner} />
-            <Club cx={at(1)} cy={g.byeRow} seed={g.bye} badge={-dir as 1 | -1} odds={odds(g.bye)} />
-            <Empty cx={at(2)} cy={g.ds} />
+            {away && club(at(0), upper, away)}
+            {home && club(at(0), lower, home)}
+            {slot(at(1), g.wcWinner, g.wcSeries)}
+            {club(at(1), g.byeRow, g.bye)}
+            {slot(at(2), g.ds, g.dsSeries)}
+            {/* In the gap between each pair, clear of both captions. */}
+            <Score x={at(0)} y={g.wcWinner + 8} s={g.wcSeries} />
+            <Score x={at(1)} y={(g.wcWinner + g.byeRow) / 2 + 9} s={g.dsSeries} />
           </g>
         );
       })}
 
       <Elbow x={at(2)} yA={dsTop} yB={dsBottom} toX={at(3)} toY={MID} dir={dir} />
-      <Empty cx={at(3)} cy={MID} />
+      {slot(at(3), MID, series.get(`L_${dir === 1 ? 1 : 2}`))}
+      <Score x={at(2)} y={MID + 20} s={series.get(`L_${dir === 1 ? 1 : 2}`)} />
 
       <RoundLabel x={at(0)} title={`${abbr(league)} WILD CARD`} best={3} size={13} />
       <RoundLabel x={at(1)} title={`${abbr(league)}DS`} best={5} />
@@ -325,15 +383,30 @@ export default function PlayoffBracket({
   divisions,
   odds = [],
   seeded = false,
+  series = [],
 }: {
   divisions: Division[];
   /** The simulation, when it is up — the figure under each club. */
   odds?: TeamOdds[];
   /** The field is final rather than a projection off the standings. */
   seeded?: boolean;
+  /** MLB's postseason series; once they name the field, they draw it. */
+  series?: PostSeries[];
 }) {
-  const field = seedField(divisions);
+  const real = realSeeds(series, divisions);
+  const field = seedField(divisions).map((f, i) => (real ? { ...f, seeds: real[i] } : f));
+  if (real) seeded = true;
   const ws = new Map(odds.map((t) => [t.team_id, t.win_world_series]));
+  const byId = new Map(real ? series.map((s) => [s.id, s]) : []);
+  const out = new Set(
+    [...byId.values()].flatMap((s) =>
+      s.winner ? [s.winner === s.home.id ? s.away.id : s.home.id] : [],
+    ),
+  );
+  const worldSeries = byId.get("W_1");
+  const champion = worldSeries?.winner
+    ? [...divisions.flatMap((d) => d.teams)].find((t) => t.id === worldSeries.winner)
+    : undefined;
 
   if (field.length < 2 || field.some((f) => f.seeds.length < 6))
     return (
@@ -360,8 +433,8 @@ export default function PlayoffBracket({
           role="img"
           aria-label={`${seeded ? "" : "Projected "}postseason bracket`}
         >
-          <Half seeds={al.seeds} league={al.league} dir={1} ws={ws} />
-          <Half seeds={nl.seeds} league={nl.league} dir={-1} ws={ws} />
+          <Half seeds={al.seeds} league={al.league} dir={1} ws={ws} series={byId} out={out} />
+          <Half seeds={nl.seeds} league={nl.league} dir={-1} ws={ws} series={byId} out={out} />
 
           {/* The two pennant winners meet in the middle. The name sits above
               the line rather than in a panel on it: a panel wide enough to
@@ -383,9 +456,11 @@ export default function PlayoffBracket({
           >
             WORLD SERIES
           </text>
+          {/* Along the foot with the other rounds', clear of the pennant
+              winners' captions once they fill the two slots beside it. */}
           <text
             x={W / 2}
-            y={MID + 50}
+            y={LABEL_Y}
             textAnchor="middle"
             fontSize={10}
             letterSpacing={1.5}
@@ -393,7 +468,21 @@ export default function PlayoffBracket({
           >
             BEST OF 7
           </text>
-          {ws.size > 0 && (
+          {champion ? (
+            <text
+              x={W / 2}
+              y={MID + 74}
+              textAnchor="middle"
+              fontSize={12}
+              fontWeight="bold"
+              letterSpacing={1.5}
+              fill="var(--color-accent)"
+            >
+              {`CHAMPIONS: ${nickname(champion.name, champion.city).toUpperCase()} ${seriesLine(worldSeries!).replace(/^\S+ WINS /, "")}`}
+            </text>
+          ) : worldSeries && seriesLine(worldSeries) ? (
+            <Score x={W / 2} y={MID + 74} s={worldSeries} />
+          ) : ws.size > 0 && (
             <text
               x={W / 2}
               y={MID + 74}
@@ -417,6 +506,7 @@ export default function PlayoffBracket({
         {seeded
           ? "The postseason field."
           : "Projected seeding — the field as the standings have it today, not a result."}{" "}
+        {real && "Winners move into the slot they have reached, and clubs knocked out fade. "}
         Three division winners seed 1-3 by record, the three best clubs left
         take 4-6, and the top two sit out the wild-card round. MLB does not
         reseed: the 1 seed draws the 4/5 winner and the 2 seed the 3/6 winner.

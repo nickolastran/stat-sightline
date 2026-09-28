@@ -144,6 +144,8 @@ export interface PlayoffOdds {
   as_of: string | null;
   /** Drawn seasons behind every share above. */
   simulations: number;
+  /** The ring is played out of MLB's real bracket, not a drawn season. */
+  postseason?: boolean;
   model: ProjectionModel;
   teams: TeamOdds[];
 }

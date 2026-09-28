@@ -4,11 +4,13 @@ import Panel from "@/components/ui/Panel";
 import ParamTabs from "@/components/mlb/ParamTabs";
 import SeasonSelect from "@/components/mlb/SeasonSelect";
 import WildCard from "@/components/mlb/WildCard";
-import PlayoffOddsTable from "@/components/mlb/PlayoffOddsTable";
+import PlayoffOddsTable, { TitleOdds } from "@/components/mlb/PlayoffOddsTable";
 import PlayoffBracket from "@/components/mlb/PlayoffBracket";
+import PostseasonSchedule from "@/components/mlb/PostseasonSchedule";
 import { Skeleton, SkeletonTable } from "@/components/ui/Skeleton";
 import { getStandings, getWildCard, seasonOf, todayPT } from "@/lib/mlb";
 import { getPlayoffOdds, type PlayoffOdds } from "@/lib/api";
+import { fieldSet, getPostseason, realSeeds, type PostSeries } from "@/lib/playoffs";
 
 /*
  * October, three ways: what the simulation gives every club, the race for the
@@ -19,6 +21,10 @@ import { getPlayoffOdds, type PlayoffOdds } from "@/lib/api";
  * service degrades that view to a notice, and the other two, which are MLB's
  * own standings, carry on. The bracket takes the odds as decoration when they
  * are there and seeds itself from the standings either way.
+ *
+ * Once MLB sets the field, October is no longer a projection: the odds of
+ * making it give way to the odds of winning it all, a SCHEDULE of every
+ * series joins, and the bracket fills in off MLB's own series.
  */
 
 export const metadata: Metadata = { title: "Playoffs" };
@@ -26,16 +32,25 @@ export const metadata: Metadata = { title: "Playoffs" };
 /** The first season under the twelve-club bracket this page draws. */
 const FIRST_SEASON = 2022;
 
-const VIEWS = [
+const RACE = [
   { value: "odds", label: "PLAYOFF ODDS" },
   { value: "wildcard", label: "WILD CARD" },
   { value: "bracket", label: "BRACKET" },
-] as const;
+];
 
-type View = (typeof VIEWS)[number]["value"];
+/** Once the field is set: the same views, the odds now of the title, and the
+ *  schedule of the series. */
+const OCTOBER = [
+  { value: "odds", label: "TITLE ODDS" },
+  { value: "schedule", label: "SCHEDULE" },
+  { value: "bracket", label: "BRACKET" },
+  { value: "wildcard", label: "WILD CARD" },
+];
 
-const pickView = (raw: string | undefined): View =>
-  VIEWS.some((v) => v.value === raw) ? (raw as View) : "odds";
+type View = "odds" | "wildcard" | "bracket" | "schedule";
+
+const pickView = (raw: string | undefined, views: { value: string }[]): View =>
+  views.some((v) => v.value === raw) ? (raw as View) : "odds";
 
 function pickSeason(raw: string | undefined, current: number): number {
   const n = Number(raw);
@@ -52,10 +67,21 @@ const Unavailable = ({ what }: { what: string }) => (
   </p>
 );
 
-async function Body({ view, season }: { view: View; season: number }) {
+async function Body({
+  view,
+  season,
+  series,
+}: {
+  view: View;
+  season: number;
+  /** MLB's postseason series — empty until it has scheduled one. */
+  series: PostSeries[];
+}) {
   try {
     if (view === "wildcard")
       return <WildCard groups={await getWildCard(season)} />;
+
+    if (view === "schedule") return <PostseasonSchedule series={series} />;
 
     if (view === "bracket") {
       const [divisions, odds] = await Promise.all([
@@ -67,14 +93,30 @@ async function Body({ view, season }: { view: View; season: number }) {
           divisions={divisions}
           odds={odds?.teams ?? []}
           seeded={season < seasonOf(todayPT())}
+          series={series}
         />
       );
     }
 
-    const odds = await oddsOrNull(season);
+    const [odds, divisions] = await Promise.all([
+      oddsOrNull(season),
+      fieldSet(series) ? getStandings(season, "R") : null,
+    ]);
     if (!odds)
       return (
         <Unavailable what="PLAYOFF ODDS UNAVAILABLE — THE PROJECTION SERVICE IS NOT RUNNING, OR ITS MODEL HAS NOT BEEN BUILT" />
+      );
+    const seeds = divisions && realSeeds(series, divisions);
+    if (seeds)
+      return (
+        <TitleOdds
+          seeds={seeds}
+          series={series}
+          teams={odds.teams}
+          simulations={odds.simulations}
+          asOf={odds.as_of}
+          postseason={!!odds.postseason}
+        />
       );
     return (
       <PlayoffOddsTable
@@ -95,8 +137,11 @@ export default async function PlayoffsPage({
 }) {
   const sp = await searchParams;
   const current = seasonOf(todayPT());
-  const view = pickView(sp.view);
   const season = pickSeason(sp.season, current);
+  /* A dead MLB API reads as no postseason: the race views still answer. */
+  const series = await getPostseason(season).catch(() => [] as PostSeries[]);
+  const views = fieldSet(series) ? OCTOBER : RACE;
+  const view = pickView(sp.view, views);
 
   return (
     <div className="mx-auto max-w-[100rem] space-y-3 p-3">
@@ -112,13 +157,13 @@ export default async function PlayoffsPage({
             ariaLabel="Playoff view"
             size="lg"
             value={view}
-            options={VIEWS as unknown as { value: string; label: string }[]}
+            options={views}
           />
         </div>
         <Suspense
           key={`${view}-${season}`}
           fallback={
-            view === "bracket" ? (
+            view === "bracket" || view === "schedule" ? (
               <div className="grid grid-cols-1 gap-3 lg:grid-cols-7">
                 {Array.from({ length: 7 }).map((_, i) => (
                   <Skeleton key={i} className="h-40 w-full" delay={i * 0.05} />
@@ -133,7 +178,7 @@ export default async function PlayoffsPage({
             )
           }
         >
-          <Body view={view} season={season} />
+          <Body view={view} season={season} series={series} />
         </Suspense>
       </Panel>
     </div>

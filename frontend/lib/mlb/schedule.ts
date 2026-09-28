@@ -33,6 +33,8 @@ export interface Game {
   state: "Preview" | "Live" | "Final" | string;
   detailedState: string;
   startTime: string; // ISO
+  /** The date is set but first pitch isn't — `startTime` is a placeholder. */
+  timeTBD?: boolean;
   venue: string;
   /** MLB's own day/night mark, which the stat feeds don't carry. */
   night: boolean;
@@ -66,6 +68,7 @@ export const toGame = (g: any): Game => ({
   state: g.status?.abstractGameState ?? "Preview",
   detailedState: g.status?.detailedState ?? "",
   startTime: g.gameDate,
+  timeTBD: !!g.status?.startTimeTBD,
   venue: g.venue?.name ?? "",
   night: g.dayNight === "night",
   inning: g.linescore?.currentInning ?? null,
@@ -159,7 +162,7 @@ export function gameStatus(
     const extra = g.inning && g.inning > 9 ? `/${g.inning}` : "";
     return { text: g.detailedState.toUpperCase() + extra, tone: "final" };
   }
-  return { text: clock(g.startTime, timeZone), tone: "pre" };
+  return { text: g.timeTBD ? "TIME TBD" : clock(g.startTime, timeZone), tone: "pre" };
 }
 
 /*

@@ -7,7 +7,17 @@
  * Run with:  npx tsx lib/playoffs.check.ts
  */
 import assert from "node:assert/strict";
-import { leagueBracket, seedField, seedLeague, isSeeded, BERTHS } from "./playoffs";
+import {
+  leagueBracket,
+  seedField,
+  seedLeague,
+  isSeeded,
+  BERTHS,
+  toSeries,
+  fieldSet,
+  seriesLine,
+  clubLine,
+} from "./playoffs";
 import type { Division, StandingRow } from "./mlb";
 
 const team = (id: number, name: string, wins: number, losses: number) =>
@@ -91,5 +101,38 @@ const nl = al.map((d) => division(d.id + 3, d.name.replace("AL", "NL"), 104, d.t
 const field = seedField([...nl, ...al]);
 assert.deepEqual(field.map((f) => f.leagueId), [103, 104]);
 assert.equal(field[0].seeds.length, BERTHS);
+
+/* ── MLB's series: wins tallied off finals, a winner once one reaches it ── */
+
+const game = (home: [number, string], away: [number, string], homeWon: boolean | null) => ({
+  gamePk: Math.random(),
+  gamesInSeries: 3,
+  status: { abstractGameState: homeWon === null ? "Preview" : "Final" },
+  teams: {
+    home: { team: { id: home[0], abbreviation: home[1] }, isWinner: homeWon === true },
+    away: { team: { id: away[0], abbreviation: away[1] }, isWinner: homeWon === false },
+  },
+});
+const NYY: [number, string] = [147, "NYY"];
+const BOS: [number, string] = [111, "BOS"];
+
+const live = toSeries({ series: { id: "F_2" }, games: [game(NYY, BOS, false), game(NYY, BOS, true), game(NYY, BOS, null)] });
+assert.equal(live.round, "WC");
+assert.equal(live.label, "AL WILD CARD");
+assert.equal(live.winner, null);
+assert.equal(seriesLine(live), "TIED 1-1");
+assert.equal(clubLine([live], 111), "TIED AL WILD CARD 1-1");
+
+const done = toSeries({ series: { id: "F_2" }, games: [game(NYY, BOS, false), game(NYY, BOS, false)] });
+assert.equal(done.winner, 111);
+assert.equal(seriesLine(done), "BOS WINS 2-0");
+assert.equal(clubLine([done], 147), "LOST AL WILD CARD 0-2");
+
+/* A division series with its wild-card side still a placeholder is a bye —
+   and the placeholder is no club, so the field isn't set off it alone. */
+const bye = toSeries({ series: { id: "D_1" }, games: [game([139, "TB"], [5529, "NYY/BOS"], null)] });
+assert.equal(bye.label, "ALDS");
+assert.equal(clubLine([bye], 139), "BYE");
+assert.equal(fieldSet([live, bye]), false);
 
 console.log("playoffs.check.ts OK");
