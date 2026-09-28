@@ -33,6 +33,7 @@ from src.stat_sightline.standings.ingest import get_schedule, iter_games, today_
 from src.stat_sightline.standings.project import is_remaining, record_played
 
 TEAMS_URL = "https://statsapi.mlb.com/api/v1/teams"
+POSTSEASON_URL = "https://statsapi.mlb.com/api/v1/schedule/postseason/series"
 
 #: Drawn seasons. Five thousand holds a percentage point steady to about ±0.7,
 #: which is the precision the table prints at.
@@ -178,18 +179,23 @@ def draw_seasons(field: Field, sims: int, rng: np.random.Generator) -> np.ndarra
     return total
 
 
-def _series(rng, hi: int, lo: int, best_of: int, matchup: np.ndarray) -> int:
-    """Play one series out. `hi` is the higher seed, which carries home field."""
+def _series(
+    rng, hi: int, lo: int, best_of: int, matchup: np.ndarray, hi_wins: int = 0, lo_wins: int = 0
+) -> int:
+    """Play one series out. `hi` is the higher seed, which carries home field.
+
+    `hi_wins`/`lo_wins` are games already won, so a series under way picks up
+    at the game it has reached — and one already decided just returns.
+    """
     need = best_of // 2 + 1
-    hi_wins = lo_wins = 0
-    for at_home in HOME_PATTERN[best_of]:
+    for at_home in HOME_PATTERN[best_of][hi_wins + lo_wins:]:
+        if hi_wins == need or lo_wins == need:
+            break
         p = matchup[hi, lo] if at_home else 1.0 - matchup[lo, hi]
         if rng.random() < p:
             hi_wins += 1
         else:
             lo_wins += 1
-        if hi_wins == need or lo_wins == need:
-            break
     return hi if hi_wins == need else lo
 
 
@@ -256,6 +262,84 @@ def simulate(field: Field, sims: int = SIMS, seed: int = 0) -> dict[str, np.ndar
     return {"made": made, "div": div, "bye": bye, "ring": ring, "totals": totals}
 
 
+#: The round-one series ids MLB schedules under, and which seeds are in them:
+#: (league, home seed, away seed), league 0 the AL. A division series' away
+#: side is the wild-card winner, so only its home seed is fixed. The ids have
+#: held since the twelve-club bracket began in 2022.
+SLOTS = {
+    "F_1": (0, 3, 6), "F_2": (0, 4, 5), "F_3": (1, 3, 6), "F_4": (1, 4, 5),
+    "D_1": (0, 1, None), "D_2": (0, 2, None), "D_3": (1, 1, None), "D_4": (1, 2, None),
+}
+
+
+def get_postseason(season: int) -> dict[str, list[dict]]:
+    """Series id -> its games, off MLB's postseason schedule."""
+    res = requests.get(POSTSEASON_URL, params={"sportId": 1, "season": season}, timeout=60)
+    res.raise_for_status()
+    return {s["series"]["id"]: s.get("games", []) for s in res.json().get("series", [])}
+
+
+def read_bracket(series: dict[str, list[dict]], at: dict[int, int]):
+    """The real field, or None before it is set.
+
+    Returns (seeds, won): each league's six seeds as field indices, best
+    first, and the games each club has won so far in each series.
+    """
+    seeds = [[None] * BERTHS, [None] * BERTHS]
+    for sid, (lg, home, away) in SLOTS.items():
+        games = series.get(sid)
+        if not games:
+            return None
+        teams = games[0]["teams"]
+        for seed, side in ((home, "home"), (away, "away")):
+            if seed is not None:
+                seeds[lg][seed - 1] = at.get(teams[side]["team"].get("id"))
+    if any(i is None for league in seeds for i in league):
+        return None
+
+    won: dict[str, dict[int, int]] = {}
+    for sid, games in series.items():
+        tally = won.setdefault(sid, {})
+        for g in games:
+            if g.get("status", {}).get("abstractGameState") != "Final":
+                continue
+            for side in ("home", "away"):
+                t = g["teams"][side]
+                i = at.get(t["team"].get("id"))
+                if i is not None and t.get("isWinner"):
+                    tally[i] = tally.get(i, 0) + 1
+    return seeds, won
+
+
+def simulate_postseason(
+    field: Field, seeds: list[list[int]], won: dict[str, dict[int, int]], sims: int = SIMS, seed: int = 0
+) -> np.ndarray:
+    """Rings per club across `sims` playings of the real bracket, each series
+    picking up from where it actually stands."""
+    rng = np.random.default_rng(seed)
+    ring = np.zeros(field.n)
+
+    def play(sid: str, hi: int, lo: int, best_of: int) -> int:
+        w = won.get(sid, {})
+        return _series(rng, hi, lo, best_of, field.matchup, w.get(hi, 0), w.get(lo, 0))
+
+    for _ in range(sims):
+        pennants = []
+        for lg, s in enumerate(seeds):
+            low = play(f"F_{2 * lg + 1}", s[2], s[5], 3)
+            high = play(f"F_{2 * lg + 2}", s[3], s[4], 3)
+            one = play(f"D_{2 * lg + 1}", s[0], high, 5)
+            two = play(f"D_{2 * lg + 2}", s[1], low, 5)
+            # The better seed hosts the championship series.
+            hi, lo = (one, two) if s.index(one) < s.index(two) else (two, one)
+            pennants.append(play(f"L_{lg + 1}", hi, lo, 7))
+        # The better regular-season record hosts the World Series.
+        a, b = pennants
+        hi, lo = (a, b) if field.wins[a] >= field.wins[b] else (b, a)
+        ring[play("W_1", hi, lo, 7)] += 1
+    return ring
+
+
 def _rank(a: int, b: int, totals: np.ndarray, jitter: np.ndarray) -> tuple[int, int]:
     """The pair, better record first — which is who gets home field."""
     return (a, b) if totals[a] + jitter[a] >= totals[b] + jitter[b] else (b, a)
@@ -269,6 +353,15 @@ def playoff_odds(season: int, games: pd.DataFrame, bundle: dict, sims: int = SIM
     """The odds table: one row per club, grouped by division by the caller."""
     field = build_field(season, games, bundle)
     out = simulate(field, sims)
+
+    # Once MLB has set the field, the regular-season draws are moot: the
+    # berths are known, and the ring is played out from the real bracket.
+    bracket = read_bracket(get_postseason(season), {int(t): i for i, t in enumerate(field.ids)})
+    if bracket:
+        seeds, won = bracket
+        made = np.zeros(field.n)
+        made[[i for league in seeds for i in league]] = sims
+        out = {**out, "made": made, "ring": simulate_postseason(field, seeds, won, sims)}
     totals = out["totals"]
 
     played = field.wins + field.losses
@@ -340,6 +433,7 @@ def playoff_odds(season: int, games: pd.DataFrame, bundle: dict, sims: int = SIM
         "season": season,
         "as_of": field.as_of,
         "simulations": sims,
+        "postseason": bracket is not None,
         "model": {**bundle.get("metrics", {}), "trained_at": bundle.get("trained_at")},
         "teams": teams,
     }

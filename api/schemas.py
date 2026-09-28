@@ -110,6 +110,7 @@ class PlayoffOdds(BaseModel):
     season: int
     as_of: str | None = None
     simulations: int             # drawn seasons behind every share above
+    postseason: bool = False     # the ring is played out of the real bracket
     model: ModelInfo
     teams: list[TeamOdds]
 

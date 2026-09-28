@@ -124,3 +124,48 @@ def test_seeding_takes_division_winners_first():
     assert seeds[:3] == [1, 2, 4], "one winner per division, best record first"
     assert set(seeds[3:]) == {0, 3, 5}, "the rest fill the wild cards"
     assert len(seeds) == odds.BERTHS
+
+
+def _bracket_games(field: odds.Field, won: dict[str, tuple[int, int]] = {}) -> dict[str, list[dict]]:
+    """MLB's postseason payload for a field whose seeds are indices 0-5 (AL)
+    and 15-20 (NL), with `won` games already final in any series named."""
+    seeds = [list(range(6)), list(range(15, 21))]
+    series = {}
+    for sid, (lg, home, away) in odds.SLOTS.items():
+        h = int(field.ids[seeds[lg][home - 1]])
+        a = int(field.ids[seeds[lg][away - 1]]) if away else 9999  # "NYY/BOS"
+        team = lambda tid, win: {"team": {"id": tid}, "isWinner": win}
+        hw, aw = won.get(sid, (0, 0))
+        finals = [
+            {"status": {"abstractGameState": "Final"}, "teams": {"home": team(h, i < hw), "away": team(a, i >= hw)}}
+            for i in range(hw + aw)
+        ]
+        series[sid] = finals or [{"status": {"abstractGameState": "Preview"}, "teams": {"home": team(h, False), "away": team(a, False)}}]
+    return series
+
+
+def test_the_real_bracket_hands_out_one_ring_per_playing():
+    field = _field()
+    at = {int(t): i for i, t in enumerate(field.ids)}
+    seeds, won = odds.read_bracket(_bracket_games(field), at)
+    assert seeds == [list(range(6)), list(range(15, 21))]
+    ring = odds.simulate_postseason(field, seeds, won, sims=300)
+    assert ring.sum() == pytest.approx(300)
+    assert set(np.flatnonzero(ring)) <= set(range(6)) | set(range(15, 21))
+
+
+def test_a_club_knocked_out_cannot_win_it_all():
+    """The 6 seed lost its wild-card series 2-0: every playing of the rest of
+    the bracket leaves it without a ring, and the 3 seed alive."""
+    field = _field()
+    at = {int(t): i for i, t in enumerate(field.ids)}
+    seeds, won = odds.read_bracket(_bracket_games(field, {"F_1": (2, 0)}), at)
+    ring = odds.simulate_postseason(field, seeds, won, sims=500)
+    assert ring[5] == 0
+    assert ring[2] > 0
+
+
+def test_no_bracket_before_the_field_is_set():
+    field = _field()
+    at = {int(t): i for i, t in enumerate(field.ids)}
+    assert odds.read_bracket({}, at) is None

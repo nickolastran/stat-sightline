@@ -102,6 +102,10 @@ const TEAM_COLORS: Record<number, string> = {
   158: "#12284b", // MIL
 };
 
+/** A current MLB club, as opposed to a placeholder like "NYY/BOS" that the
+ *  postseason schedule carries until a series is decided. */
+export const isClub = (id: number | undefined) => !!id && id in TEAM_COLORS;
+
 /** A club's colour, falling back to the app's accent for anyone unlisted. */
 export const teamColor = (id: number | undefined) =>
   (id && TEAM_COLORS[id]) || "var(--color-accent)";

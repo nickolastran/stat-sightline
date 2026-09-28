@@ -1,5 +1,6 @@
 import TeamLink from "@/components/mlb/TeamLink";
 import type { TeamOdds } from "@/lib/api";
+import { clubLine, type PostSeries, type Seed } from "@/lib/playoffs";
 
 /*
  * Playoff odds, a table per division: what a club has done on the left, and
@@ -233,6 +234,89 @@ export default function PlayoffOddsTable({
         WILD CARD add up to PLAYOFFS. Ties are settled by a coin flip rather
         than MLB&apos;s head-to-head ladder, and no club&apos;s form is allowed to move
         between now and October.
+      </p>
+    </div>
+  );
+}
+
+/*
+ * Once the field is set, the one question left: who wins it all. The twelve
+ * clubs MLB seeded, most likely first, beside where each one's October
+ * stands — a club at 0% is one already knocked out.
+ */
+export function TitleOdds({
+  seeds,
+  series,
+  teams,
+  simulations,
+  asOf,
+  postseason,
+}: {
+  /** Both leagues' seeds, AL first. */
+  seeds: Seed[][];
+  series: PostSeries[];
+  teams: TeamOdds[];
+  simulations: number;
+  asOf: string | null;
+  /** Played out of the real bracket, rather than a pre-October simulation. */
+  postseason: boolean;
+}) {
+  const odds = new Map(teams.map((t) => [t.team_id, t.win_world_series]));
+  const rows = seeds
+    .flatMap((league, lg) => league.map((s) => ({ ...s, lg: lg ? "NL" : "AL" })))
+    .sort((a, b) => (odds.get(b.team.id) ?? 0) - (odds.get(a.team.id) ?? 0));
+
+  return (
+    <div className="space-y-3">
+      <div className="overflow-x-auto border border-line">
+        <table className="w-full border-collapse text-xs">
+          <thead>
+            <tr>
+              <th scope="col" className={`${TH} w-36 min-w-36 text-left`}>TEAM</th>
+              <th scope="col" className={TH} title="League and seed">SEED</th>
+              <th scope="col" className={TH} title="Regular-season record">W-L</th>
+              <th scope="col" className={`${TH} text-left`} title="Where the club's postseason stands">
+                SERIES
+              </th>
+              <th scope="col" className={TH} title="Share of simulations this club wins the World Series">
+                WIN WS
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r) => {
+              const p = odds.get(r.team.id);
+              return (
+                <tr key={r.team.id} className="border-b border-grid last:border-b-0 hover:bg-surface-2">
+                  <td className="w-36 min-w-36 px-2 py-1.5 whitespace-nowrap">
+                    <TeamLink id={r.team.id} name={r.team.name} />
+                  </td>
+                  <td className="px-2 py-1.5 text-right tabular-nums text-ink-2">
+                    {r.lg} {r.seed}
+                  </td>
+                  <td className="px-2 py-1.5 text-right tabular-nums text-ink-2">
+                    {r.team.wins}-{r.team.losses}
+                  </td>
+                  <td className="px-2 py-1.5 whitespace-nowrap text-[10px] tracking-wider text-ink-3">
+                    {clubLine(series, r.team.id)}
+                  </td>
+                  <td className={`px-2 py-1.5 text-right tabular-nums ${p === undefined ? "text-ink-3" : shade(p)}`}>
+                    {p === undefined ? "—" : PCT(p)}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+      <p className="text-[10px] leading-relaxed tracking-wider text-ink-3">
+        {postseason
+          ? `${simulations.toLocaleString()} playings of the bracket from where every series stands${
+              asOf ? `, off form through ${asOf}` : ""
+            }. Each game left is drawn at the model's own probability for it, with home field as MLB schedules it.`
+          : `${simulations.toLocaleString()} simulated seasons${
+              asOf ? `, through ${asOf}` : ""
+            } — the odds as the regular season ended, before a postseason game was played.`}
       </p>
     </div>
   );
