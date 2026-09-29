@@ -118,6 +118,14 @@ body {
   }
 }
 
+/* The page's scrollbar keeps its lane even when the page is short enough not
+   to need one — a section re-suspending into its shorter skeleton would
+   otherwise drop the bar, widen the page, and slide everything right-aligned
+   in the header across and back. */
+html {
+  scrollbar-gutter: stable;
+}
+
 /* Hairline scrollbars to match the chrome. */
 * {
   scrollbar-width: thin;

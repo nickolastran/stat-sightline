@@ -28,10 +28,19 @@ const tiedRanks = (leaders: LeaderRow[]) =>
 /** Rows a card carries — the rest of the league is a page of its own. */
 const SHOWN = 5;
 
+/* One height for every line — a headshot, a club mark or nothing at all —
+   so a card is the same size whatever it ranks. */
+const LINE = "flex h-8 items-center gap-2 border-b border-grid px-3 text-xs last:border-b-0";
+
+/* The footer strip, link or not, so a card with no full board behind it
+   still ends where its neighbours do. */
+const FOOT =
+  "flex items-center justify-center gap-1 border-t border-line py-1 text-[10px] tracking-[0.2em] text-ink-3";
+
 /** One ranked line: rank (tie-marked), player, value. */
 function Row({ leader, tied }: { leader: LeaderRow; tied: boolean }) {
   return (
-    <li className="flex items-center gap-2 border-b border-grid px-3 py-1.5 text-xs last:border-b-0">
+    <li className={LINE}>
       <span className="w-6 text-right text-[10px] text-ink-3 tabular-nums">
         {tied ? `T-${leader.rank}` : leader.rank}
       </span>
@@ -86,14 +95,20 @@ function Board({
         {board.leaders.slice(0, SHOWN).map((l) => (
           <Row key={l.teamId ?? l.personId} leader={l} tied={tied.has(l.rank)} />
         ))}
+        {/* A short board — early spring, a thin October pool — keeps five
+            lines, the empty ones blank. */}
+        {Array.from({ length: Math.max(0, SHOWN - board.leaders.length) }, (_, i) => (
+          <li key={`pad-${i}`} className={LINE} aria-hidden />
+        ))}
       </ol>
-      {href && (
-        <Link
-          href={href}
-          className="flex items-center justify-center gap-1 border-t border-line py-1 text-[10px] tracking-[0.2em] text-ink-3 hover:text-ink"
-        >
+      {href ? (
+        <Link href={href} className={`${FOOT} hover:text-ink`}>
           COMPLETE LIST →
         </Link>
+      ) : (
+        <div className={FOOT} aria-hidden>
+          &nbsp;
+        </div>
       )}
     </div>
   );
