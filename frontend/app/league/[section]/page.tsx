@@ -32,6 +32,7 @@ import {
   getTeamStats,
   getLeaderboards,
   getStatLeaders,
+  postseasonStart,
   leaderCols,
   pickLeaderOrder,
   pickLeaderStat,
@@ -314,11 +315,18 @@ export default async function LeagueSectionPage({
     probables && (picked < today || picked > lastProbable) ? today : picked;
   const gameType = typed ? pickGameType(sp.type) : "R";
   const group = pickGroup(sp.group);
+  /* Once this October's first pitch is thrown, the player boards open on the
+     postseason — the regular season is settled and the playoffs are what is
+     being played. A chosen type, or any other year, reads as asked. */
+  const start =
+    playerBoard && season === current
+      ? await postseasonStart(current).catch(() => null)
+      : null;
   const players: PlayerQuery = {
     group,
     /* Player boards carry a post-season of their own, which no standings or
        team table does — so this is the three-way game type, not the two. */
-    type: pickPlayerGameType(sp.type),
+    type: pickPlayerGameType(sp.type, start && today >= start ? "P" : "R"),
     stat: pickLeaderStat(sp.stat, group),
     league: inList(sp.league, LEADER_LEAGUES),
     position: inList(sp.pos, leaderPositions(group)),

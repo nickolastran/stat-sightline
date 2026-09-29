@@ -120,6 +120,20 @@ export async function getSchedule(date: string): Promise<Game[]> {
 }
 
 /**
+ * The day a season's postseason throws its first pitch, YYYY-MM-DD, or null
+ * before one is scheduled. Off the schedule rather than the season's own
+ * `postSeasonStartDate`, which MLB sets a day early to leave room for a
+ * tiebreaker nobody plays.
+ */
+export async function postseasonStart(season: number): Promise<string | null> {
+  const data = await mlb(
+    `/schedule?sportId=1&season=${season}&gameType=F,D,L,W&fields=dates,date`,
+    3600,
+  );
+  return data.dates?.[0]?.date ?? null;
+}
+
+/**
  * One game's schedule row — the header half of /game/[pk] (records, status,
  * venue, probables), which the box score payload alone doesn't carry. Null for
  * an unknown gamePk so the route can 404.
