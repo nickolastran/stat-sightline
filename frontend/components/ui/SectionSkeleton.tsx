@@ -80,6 +80,7 @@ export default function SectionSkeleton({ section }: { section: string }) {
       return <SkeletonTable rows={16} heading={false} />;
 
     case "leaders":
+    case "teamleaders":
       return (
         <div className="space-y-3">
           <Controls width="w-32" />

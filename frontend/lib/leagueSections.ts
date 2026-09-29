@@ -16,6 +16,7 @@ export const LEAGUE_SECTIONS = [
   { id: "standings", tab: "STANDINGS", title: "STANDINGS" },
   { id: "wildcard", tab: "WILD CARD", title: "WILD CARD RACE", inBar: false },
   { id: "leaders", tab: "STAT LEADERS", title: "STAT LEADERS" },
+  { id: "teamleaders", tab: "TEAM LEADERS", title: "TEAM LEADERS" },
   { id: "players", tab: "PLAYER STATS", title: "PLAYER STATISTICS" },
   { id: "teams", tab: "TEAM STATS", title: "TEAM STATISTICS" },
   { id: "abs", tab: "ABS", title: "ABS CHALLENGES" },
@@ -47,6 +48,7 @@ export const STANDINGS_VIEWS = [
 const WIDE = new Set([
   "scoreboard",
   "leaders",
+  "teamleaders",
   "gamefeed",
   "probables",
   "players",

@@ -31,6 +31,7 @@ import {
   getWildCard,
   getTeamStats,
   getLeaderboards,
+  getTeamLeaderboards,
   getStatLeaders,
   postseasonStart,
   leaderCols,
@@ -58,7 +59,7 @@ import AbsFilterBar from "@/components/mlb/AbsFilterBar";
 import { getAbsLeaders, pickAbsQuery, type AbsQuery } from "@/lib/abs";
 import { getGameFeed } from "@/lib/gamefeed";
 import { getProjections, type StandingsProjection } from "@/lib/api";
-import { getCwpaBoards } from "@/lib/cwpa";
+import { getCwpaBoards, getTeamCwpaBoards } from "@/lib/cwpa";
 
 /*
  * One league reference section per route — the targets the league bar opens
@@ -192,6 +193,20 @@ async function SectionBody({
           />
         );
       }
+      case "teamleaders": {
+        const [cwpa, boards] = await Promise.all([
+          leaderType === "P" ? getTeamCwpaBoards(season).catch(() => []) : [],
+          getTeamLeaderboards(season, leaderType),
+        ]);
+        return (
+          <Leaderboards
+            boards={[...cwpa, ...boards]}
+            season={season}
+            gameType={leaderType}
+            teams
+          />
+        );
+      }
       case "gamefeed":
         return <GameFeed feed={await getGameFeed(date)} />;
       case "probables":
@@ -314,6 +329,7 @@ export default async function LeagueSectionPage({
   const absBoard = found.id === "abs";
   const seasonal =
     found.id === "leaders" ||
+    found.id === "teamleaders" ||
     found.id === "standings" ||
     found.id === "wildcard" ||
     found.id === "teams" ||
@@ -334,7 +350,8 @@ export default async function LeagueSectionPage({
      leaders open on the postseason — the regular season is settled and the
      playoffs are what is being played. A chosen type, or any other year,
      reads as asked. */
-  const leadersBoard = found.id === "leaders";
+  /* Player cards and club cards, one set of controls between them. */
+  const leadersBoard = found.id === "leaders" || found.id === "teamleaders";
   const start =
     (playerBoard || leadersBoard) && season === current
       ? await postseasonStart(current).catch(() => null)

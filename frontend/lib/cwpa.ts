@@ -1,4 +1,4 @@
-import { mlb, type Leaderboard, type LeaderRow } from "@/lib/mlb";
+import { mlb, rankTeams, type Leaderboard, type LeaderRow } from "@/lib/mlb";
 import { playSwings, WP_FIELDS } from "@/lib/gamefeed";
 
 /*
@@ -62,6 +62,7 @@ interface Mark {
   personId: number;
   name: string;
   team: string;
+  teamId: number;
   value: number;
 }
 
@@ -86,8 +87,14 @@ function rank(marks: Map<number, Mark>, limit: number): LeaderRow[] {
 export function cwpaTotals(games: any[], wpLogs: unknown[]) {
   const bat = new Map<number, Mark>();
   const arm = new Map<number, Mark>();
-  const add = (at: Map<number, Mark>, p: any, team: string, by: number) => {
-    const m = at.get(p.id) ?? { personId: p.id, name: p.fullName ?? "—", team, value: 0 };
+  const add = (at: Map<number, Mark>, p: any, club: any, by: number) => {
+    const m = at.get(p.id) ?? {
+      personId: p.id,
+      name: p.fullName ?? "—",
+      team: club?.name ?? "",
+      teamId: club?.id,
+      value: 0,
+    };
     m.value += by;
     at.set(p.id, m);
   };
@@ -95,8 +102,8 @@ export function cwpaTotals(games: any[], wpLogs: unknown[]) {
   games.forEach((g, i) => {
     const [w, l] = scoreBefore(g);
     const stake = gameStake(g.gameType, g.gamesInSeries ?? 0, w, l);
-    const away = g.teams?.away?.team?.name ?? "";
-    const home = g.teams?.home?.team?.name ?? "";
+    const away = g.teams?.away?.team;
+    const home = g.teams?.home?.team;
     for (const s of playSwings(wpLogs[i])) {
       /* The top half is the away club batting. */
       const [batFor, armFor] = s.top ? [away, home] : [home, away];
@@ -107,11 +114,8 @@ export function cwpaTotals(games: any[], wpLogs: unknown[]) {
   return { bat, arm };
 }
 
-/** The two cWPA cards that open the postseason leaders, hitting and pitching. */
-export async function getCwpaBoards(
-  season: number,
-  limit = 20,
-): Promise<Leaderboard[]> {
+/** A postseason's batter and pitcher cWPA totals, fetched and folded. */
+async function seasonCwpa(season: number) {
   const data = await mlb(
     `/schedule?sportId=1&season=${season}&gameType=F,D,L,W&hydrate=team`,
     300,
@@ -126,7 +130,15 @@ export async function getCwpaBoards(
       ),
     ),
   );
-  const { bat, arm } = cwpaTotals(games, wpLogs);
+  return cwpaTotals(games, wpLogs);
+}
+
+/** The two cWPA cards that open the postseason leaders, hitting and pitching. */
+export async function getCwpaBoards(
+  season: number,
+  limit = 20,
+): Promise<Leaderboard[]> {
+  const { bat, arm } = await seasonCwpa(season);
   const board = (group: "hitting" | "pitching", marks: Map<number, Mark>) => ({
     code: `${group}.cwpa`,
     label: "cWPA",
@@ -135,5 +147,31 @@ export async function getCwpaBoards(
     stat: null,
     leaders: rank(marks, limit),
   });
+  return [board("hitting", bat), board("pitching", arm)];
+}
+
+/**
+ * The same two cards for the clubs: each one's batters, and each one's arms,
+ * summed — a pennant winner's hitters carry the title odds they added.
+ */
+export async function getTeamCwpaBoards(
+  season: number,
+  limit = 5,
+): Promise<Leaderboard[]> {
+  const { bat, arm } = await seasonCwpa(season);
+  const board = (group: "hitting" | "pitching", marks: Map<number, Mark>) => {
+    const clubs = new Map<number, { id: number; name: string; v: number }>();
+    for (const m of marks.values()) {
+      const c = clubs.get(m.teamId) ?? { id: m.teamId, name: m.team, v: 0 };
+      c.v += m.value;
+      clubs.set(m.teamId, c);
+    }
+    const leaders = rankTeams(
+      [...clubs.values()].map((c) => ({ id: c.id, name: c.name, value: String(c.v) })),
+      false,
+      limit,
+    ).map((l) => ({ ...l, value: `${(Number(l.value) * 100).toFixed(1)}%` }));
+    return { code: `team.${group}.cwpa`, label: "cWPA", group, stat: null, leaders };
+  };
   return [board("hitting", bat), board("pitching", arm)];
 }

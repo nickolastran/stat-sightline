@@ -14,6 +14,7 @@ import {
   toGame,
 } from "./schedule";
 import {
+  getTeamStats,
   latestByGame,
   seasonQualityStarts,
   seasonWar,
@@ -35,6 +36,9 @@ import {
 export interface LeaderRow {
   rank: number;
   personId: number;
+  /** Set on a club's row — a team leader card — which links to the club
+   *  rather than to a player. */
+  teamId?: number;
   name: string;
   team: string;
   value: string;
@@ -297,6 +301,96 @@ export async function getLeaderboards(
        here rather than by MLB, so it isn't one of them. */
     qsBoard(season, limit, gameType),
   ]);
+}
+
+/* ── Team leaders ───────────────────────────────────────────────────── */
+
+/** Clubs ranked on one figure, ties sharing a rank, best `limit` kept. */
+export function rankTeams(
+  clubs: { id: number; name: string; value: string }[],
+  asc: boolean,
+  limit: number,
+): LeaderRow[] {
+  const sorted = clubs
+    /* A blank is no figure at all, not a zero — WAR outside the season. */
+    .filter((c) => c.value.trim() !== "" && !Number.isNaN(Number(c.value)))
+    .sort((a, b) =>
+      asc ? Number(a.value) - Number(b.value) : Number(b.value) - Number(a.value),
+    );
+  return sorted.slice(0, limit).map((c) => ({
+    rank: sorted.findIndex((x) => x.value === c.value) + 1,
+    personId: c.id,
+    teamId: c.id,
+    name: c.name,
+    team: c.name,
+    value: c.value,
+  }));
+}
+
+/**
+ * The stat leader cards again, for the thirty clubs: WAR first in the
+ * regular season, then every category the player cards carry, quality
+ * starts last. Read off the same cached team tables the TEAM STATISTICS
+ * section shows, so it costs no requests of its own but the quality starts.
+ * No qualifier — every club plays enough of its own games.
+ */
+export async function getTeamLeaderboards(
+  season: number,
+  gameType: PlayerGameType = "R",
+  limit = 5,
+): Promise<Leaderboard[]> {
+  const [tables, qs] = await Promise.all([
+    getTeamStats(season, gameType),
+    seasonQualityStarts(season, gameType).catch(() => []),
+  ]);
+  const board = (
+    group: "hitting" | "pitching",
+    stat: string,
+    label: string,
+    asc = false,
+  ): Leaderboard => ({
+    code: `team.${group}.${stat}`,
+    label,
+    group,
+    stat,
+    leaders: rankTeams(
+      (tables.find((t) => t.group === group)?.rows ?? []).map((r) => ({
+        id: r.id,
+        name: r.name,
+        value: String(r.values[stat] ?? ""),
+      })),
+      asc,
+      limit,
+    ),
+  });
+
+  /* Quality starts are a pitcher's line; a club's is its starters' summed. */
+  const byName = new Map<string, number>();
+  for (const l of qs) byName.set(l.team, (byName.get(l.team) ?? 0) + l.qs);
+  const pitchingRows = tables.find((t) => t.group === "pitching")?.rows ?? [];
+
+  return [
+    /* Empty outside the regular season, and dropped by the page like any
+       empty card — the sabermetrics feed has no October or spring. */
+    board("hitting", "war", "WAR"),
+    board("pitching", "war", "WAR"),
+    ...LEADER_SPECS.map((s) => board(s.group, s.stat, s.label, s.rate === "asc")),
+    {
+      code: "team.pitching.qualityStarts",
+      label: "QUALITY STARTS",
+      group: "pitching",
+      stat: "qualityStarts",
+      leaders: rankTeams(
+        pitchingRows.map((r) => ({
+          id: r.id,
+          name: r.name,
+          value: String(byName.get(r.name) ?? 0),
+        })),
+        false,
+        limit,
+      ),
+    },
+  ];
 }
 
 /* ── League-wide player leaders ─────────────────────────────────────── */

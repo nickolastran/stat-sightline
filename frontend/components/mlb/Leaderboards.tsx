@@ -5,6 +5,7 @@ import { useState } from "react";
 import type { Leaderboard, LeaderRow, PlayerGameType } from "@/lib/mlb";
 import SegmentedControl from "@/components/ui/SegmentedControl";
 import PlayerLink from "@/components/mlb/PlayerLink";
+import TeamLink from "@/components/mlb/TeamLink";
 
 /*
  * Season stat leaders, split into hitting / pitching via a segmented toggle.
@@ -35,7 +36,11 @@ function Row({ leader, tied }: { leader: LeaderRow; tied: boolean }) {
         {tied ? `T-${leader.rank}` : leader.rank}
       </span>
       <span className="min-w-0 flex-1 truncate text-ink-2">
-        <PlayerLink id={leader.personId}>{leader.name}</PlayerLink>
+        {leader.teamId ? (
+          <TeamLink id={leader.teamId} name={leader.name} />
+        ) : (
+          <PlayerLink id={leader.personId}>{leader.name}</PlayerLink>
+        )}
       </span>
       <span className="w-14 text-right font-bold text-ink tabular-nums">
         {leader.value}
@@ -54,12 +59,23 @@ function Board({
   board,
   season,
   gameType,
+  teams,
 }: {
   board: Leaderboard;
   season: number;
   gameType: PlayerGameType;
+  teams: boolean;
 }) {
   const tied = tiedRanks(board.leaders);
+  /* A club card hands off to the team table, which has no October of its
+     own — so a postseason club card is the whole board. */
+  const href = !board.stat
+    ? null
+    : teams
+      ? gameType === "P"
+        ? null
+        : `/league/teams?season=${season}${gameType === "S" ? "&type=S" : ""}`
+      : `/league/players?season=${season}&group=${board.group}&stat=${board.stat}&type=${gameType}`;
 
   return (
     <div className="self-start border border-line bg-bg">
@@ -68,12 +84,12 @@ function Board({
       </h3>
       <ol>
         {board.leaders.slice(0, SHOWN).map((l) => (
-          <Row key={l.personId} leader={l} tied={tied.has(l.rank)} />
+          <Row key={l.teamId ?? l.personId} leader={l} tied={tied.has(l.rank)} />
         ))}
       </ol>
-      {board.stat && (
+      {href && (
         <Link
-          href={`/league/players?season=${season}&group=${board.group}&stat=${board.stat}&type=${gameType}`}
+          href={href}
           className="flex items-center justify-center gap-1 border-t border-line py-1 text-[10px] tracking-[0.2em] text-ink-3 hover:text-ink"
         >
           COMPLETE LIST →
@@ -87,10 +103,13 @@ export default function Leaderboards({
   boards,
   season,
   gameType = "R",
+  teams = false,
 }: {
   boards: Leaderboard[];
   season: number;
   gameType?: PlayerGameType;
+  /** Club cards rather than player ones — the TEAM LEADERS section. */
+  teams?: boolean;
 }) {
   const [group, setGroup] = useState<"hitting" | "pitching">("hitting");
   const shown = boards.filter((b) => b.group === group && b.leaders.length > 0);
@@ -116,7 +135,13 @@ export default function Leaderboards({
       ) : (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
           {shown.map((b) => (
-            <Board key={b.code} board={b} season={season} gameType={gameType} />
+            <Board
+              key={b.code}
+              board={b}
+              season={season}
+              gameType={gameType}
+              teams={teams}
+            />
           ))}
         </div>
       )}
