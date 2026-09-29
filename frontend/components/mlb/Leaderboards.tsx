@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import type { Leaderboard, LeaderRow } from "@/lib/mlb";
+import type { Leaderboard, LeaderRow, PlayerGameType } from "@/lib/mlb";
 import SegmentedControl from "@/components/ui/SegmentedControl";
 import PlayerLink from "@/components/mlb/PlayerLink";
 
@@ -50,7 +50,15 @@ function Row({ leader, tied }: { leader: LeaderRow; tied: boolean }) {
  * what marks the players left off. The whole league in this figure is the
  * player table, ranked and filterable, rather than more rows in a box.
  */
-function Board({ board, season }: { board: Leaderboard; season: number }) {
+function Board({
+  board,
+  season,
+  gameType,
+}: {
+  board: Leaderboard;
+  season: number;
+  gameType: PlayerGameType;
+}) {
   const tied = tiedRanks(board.leaders);
 
   return (
@@ -63,12 +71,14 @@ function Board({ board, season }: { board: Leaderboard; season: number }) {
           <Row key={l.personId} leader={l} tied={tied.has(l.rank)} />
         ))}
       </ol>
-      <Link
-        href={`/league/players?season=${season}&group=${board.group}&stat=${board.stat}`}
-        className="flex items-center justify-center gap-1 border-t border-line py-1 text-[10px] tracking-[0.2em] text-ink-3 hover:text-ink"
-      >
-        COMPLETE LIST →
-      </Link>
+      {board.stat && (
+        <Link
+          href={`/league/players?season=${season}&group=${board.group}&stat=${board.stat}&type=${gameType}`}
+          className="flex items-center justify-center gap-1 border-t border-line py-1 text-[10px] tracking-[0.2em] text-ink-3 hover:text-ink"
+        >
+          COMPLETE LIST →
+        </Link>
+      )}
     </div>
   );
 }
@@ -76,9 +86,11 @@ function Board({ board, season }: { board: Leaderboard; season: number }) {
 export default function Leaderboards({
   boards,
   season,
+  gameType = "R",
 }: {
   boards: Leaderboard[];
   season: number;
+  gameType?: PlayerGameType;
 }) {
   const [group, setGroup] = useState<"hitting" | "pitching">("hitting");
   const shown = boards.filter((b) => b.group === group && b.leaders.length > 0);
@@ -104,7 +116,7 @@ export default function Leaderboards({
       ) : (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
           {shown.map((b) => (
-            <Board key={b.code} board={b} season={season} />
+            <Board key={b.code} board={b} season={season} gameType={gameType} />
           ))}
         </div>
       )}

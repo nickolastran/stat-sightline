@@ -45,8 +45,9 @@ export interface Leaderboard {
   code: string;
   label: string;
   group: "hitting" | "pitching";
-  /** The stat key the full board sorts on — where MORE hands the reader off. */
-  stat: string;
+  /** The stat key the full board sorts on — where MORE hands the reader off.
+   *  Null for a card with no player-table column behind it. */
+  stat: string | null;
   leaders: LeaderRow[];
 }
 
@@ -114,9 +115,12 @@ async function oneBoard(
   spec: (typeof LEADER_SPECS)[number],
   season: number,
   limit: number,
+  gameType: PlayerGameType,
 ): Promise<Leaderboard> {
+  /* `leaderGameTypes`, not `gameType` — the leaders endpoint ignores the
+     latter and answers with the regular season whatever it is asked. */
   const data = await mlb(
-    `/stats/leaders?leaderCategories=${spec.cat}&statGroup=${spec.group}&season=${season}&sportId=1&limit=${limit}`,
+    `/stats/leaders?leaderCategories=${spec.cat}&statGroup=${spec.group}&season=${season}&sportId=1&limit=${limit}&leaderGameTypes=${gameType}`,
     1800,
   );
   const leaders = (data.leagueLeaders?.[0]?.leaders ?? []) as any[];
@@ -181,8 +185,14 @@ async function warBoard(
  * gap WAR has — so this ranks the advanced line itself. Ties share a rank,
  * the way every other card's do, which is what the "T-" mark reads off.
  */
-async function qsBoard(season: number, limit: number): Promise<Leaderboard> {
-  const lines = (await seasonQualityStarts(season)).sort((a, b) => b.qs - a.qs);
+async function qsBoard(
+  season: number,
+  limit: number,
+  gameType: PlayerGameType,
+): Promise<Leaderboard> {
+  const lines = (await seasonQualityStarts(season, gameType)).sort(
+    (a, b) => b.qs - a.qs,
+  );
   const top = lines.slice(0, limit);
   return {
     code: "pitching.qualityStarts",
@@ -203,17 +213,21 @@ async function qsBoard(season: number, limit: number): Promise<Leaderboard> {
 
 export async function getLeaderboards(
   season: number,
+  gameType: PlayerGameType = "R",
   limit = 20,
 ): Promise<Leaderboard[]> {
   return Promise.all([
     /* WAR opens each group — it is the one figure on the page that answers
-       "who had the best season" rather than "who led one column". */
-    warBoard("hitting", season, limit),
-    warBoard("pitching", season, limit),
-    ...LEADER_SPECS.map((s) => oneBoard(s, season, limit)),
+       "who had the best season" rather than "who led one column". The
+       sabermetrics feed has no October of its own, so the postseason boards
+       open on cWPA instead, which the page puts in front of these. */
+    ...(gameType === "R"
+      ? [warBoard("hitting", season, limit), warBoard("pitching", season, limit)]
+      : []),
+    ...LEADER_SPECS.map((s) => oneBoard(s, season, limit, gameType)),
     /* Last of the pitching cards rather than in the spec list — it is ranked
        here rather than by MLB, so it isn't one of them. */
-    qsBoard(season, limit),
+    qsBoard(season, limit, gameType),
   ]);
 }
 
