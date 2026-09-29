@@ -90,7 +90,7 @@ const COLS: Col[] = [
   {
     key: "gb",
     label: "GB",
-    title: "Games back of the leader in the current scope",
+    title: "Games back of the leader",
     text: (r) => (r.gbGames === 0 ? "-" : r.gbGames.toFixed(1)),
     num: (r) => r.gbGames,
   },
@@ -452,11 +452,11 @@ export default function Standings({
       {projection && <ModelNote model={projection.model} asOf={projection.as_of} />}
 
       <Glossary
-        entries={cols.map((c) => ({ label: c.label, title: c.title }))}
-        /* No marks on the table means no key for them. */
-        groups={
-          phase === "none" ? [] : [{ name: "CLINCH", entries: CLINCH_LEGEND }]
-        }
+        entries={[
+          ...cols.map((c) => ({ label: c.label, title: c.title })),
+          /* No marks on the table means no key for them. */
+          ...(phase === "none" ? [] : CLINCH_LEGEND),
+        ]}
       />
     </div>
   );
