@@ -155,11 +155,18 @@ export default function ScoreboardBar() {
             </div>
           ))
         ) : sorted.length === 0 ? (
-          <p className="py-2 text-[11px] text-ink-3">
-            {error
-              ? "SCOREBOARD UNAVAILABLE — MLB API UNREACHABLE"
-              : "NO GAMES ON THIS DATE"}
-          </p>
+          /* An invisible card holds the rail at a game day's height, so an
+             empty date doesn't pull the page up under the reader. */
+          <div className="relative">
+            <div className="invisible w-[220px]" aria-hidden>
+              <SkeletonGameCard />
+            </div>
+            <p className="absolute inset-0 flex items-center whitespace-nowrap text-[11px] text-ink-3">
+              {error
+                ? "SCOREBOARD UNAVAILABLE — MLB API UNREACHABLE"
+                : "NO GAMES ON THIS DATE"}
+            </p>
+          </div>
         ) : (
           sorted.map((g, i) => (
             <motion.div
