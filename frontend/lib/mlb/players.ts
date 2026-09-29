@@ -181,8 +181,10 @@ export const PLAYER_GAME_TYPES: { value: PlayerGameType; label: string }[] = [
   { value: "S", label: "SPRING TRAINING" },
 ];
 
-export const pickPlayerGameType = (raw: string | undefined): PlayerGameType =>
-  raw === "P" || raw === "S" ? raw : "R";
+export const pickPlayerGameType = (
+  raw: string | undefined,
+  fallback: PlayerGameType = "R",
+): PlayerGameType => (raw === "P" || raw === "S" || raw === "R" ? raw : fallback);
 
 export type StatGroup = "hitting" | "pitching" | "fielding";
 

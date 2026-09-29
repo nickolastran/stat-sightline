@@ -31,7 +31,9 @@ import {
   getWildCard,
   getTeamStats,
   getLeaderboards,
+  getTeamLeaderboards,
   getStatLeaders,
+  postseasonStart,
   leaderCols,
   pickLeaderOrder,
   pickLeaderStat,
@@ -57,6 +59,7 @@ import AbsFilterBar from "@/components/mlb/AbsFilterBar";
 import { getAbsLeaders, pickAbsQuery, type AbsQuery } from "@/lib/abs";
 import { getGameFeed } from "@/lib/gamefeed";
 import { getProjections, type StandingsProjection } from "@/lib/api";
+import { getCwpaBoards } from "@/lib/cwpa";
 
 /*
  * One league reference section per route — the targets the league bar opens
@@ -143,6 +146,7 @@ async function SectionBody({
   date,
   season,
   gameType,
+  leaderType,
   players,
   abs,
   views,
@@ -152,6 +156,8 @@ async function SectionBody({
   date: string;
   season: number;
   gameType: GameType;
+  /** Which part of the year the leader cards read — spring, season or October. */
+  leaderType: PlayerGameType;
   /** What the player table is showing — group, sort, filters, page size. */
   players: PlayerQuery;
   /** Which ABS board, and everything it is filtered by. */
@@ -172,9 +178,29 @@ async function SectionBody({
         );
         return <GameGrid games={games} lines={lines} />;
       }
-      case "leaders":
+      case "leaders": {
+        /* cWPA opens each group in October, where WAR does the rest of the
+           year — it is computed here rather than published by MLB. */
+        const [cwpa, boards] = await Promise.all([
+          leaderType === "P" ? getCwpaBoards(season).catch(() => []) : [],
+          getLeaderboards(season, leaderType),
+        ]);
         return (
-          <Leaderboards boards={await getLeaderboards(season)} season={season} />
+          <Leaderboards
+            boards={[...cwpa, ...boards]}
+            season={season}
+            gameType={leaderType}
+          />
+        );
+      }
+      case "teamleaders":
+        return (
+          <Leaderboards
+            boards={await getTeamLeaderboards(season, leaderType)}
+            season={season}
+            gameType={leaderType}
+            teams
+          />
         );
       case "gamefeed":
         return <GameFeed feed={await getGameFeed(date)} />;
@@ -298,6 +324,7 @@ export default async function LeagueSectionPage({
   const absBoard = found.id === "abs";
   const seasonal =
     found.id === "leaders" ||
+    found.id === "teamleaders" ||
     found.id === "standings" ||
     found.id === "wildcard" ||
     found.id === "teams" ||
@@ -314,11 +341,23 @@ export default async function LeagueSectionPage({
     probables && (picked < today || picked > lastProbable) ? today : picked;
   const gameType = typed ? pickGameType(sp.type) : "R";
   const group = pickGroup(sp.group);
+  /* Once this October's first pitch is thrown, the player boards and the
+     leaders open on the postseason — the regular season is settled and the
+     playoffs are what is being played. A chosen type, or any other year,
+     reads as asked. */
+  /* Player cards and club cards, one set of controls between them. */
+  const leadersBoard = found.id === "leaders" || found.id === "teamleaders";
+  const start =
+    (playerBoard || leadersBoard) && season === current
+      ? await postseasonStart(current).catch(() => null)
+      : null;
+  const october = start && today >= start ? "P" : "R";
+  const leaderType = pickPlayerGameType(sp.type, october);
   const players: PlayerQuery = {
     group,
     /* Player boards carry a post-season of their own, which no standings or
        team table does — so this is the three-way game type, not the two. */
-    type: pickPlayerGameType(sp.type),
+    type: pickPlayerGameType(sp.type, october),
     stat: pickLeaderStat(sp.stat, group),
     league: inList(sp.league, LEADER_LEAGUES),
     position: inList(sp.pos, leaderPositions(group)),
@@ -392,6 +431,16 @@ export default async function LeagueSectionPage({
                   options={GAME_TYPES}
                 />
               )}
+              {/* The leaders read all three halves of the year, spring and
+                  October included — the player table's three-way type. */}
+              {leadersBoard && (
+                <ParamSelect
+                  param="type"
+                  label="TYPE"
+                  value={leaderType}
+                  options={PLAYER_GAME_TYPES}
+                />
+              )}
               <SeasonSelect value={season} first={FIRST_SEASON} last={current} />
             </div>
           ) : null
@@ -414,7 +463,7 @@ export default async function LeagueSectionPage({
         {/* Keyed on what the section is showing, so switching year or day
             re-suspends into the skeleton rather than holding the last one. */}
         <Suspense
-          key={`${season}-${date}-${gameType}-${Object.values(abs).join("-")}-${Object.values(players).join("-")}`}
+          key={`${season}-${date}-${gameType}-${leaderType}-${Object.values(abs).join("-")}-${Object.values(players).join("-")}`}
           fallback={<SectionSkeleton section={found.id} />}
         >
           <SectionBody
@@ -422,6 +471,7 @@ export default async function LeagueSectionPage({
             date={date}
             season={season}
             gameType={gameType}
+            leaderType={leaderType}
             players={players}
             abs={abs}
             seasonOver={season < current}

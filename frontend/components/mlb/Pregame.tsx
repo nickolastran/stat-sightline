@@ -169,7 +169,18 @@ export default async function Pregame({ game }: { game: Game }) {
       : {},
   ]);
 
-  const odds = winProbability(game);
+  /* In October a side's record is its series one, which says nothing about
+     who is better; the predictor reads the 162 off the standings instead.
+     No standings, no season record, no call. */
+  const season162 = (s: GameSide): GameSide => {
+    const r = standings?.flatMap((d) => d.teams).find((t) => t.id === s.id);
+    return { ...s, wins: r?.wins ?? null, losses: r?.losses ?? null };
+  };
+  const odds = winProbability(
+    game.series
+      ? { ...game, away: season162(game.away), home: season162(game.home) }
+      : game,
+  );
   const matchups = awaySchedule ? headToHead(awaySchedule, game.home.id) : [];
   const series = seriesGames(matchups, game.pk);
 
@@ -185,13 +196,17 @@ export default async function Pregame({ game }: { game: Game }) {
        breakpoint the three stack at the full width of the page. */
     <div className="mt-3 bento gap-2">
       <div className="space-y-2">
-        <Panel title="Matchup Predictor" tight>
-          {odds ? (
-            <Donut game={game} odds={odds} />
-          ) : (
-            <Notice what="NO RECORDS TO CALL IT ON YET" />
-          )}
-        </Panel>
+        {/* A playoff game with no season records to read is left uncalled
+            rather than told it has none. */}
+        {(odds || !game.series) && (
+          <Panel title="Matchup Predictor" tight>
+            {odds ? (
+              <Donut game={game} odds={odds} />
+            ) : (
+              <Notice what="NO RECORDS TO CALL IT ON YET" />
+            )}
+          </Panel>
+        )}
 
 
         <ResultTable

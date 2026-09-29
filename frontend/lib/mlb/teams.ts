@@ -215,7 +215,7 @@ export const warText = (war: number | undefined): TeamStatValue =>
 async function teamStatTable(
   group: "hitting" | "pitching",
   season: number,
-  gameType: GameType,
+  gameType: GameType | "P",
   sportId: number,
 ): Promise<TeamStatTable> {
   const [data, war] = await Promise.all([
@@ -259,7 +259,9 @@ async function teamStatTable(
  */
 export async function getTeamStats(
   season: number,
-  gameType: GameType = "R",
+  /* The postseason too, for the team leader cards; the table itself offers
+     only the regular season and spring. */
+  gameType: GameType | "P" = "R",
   /** The level, as StatsAPI numbers it — 1 for the majors, 11 for Triple-A. */
   sportId = 1,
 ): Promise<TeamStatTable[]> {

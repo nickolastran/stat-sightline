@@ -41,9 +41,31 @@ const FEED_FIELDS =
 
 /* The win probability line is the same plays again with a megabyte of
    matchup padding; only who batted and what it moved is wanted. */
-const WP_FIELDS =
+export const WP_FIELDS =
   "about,isTopInning,matchup,batter,pitcher,id,fullName," +
   "homeTeamWinProbabilityAdded";
+
+/**
+ * Each play of a win probability line as the batter's swing. The API states
+ * every swing from the home club's side, in whole percent; the batter owns it
+ * when he bats for the home club, and its opposite when he bats in the top
+ * half — and a win is one, not a hundred.
+ */
+export function playSwings(plays: unknown) {
+  return ((plays ?? []) as any[]).flatMap((p) => {
+    const swing = p.homeTeamWinProbabilityAdded;
+    if (typeof swing !== "number") return [];
+    const top = !!p.about?.isTopInning;
+    return [
+      {
+        top,
+        batter: p.matchup?.batter,
+        pitcher: p.matchup?.pitcher,
+        batting: (top ? -swing : swing) / 100,
+      },
+    ];
+  });
+}
 
 /** A pitch the batter swung through — swinging strike, blocked, or tipped. */
 const WHIFF_CODES = new Set(["S", "W", "T"]);
@@ -144,18 +166,10 @@ export function feedBoards(logs: unknown[], wpLogs: unknown[]): FeedBoard[] {
     }
   }
 
-  /* The API states every swing from the home club's side, in whole percent.
-     The batter owns it when he bats for the home club, and owns its opposite
-     when he bats in the top half — and a win is one, not a hundred. The
-     pitcher is on the other side of the same swing, so it is his negated:
-     the man who gets the out gains exactly what the batter lost. */
-  for (const plays of wpLogs as any[]) {
-    for (const p of (plays ?? []) as any[]) {
-      const swing = p.homeTeamWinProbabilityAdded;
-      if (typeof swing !== "number") continue;
-      const batting = (p.about?.isTopInning ? -swing : swing) / 100;
-      const batter = p.matchup?.batter;
-      const pitcher = p.matchup?.pitcher;
+  /* The pitcher is on the other side of the same swing, so it is his
+     negated: the man who gets the out gains exactly what the batter lost. */
+  for (const plays of wpLogs) {
+    for (const { batter, pitcher, batting } of playSwings(plays)) {
       if (batter?.id) add(wpa, batter.id, batter.fullName ?? "—", batting);
       if (pitcher?.id) add(pwpa, pitcher.id, pitcher.fullName ?? "—", -batting);
     }

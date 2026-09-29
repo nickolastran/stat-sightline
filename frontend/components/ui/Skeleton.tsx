@@ -116,7 +116,8 @@ export function SkeletonTiles({
 export function SkeletonGameCard({ delay = 0 }: { delay?: number }) {
   return (
     <div className="border border-line bg-bg p-2">
-      <Skeleton className="mb-2 h-2.5 w-16" delay={delay} />
+      {/* 17px, the status line of a real card, so nothing jumps on load. */}
+      <Skeleton className="mb-[7px] h-2.5 w-16" delay={delay} />
       {[0, 1].map((r) => (
         <div key={r} className="flex items-center gap-2 py-1">
           <Skeleton className="h-5 w-5 rounded-full" delay={delay + r * 0.1} />

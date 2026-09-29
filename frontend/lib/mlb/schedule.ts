@@ -45,6 +45,9 @@ export interface Game {
   decisions: Decisions;
   /** Tickets counted through the gate, null for a game not yet played. */
   attendance: number | null;
+  /** A postseason game's place in its series — "ALDS G4 · TOR 3-1".
+   *  Null in the regular season, whose series nobody reads a score of. */
+  series: string | null;
 }
 
 function side(raw: any, line: any): GameSide {
@@ -81,15 +84,32 @@ export const toGame = (g: any): Game => ({
     save: person(g.decisions?.save),
   },
   attendance: g.gameInfo?.attendance ?? null,
+  series: /^[FDLW]$/.test(g.gameType) && g.seriesStatus ? seriesLine(g) : null,
 });
+
+/**
+ * "ALDS G4 · TOR 3-1", "NLWC G1 · TIED 0-0", "WS G7 · LAD WINS 4-3" — short
+ * enough to sit beside a first-pitch time on the strip's 220px card. Built
+ * from the parts rather than MLB's own `result`, which is longer ("TOR leads
+ * 3-1") and absent altogether before a series' first pitch.
+ */
+function seriesLine(g: any): string {
+  const s = g.seriesStatus;
+  const lead = [g.teams?.away, g.teams?.home].find(
+    (t) => s.winningTeam && t?.team?.id === s.winningTeam.id,
+  )?.team?.abbreviation;
+  const score = `${s.wins ?? 0}-${s.losses ?? 0}`;
+  const standing = lead ? `${lead}${s.isOver ? " WINS" : ""} ${score}` : `TIED ${score}`;
+  return `${s.abbreviation} G${s.gameNumber} · ${standing}`;
+}
 
 /** The pitcher of a decision or a probable, or null when there isn't one. */
 const person = (p: any) =>
   p?.id ? { id: p.id, name: p.fullName ?? "—" } : null;
 
-/* Decisions and the gate count ride along with every schedule read: they are
+/* Decisions, the gate count and the series standing ride along with every schedule read: they are
  * a few hundred bytes a game, and it keeps one hydrate string to keep right. */
-export const SCHEDULE_HYDRATE = "probablePitcher,linescore,team,decisions,gameInfo";
+export const SCHEDULE_HYDRATE = "probablePitcher,linescore,team,decisions,gameInfo,seriesStatus";
 
 export async function getSchedule(date: string): Promise<Game[]> {
   const data = await mlb(
@@ -97,6 +117,20 @@ export async function getSchedule(date: string): Promise<Game[]> {
     60,
   );
   return (data.dates?.[0]?.games ?? []).map(toGame);
+}
+
+/**
+ * The day a season's postseason throws its first pitch, YYYY-MM-DD, or null
+ * before one is scheduled. Off the schedule rather than the season's own
+ * `postSeasonStartDate`, which MLB sets a day early to leave room for a
+ * tiebreaker nobody plays.
+ */
+export async function postseasonStart(season: number): Promise<string | null> {
+  const data = await mlb(
+    `/schedule?sportId=1&season=${season}&gameType=F,D,L,W&fields=dates,date`,
+    3600,
+  );
+  return data.dates?.[0]?.date ?? null;
 }
 
 /**

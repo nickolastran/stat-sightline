@@ -14,6 +14,7 @@ import {
   toGame,
 } from "./schedule";
 import {
+  getTeamStats,
   latestByGame,
   seasonQualityStarts,
   seasonWar,
@@ -35,6 +36,9 @@ import {
 export interface LeaderRow {
   rank: number;
   personId: number;
+  /** Set on a club's row — a team leader card — which links to the club
+   *  rather than to a player. */
+  teamId?: number;
   name: string;
   team: string;
   value: string;
@@ -45,8 +49,9 @@ export interface Leaderboard {
   code: string;
   label: string;
   group: "hitting" | "pitching";
-  /** The stat key the full board sorts on — where MORE hands the reader off. */
-  stat: string;
+  /** The stat key the full board sorts on — where MORE hands the reader off.
+   *  Null for a card with no player-table column behind it. */
+  stat: string | null;
   leaders: LeaderRow[];
 }
 
@@ -63,9 +68,12 @@ const LEADER_SPECS: {
   /* The same figure under its `stat` key, which is what the full player table
      sorts on — the leader categories have names of their own. */
   stat: string;
+  /** A rate, which needs a qualifier to mean anything — and which way is
+   *  best, ERA and WHIP ranking low. */
+  rate?: "asc" | "desc";
 }[] = [
-  { cat: "battingAverage", group: "hitting", label: "AVG", stat: "avg" },
-  { cat: "onBasePlusSlugging", group: "hitting", label: "OPS", stat: "ops" },
+  { cat: "battingAverage", group: "hitting", label: "AVG", stat: "avg", rate: "desc" },
+  { cat: "onBasePlusSlugging", group: "hitting", label: "OPS", stat: "ops", rate: "desc" },
   { cat: "hits", group: "hitting", label: "HITS", stat: "hits" },
   { cat: "doubles", group: "hitting", label: "DOUBLES", stat: "doubles" },
   { cat: "triples", group: "hitting", label: "TRIPLES", stat: "triples" },
@@ -84,7 +92,7 @@ const LEADER_SPECS: {
     label: "STOLEN BASES",
     stat: "stolenBases",
   },
-  { cat: "earnedRunAverage", group: "pitching", label: "ERA", stat: "era" },
+  { cat: "earnedRunAverage", group: "pitching", label: "ERA", stat: "era", rate: "asc" },
   { cat: "wins", group: "pitching", label: "WINS", stat: "wins" },
   { cat: "losses", group: "pitching", label: "LOSSES", stat: "losses" },
   {
@@ -106,7 +114,7 @@ const LEADER_SPECS: {
     label: "EARNED RUNS",
     stat: "earnedRuns",
   },
-  { cat: "whip", group: "pitching", label: "WHIP", stat: "whip" },
+  { cat: "whip", group: "pitching", label: "WHIP", stat: "whip", rate: "asc" },
   { cat: "saves", group: "pitching", label: "SAVES", stat: "saves" },
 ];
 
@@ -114,9 +122,12 @@ async function oneBoard(
   spec: (typeof LEADER_SPECS)[number],
   season: number,
   limit: number,
+  gameType: PlayerGameType,
 ): Promise<Leaderboard> {
+  /* `leaderGameTypes`, not `gameType` — the leaders endpoint ignores the
+     latter and answers with the regular season whatever it is asked. */
   const data = await mlb(
-    `/stats/leaders?leaderCategories=${spec.cat}&statGroup=${spec.group}&season=${season}&sportId=1&limit=${limit}`,
+    `/stats/leaders?leaderCategories=${spec.cat}&statGroup=${spec.group}&season=${season}&sportId=1&limit=${limit}&leaderGameTypes=${gameType}`,
     1800,
   );
   const leaders = (data.leagueLeaders?.[0]?.leaders ?? []) as any[];
@@ -132,6 +143,66 @@ async function oneBoard(
         name: l.person?.fullName ?? "—",
         team: l.team?.name ?? "",
         value: l.value,
+      }),
+    ),
+  };
+}
+
+/**
+ * A postseason rate card over a qualified pool. MLB's own postseason
+ * qualifier is per club — three trips a game the club played — so a hitter
+ * whose club went out in two Wild Card games leads batting average on six
+ * plate appearances. The bar here is the regular season's, 3.1 plate
+ * appearances or one inning a game, counted against the longest run so far:
+ * the leaders of October are the ones who played enough of it.
+ */
+async function postseasonRateBoard(
+  spec: (typeof LEADER_SPECS)[number],
+  season: number,
+  limit: number,
+): Promise<Leaderboard> {
+  const [clubs, pool] = await Promise.all([
+    mlb(
+      `/teams/stats?season=${season}&sportId=1&stats=season&group=hitting&gameType=P`,
+      1800,
+    ),
+    mlb(
+      `/stats?stats=season&group=${spec.group}&season=${season}&sportId=1` +
+        `&gameType=P&playerPool=all&limit=1000&hydrate=team`,
+      1800,
+    ),
+  ]);
+  const games = Math.max(
+    0,
+    ...((clubs.stats?.[0]?.splits ?? []) as any[]).map(
+      (t) => t.stat?.gamesPlayed ?? 0,
+    ),
+  );
+  const enough = (st: any) =>
+    spec.group === "hitting"
+      ? (st.plateAppearances ?? 0) >= 3.1 * games
+      : (st.outs ?? 0) >= 3 * games;
+  const value = (st: any) => Number(st[spec.stat]);
+  const sorted = ((pool.stats?.[0]?.splits ?? []) as any[])
+    .filter((x) => x.player?.id && enough(x.stat ?? {}) && !Number.isNaN(value(x.stat)))
+    .sort((a, b) =>
+      spec.rate === "asc"
+        ? value(a.stat) - value(b.stat)
+        : value(b.stat) - value(a.stat),
+    );
+  return {
+    code: `${spec.group}.${spec.cat}`,
+    label: spec.label,
+    group: spec.group,
+    stat: spec.stat,
+    leaders: sorted.slice(0, limit).map(
+      (x): LeaderRow => ({
+        /* Ties share a rank, the way MLB's own cards hand them out. */
+        rank: sorted.findIndex((y) => y.stat[spec.stat] === x.stat[spec.stat]) + 1,
+        personId: x.player.id,
+        name: x.player.fullName ?? "—",
+        team: x.team?.name ?? "",
+        value: x.stat[spec.stat],
       }),
     ),
   };
@@ -181,8 +252,14 @@ async function warBoard(
  * gap WAR has — so this ranks the advanced line itself. Ties share a rank,
  * the way every other card's do, which is what the "T-" mark reads off.
  */
-async function qsBoard(season: number, limit: number): Promise<Leaderboard> {
-  const lines = (await seasonQualityStarts(season)).sort((a, b) => b.qs - a.qs);
+async function qsBoard(
+  season: number,
+  limit: number,
+  gameType: PlayerGameType,
+): Promise<Leaderboard> {
+  const lines = (await seasonQualityStarts(season, gameType)).sort(
+    (a, b) => b.qs - a.qs,
+  );
   const top = lines.slice(0, limit);
   return {
     code: "pitching.qualityStarts",
@@ -203,18 +280,117 @@ async function qsBoard(season: number, limit: number): Promise<Leaderboard> {
 
 export async function getLeaderboards(
   season: number,
+  gameType: PlayerGameType = "R",
   limit = 20,
 ): Promise<Leaderboard[]> {
   return Promise.all([
     /* WAR opens each group — it is the one figure on the page that answers
-       "who had the best season" rather than "who led one column". */
-    warBoard("hitting", season, limit),
-    warBoard("pitching", season, limit),
-    ...LEADER_SPECS.map((s) => oneBoard(s, season, limit)),
+       "who had the best season" rather than "who led one column". The
+       sabermetrics feed has no October or spring of its own, so the
+       postseason boards open on cWPA instead, which the page puts in front of
+       these, and spring opens on the first of MLB's. */
+    ...(gameType === "R"
+      ? [warBoard("hitting", season, limit), warBoard("pitching", season, limit)]
+      : []),
+    ...LEADER_SPECS.map((s) =>
+      gameType === "P" && s.rate
+        ? postseasonRateBoard(s, season, limit)
+        : oneBoard(s, season, limit, gameType),
+    ),
     /* Last of the pitching cards rather than in the spec list — it is ranked
        here rather than by MLB, so it isn't one of them. */
-    qsBoard(season, limit),
+    qsBoard(season, limit, gameType),
   ]);
+}
+
+/* ── Team leaders ───────────────────────────────────────────────────── */
+
+/** Clubs ranked on one figure, ties sharing a rank, best `limit` kept. */
+export function rankTeams(
+  clubs: { id: number; name: string; value: string }[],
+  asc: boolean,
+  limit: number,
+): LeaderRow[] {
+  const sorted = clubs
+    /* A blank is no figure at all, not a zero — WAR outside the season. */
+    .filter((c) => c.value.trim() !== "" && !Number.isNaN(Number(c.value)))
+    .sort((a, b) =>
+      asc ? Number(a.value) - Number(b.value) : Number(b.value) - Number(a.value),
+    );
+  return sorted.slice(0, limit).map((c) => ({
+    rank: sorted.findIndex((x) => x.value === c.value) + 1,
+    personId: c.id,
+    teamId: c.id,
+    name: c.name,
+    team: c.name,
+    value: c.value,
+  }));
+}
+
+/**
+ * The stat leader cards again, for the thirty clubs: WAR first in the
+ * regular season, then every category the player cards carry, quality
+ * starts last. Read off the same cached team tables the TEAM STATISTICS
+ * section shows, so it costs no requests of its own but the quality starts.
+ * No qualifier — every club plays enough of its own games.
+ */
+export async function getTeamLeaderboards(
+  season: number,
+  gameType: PlayerGameType = "R",
+  limit = 5,
+): Promise<Leaderboard[]> {
+  const [tables, qs] = await Promise.all([
+    getTeamStats(season, gameType),
+    seasonQualityStarts(season, gameType).catch(() => []),
+  ]);
+  const board = (
+    group: "hitting" | "pitching",
+    stat: string,
+    label: string,
+    asc = false,
+  ): Leaderboard => ({
+    code: `team.${group}.${stat}`,
+    label,
+    group,
+    stat,
+    leaders: rankTeams(
+      (tables.find((t) => t.group === group)?.rows ?? []).map((r) => ({
+        id: r.id,
+        name: r.name,
+        value: String(r.values[stat] ?? ""),
+      })),
+      asc,
+      limit,
+    ),
+  });
+
+  /* Quality starts are a pitcher's line; a club's is its starters' summed. */
+  const byName = new Map<string, number>();
+  for (const l of qs) byName.set(l.team, (byName.get(l.team) ?? 0) + l.qs);
+  const pitchingRows = tables.find((t) => t.group === "pitching")?.rows ?? [];
+
+  return [
+    /* Empty outside the regular season, and dropped by the page like any
+       empty card — the sabermetrics feed has no October or spring. */
+    board("hitting", "war", "WAR"),
+    board("pitching", "war", "WAR"),
+    ...LEADER_SPECS.map((s) => board(s.group, s.stat, s.label, s.rate === "asc")),
+    {
+      code: "team.pitching.qualityStarts",
+      label: "QUALITY STARTS",
+      group: "pitching",
+      stat: "qualityStarts",
+      leaders: rankTeams(
+        pitchingRows.map((r) => ({
+          id: r.id,
+          name: r.name,
+          value: String(byName.get(r.name) ?? 0),
+        })),
+        false,
+        limit,
+      ),
+    },
+  ];
 }
 
 /* ── League-wide player leaders ─────────────────────────────────────── */

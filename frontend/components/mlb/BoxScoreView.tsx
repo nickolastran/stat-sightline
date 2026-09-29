@@ -477,6 +477,9 @@ export default function BoxScoreView({
             )}
             {st.text}
           </p>
+          {game.series && (
+            <p className="text-[10px] tracking-wider text-ink-2">{game.series}</p>
+          )}
           {game.venue && (
             <p className="hidden text-[10px] text-ink-3 sm:block">{game.venue}</p>
           )}
