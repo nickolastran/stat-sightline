@@ -141,10 +141,7 @@ export default function WildCard({
       </p>
 
       <Glossary
-        entries={COLS}
-        groups={
-          phase === "none" ? [] : [{ name: "CLINCH", entries: CLINCH_LEGEND }]
-        }
+        entries={[...COLS, ...(phase === "none" ? [] : CLINCH_LEGEND)]}
       />
     </div>
   );

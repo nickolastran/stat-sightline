@@ -11,20 +11,10 @@ export interface GlossaryEntry {
   wide?: boolean;
 }
 
-export default function Glossary({
-  entries,
-  groups = [],
-}: {
-  entries: GlossaryEntry[];
-  /** Extra titled blocks below the stats — clinch marks, for the standings. */
-  groups?: { name: string; entries: GlossaryEntry[] }[];
-}) {
+export default function Glossary({ entries }: { entries: GlossaryEntry[] }) {
   return (
     <div className="space-y-3 border border-line bg-bg px-4 py-3">
       <Section name="GLOSSARY" entries={entries} />
-      {groups.map((g) => (
-        <Section key={g.name} name={g.name} entries={g.entries} />
-      ))}
     </div>
   );
 }
