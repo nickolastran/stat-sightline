@@ -64,9 +64,12 @@ const LEADER_SPECS: {
   /* The same figure under its `stat` key, which is what the full player table
      sorts on — the leader categories have names of their own. */
   stat: string;
+  /** A rate, which needs a qualifier to mean anything — and which way is
+   *  best, ERA and WHIP ranking low. */
+  rate?: "asc" | "desc";
 }[] = [
-  { cat: "battingAverage", group: "hitting", label: "AVG", stat: "avg" },
-  { cat: "onBasePlusSlugging", group: "hitting", label: "OPS", stat: "ops" },
+  { cat: "battingAverage", group: "hitting", label: "AVG", stat: "avg", rate: "desc" },
+  { cat: "onBasePlusSlugging", group: "hitting", label: "OPS", stat: "ops", rate: "desc" },
   { cat: "hits", group: "hitting", label: "HITS", stat: "hits" },
   { cat: "doubles", group: "hitting", label: "DOUBLES", stat: "doubles" },
   { cat: "triples", group: "hitting", label: "TRIPLES", stat: "triples" },
@@ -85,7 +88,7 @@ const LEADER_SPECS: {
     label: "STOLEN BASES",
     stat: "stolenBases",
   },
-  { cat: "earnedRunAverage", group: "pitching", label: "ERA", stat: "era" },
+  { cat: "earnedRunAverage", group: "pitching", label: "ERA", stat: "era", rate: "asc" },
   { cat: "wins", group: "pitching", label: "WINS", stat: "wins" },
   { cat: "losses", group: "pitching", label: "LOSSES", stat: "losses" },
   {
@@ -107,7 +110,7 @@ const LEADER_SPECS: {
     label: "EARNED RUNS",
     stat: "earnedRuns",
   },
-  { cat: "whip", group: "pitching", label: "WHIP", stat: "whip" },
+  { cat: "whip", group: "pitching", label: "WHIP", stat: "whip", rate: "asc" },
   { cat: "saves", group: "pitching", label: "SAVES", stat: "saves" },
 ];
 
@@ -136,6 +139,66 @@ async function oneBoard(
         name: l.person?.fullName ?? "—",
         team: l.team?.name ?? "",
         value: l.value,
+      }),
+    ),
+  };
+}
+
+/**
+ * A postseason rate card over a qualified pool. MLB's own postseason
+ * qualifier is per club — three trips a game the club played — so a hitter
+ * whose club went out in two Wild Card games leads batting average on six
+ * plate appearances. The bar here is the regular season's, 3.1 plate
+ * appearances or one inning a game, counted against the longest run so far:
+ * the leaders of October are the ones who played enough of it.
+ */
+async function postseasonRateBoard(
+  spec: (typeof LEADER_SPECS)[number],
+  season: number,
+  limit: number,
+): Promise<Leaderboard> {
+  const [clubs, pool] = await Promise.all([
+    mlb(
+      `/teams/stats?season=${season}&sportId=1&stats=season&group=hitting&gameType=P`,
+      1800,
+    ),
+    mlb(
+      `/stats?stats=season&group=${spec.group}&season=${season}&sportId=1` +
+        `&gameType=P&playerPool=all&limit=1000&hydrate=team`,
+      1800,
+    ),
+  ]);
+  const games = Math.max(
+    0,
+    ...((clubs.stats?.[0]?.splits ?? []) as any[]).map(
+      (t) => t.stat?.gamesPlayed ?? 0,
+    ),
+  );
+  const enough = (st: any) =>
+    spec.group === "hitting"
+      ? (st.plateAppearances ?? 0) >= 3.1 * games
+      : (st.outs ?? 0) >= 3 * games;
+  const value = (st: any) => Number(st[spec.stat]);
+  const sorted = ((pool.stats?.[0]?.splits ?? []) as any[])
+    .filter((x) => x.player?.id && enough(x.stat ?? {}) && !Number.isNaN(value(x.stat)))
+    .sort((a, b) =>
+      spec.rate === "asc"
+        ? value(a.stat) - value(b.stat)
+        : value(b.stat) - value(a.stat),
+    );
+  return {
+    code: `${spec.group}.${spec.cat}`,
+    label: spec.label,
+    group: spec.group,
+    stat: spec.stat,
+    leaders: sorted.slice(0, limit).map(
+      (x): LeaderRow => ({
+        /* Ties share a rank, the way MLB's own cards hand them out. */
+        rank: sorted.findIndex((y) => y.stat[spec.stat] === x.stat[spec.stat]) + 1,
+        personId: x.player.id,
+        name: x.player.fullName ?? "—",
+        team: x.team?.name ?? "",
+        value: x.stat[spec.stat],
       }),
     ),
   };
@@ -219,12 +282,17 @@ export async function getLeaderboards(
   return Promise.all([
     /* WAR opens each group — it is the one figure on the page that answers
        "who had the best season" rather than "who led one column". The
-       sabermetrics feed has no October of its own, so the postseason boards
-       open on cWPA instead, which the page puts in front of these. */
+       sabermetrics feed has no October or spring of its own, so the
+       postseason boards open on cWPA instead, which the page puts in front of
+       these, and spring opens on the first of MLB's. */
     ...(gameType === "R"
       ? [warBoard("hitting", season, limit), warBoard("pitching", season, limit)]
       : []),
-    ...LEADER_SPECS.map((s) => oneBoard(s, season, limit, gameType)),
+    ...LEADER_SPECS.map((s) =>
+      gameType === "P" && s.rate
+        ? postseasonRateBoard(s, season, limit)
+        : oneBoard(s, season, limit, gameType),
+    ),
     /* Last of the pitching cards rather than in the spec list — it is ranked
        here rather than by MLB, so it isn't one of them. */
     qsBoard(season, limit, gameType),

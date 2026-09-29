@@ -123,11 +123,6 @@ interface PlayerQuery {
   order?: "asc" | "desc";
 }
 
-const LEADER_TYPES: { value: PlayerGameType; label: string }[] = [
-  { value: "R", label: "REGULAR SEASON" },
-  { value: "P", label: "PLAYOFFS" },
-];
-
 const PLAYER_GROUPS: { value: StatGroup; label: string }[] = [
   { value: "hitting", label: "BATTING" },
   { value: "pitching", label: "PITCHING" },
@@ -160,7 +155,7 @@ async function SectionBody({
   date: string;
   season: number;
   gameType: GameType;
-  /** Which half of the year the leader cards read — the season or October. */
+  /** Which part of the year the leader cards read — spring, season or October. */
   leaderType: PlayerGameType;
   /** What the player table is showing — group, sort, filters, page size. */
   players: PlayerQuery;
@@ -345,10 +340,7 @@ export default async function LeagueSectionPage({
       ? await postseasonStart(current).catch(() => null)
       : null;
   const october = start && today >= start ? "P" : "R";
-  /* The leaders are the regular season or the playoffs — spring has no
-     leader cards worth a tab. */
-  const leaderType: PlayerGameType =
-    sp.type === "R" || sp.type === "P" ? sp.type : october;
+  const leaderType = pickPlayerGameType(sp.type, october);
   const players: PlayerQuery = {
     group,
     /* Player boards carry a post-season of their own, which no standings or
@@ -427,6 +419,16 @@ export default async function LeagueSectionPage({
                   options={GAME_TYPES}
                 />
               )}
+              {/* The leaders read all three halves of the year, spring and
+                  October included — the player table's three-way type. */}
+              {leadersBoard && (
+                <ParamSelect
+                  param="type"
+                  label="TYPE"
+                  value={leaderType}
+                  options={PLAYER_GAME_TYPES}
+                />
+              )}
               <SeasonSelect value={season} first={FIRST_SEASON} last={current} />
             </div>
           ) : null
@@ -443,17 +445,6 @@ export default async function LeagueSectionPage({
               size="lg"
               value={players.group}
               options={PLAYER_GROUPS}
-            />
-          </div>
-        )}
-        {leadersBoard && (
-          <div className="mb-3 flex">
-            <ParamTabs
-              param="type"
-              ariaLabel="Season or playoffs"
-              size="lg"
-              value={leaderType}
-              options={LEADER_TYPES}
             />
           </div>
         )}
