@@ -1,4 +1,4 @@
-import { mlb, rankTeams, type Leaderboard, type LeaderRow } from "@/lib/mlb";
+import { mlb, type Leaderboard, type LeaderRow } from "@/lib/mlb";
 import { playSwings, WP_FIELDS } from "@/lib/gamefeed";
 
 /*
@@ -62,7 +62,6 @@ interface Mark {
   personId: number;
   name: string;
   team: string;
-  teamId: number;
   value: number;
 }
 
@@ -92,7 +91,6 @@ export function cwpaTotals(games: any[], wpLogs: unknown[]) {
       personId: p.id,
       name: p.fullName ?? "—",
       team: club?.name ?? "",
-      teamId: club?.id,
       value: 0,
     };
     m.value += by;
@@ -150,28 +148,3 @@ export async function getCwpaBoards(
   return [board("hitting", bat), board("pitching", arm)];
 }
 
-/**
- * The same two cards for the clubs: each one's batters, and each one's arms,
- * summed — a pennant winner's hitters carry the title odds they added.
- */
-export async function getTeamCwpaBoards(
-  season: number,
-  limit = 5,
-): Promise<Leaderboard[]> {
-  const { bat, arm } = await seasonCwpa(season);
-  const board = (group: "hitting" | "pitching", marks: Map<number, Mark>) => {
-    const clubs = new Map<number, { id: number; name: string; v: number }>();
-    for (const m of marks.values()) {
-      const c = clubs.get(m.teamId) ?? { id: m.teamId, name: m.team, v: 0 };
-      c.v += m.value;
-      clubs.set(m.teamId, c);
-    }
-    const leaders = rankTeams(
-      [...clubs.values()].map((c) => ({ id: c.id, name: c.name, value: String(c.v) })),
-      false,
-      limit,
-    ).map((l) => ({ ...l, value: `${(Number(l.value) * 100).toFixed(1)}%` }));
-    return { code: `team.${group}.cwpa`, label: "cWPA", group, stat: null, leaders };
-  };
-  return [board("hitting", bat), board("pitching", arm)];
-}

@@ -59,7 +59,7 @@ import AbsFilterBar from "@/components/mlb/AbsFilterBar";
 import { getAbsLeaders, pickAbsQuery, type AbsQuery } from "@/lib/abs";
 import { getGameFeed } from "@/lib/gamefeed";
 import { getProjections, type StandingsProjection } from "@/lib/api";
-import { getCwpaBoards, getTeamCwpaBoards } from "@/lib/cwpa";
+import { getCwpaBoards } from "@/lib/cwpa";
 
 /*
  * One league reference section per route — the targets the league bar opens
@@ -193,20 +193,15 @@ async function SectionBody({
           />
         );
       }
-      case "teamleaders": {
-        const [cwpa, boards] = await Promise.all([
-          leaderType === "P" ? getTeamCwpaBoards(season).catch(() => []) : [],
-          getTeamLeaderboards(season, leaderType),
-        ]);
+      case "teamleaders":
         return (
           <Leaderboards
-            boards={[...cwpa, ...boards]}
+            boards={await getTeamLeaderboards(season, leaderType)}
             season={season}
             gameType={leaderType}
             teams
           />
         );
-      }
       case "gamefeed":
         return <GameFeed feed={await getGameFeed(date)} />;
       case "probables":
