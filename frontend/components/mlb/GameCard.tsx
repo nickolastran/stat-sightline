@@ -155,9 +155,15 @@ export default function GameCard({
     >
       <div className="mb-0.5 flex items-center justify-between gap-2">
         <GameStatus game={game} />
-        {/* The scoreboard card has no room for the park: its own page names
-            it, and the line score and the pitchers are what is read here. */}
-        {detailed && !full && game.venue && (
+        {/* In October the series is the story, so it takes the park's place,
+            on every size of card. The scoreboard card has no room for the
+            park: its own page names it, and the line score and the pitchers
+            are what is read here. */}
+        {game.series ? (
+          <span className="min-w-0 truncate text-[10px] tracking-wider text-ink-2">
+            {game.series}
+          </span>
+        ) : detailed && !full && game.venue && (
           <span className="hidden truncate text-[10px] text-ink-3 sm:block">
             {game.venue}
           </span>
