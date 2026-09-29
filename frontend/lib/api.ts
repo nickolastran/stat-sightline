@@ -100,13 +100,23 @@ export interface StandingsProjection {
  * Called from server components. Cached for half an hour, matching the
  * standings themselves: the projection only moves as games go final, and it
  * scores every remaining game on the schedule to answer.
+ *
+ * Falls back to a daily snapshot like `getPlayoffOdds` below, since the
+ * deployed site has no API behind it.
  */
 export async function getProjections(
   season: number
 ): Promise<StandingsProjection> {
-  return api(`/api/standings/projections?season=${season}`, {
-    next: { revalidate: 1800 },
-  });
+  try {
+    return await api(`/api/standings/projections?season=${season}`, {
+      next: { revalidate: 1800 },
+    });
+  } catch (err) {
+    const { default: all } = await import("@/data/projections.json");
+    const snap = (all as Record<string, StandingsProjection>)[season];
+    if (snap) return snap;
+    throw err;
+  }
 }
 
 /* ── Playoff odds ───────────────────────────────────────────────────── */

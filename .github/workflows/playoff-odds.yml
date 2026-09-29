@@ -1,5 +1,6 @@
-# Refreshes frontend/data/playoff-odds.json — the deployed site has no API, so
-# /playoffs reads the odds from that snapshot. Rebuilds games.csv + model.pkl
+# Refreshes frontend/data/playoff-odds.json + projections.json — the deployed
+# site has no API, so /playoffs and the standings' PROJ / PACE / P162 columns
+# read from those snapshots. Rebuilds games.csv + model.pkl
 # from scratch (they're gitignored; ~10s), then commits only if the odds moved,
 # which triggers the Vercel redeploy.
 name: Playoff odds
@@ -27,5 +28,5 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898729+github-actions[bot]@users.noreply.github.com"
-          git add frontend/data/playoff-odds.json
-          git diff --cached --quiet || { git commit -m "chore: refresh playoff odds" && git push; }
+          git add frontend/data/playoff-odds.json frontend/data/projections.json
+          git diff --cached --quiet || { git commit -m "chore: refresh playoff odds + projections" && git push; }
