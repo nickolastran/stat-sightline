@@ -26,6 +26,7 @@ function TeamRow({
   detailed,
   upcoming,
   line,
+  playoff,
 }: {
   s: GameSide;
   live: boolean;
@@ -34,6 +35,8 @@ function TeamRow({
   upcoming: boolean;
   /** The game has a line score — hits and errors read beside the runs. */
   line: boolean;
+  /** A postseason game, whose record is the series standing. */
+  playoff: boolean;
 }) {
   return (
     <div className="flex items-center gap-2 py-1">
@@ -53,7 +56,7 @@ function TeamRow({
         {s.abbr !== "—" ? s.abbr : s.name}
         {s.wins !== null && (
           <span className="ml-1.5 text-[10px] text-ink-3">
-            {s.wins}-{s.losses}
+            {playoff ? `(${s.wins}-${s.losses})` : `${s.wins}-${s.losses}`}
           </span>
         )}
       </span>
@@ -161,7 +164,8 @@ export default function GameCard({
             are what is read here. */}
         {game.series ? (
           <span className="min-w-0 truncate text-[10px] tracking-wider text-ink-2">
-            {game.series}
+            {/* Just "ALDS G4": the standing already sits by each club. */}
+            {game.series.split(" · ")[0]}
           </span>
         ) : detailed && !full && game.venue && (
           <span className="hidden truncate text-[10px] text-ink-3 sm:block">
@@ -185,6 +189,7 @@ export default function GameCard({
         detailed={detailed}
         upcoming={upcoming}
         line={line}
+        playoff={!!game.series}
       />
       <TeamRow
         s={game.home}
@@ -192,6 +197,7 @@ export default function GameCard({
         detailed={detailed}
         upcoming={upcoming}
         line={line}
+        playoff={!!game.series}
       />
       {full && (
         <>

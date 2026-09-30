@@ -268,9 +268,9 @@ export function seriesLine(s: PostSeries): string {
   const h = s.wins.get(s.home.id) ?? 0;
   const a = s.wins.get(s.away.id) ?? 0;
   if (h + a === 0) return "";
-  if (h === a) return `TIED ${h}-${a}`;
+  if (h === a) return `TIED (${h}-${a})`;
   const [lead, hi, lo] = h > a ? [s.home, h, a] : [s.away, a, h];
-  return `${lead.abbr} ${s.winner ? "WINS" : "LEADS"} ${hi}-${lo}`;
+  return `${lead.abbr} ${s.winner ? "WINS" : "LEADS"} (${hi}-${lo})`;
 }
 
 /**
