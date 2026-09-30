@@ -18,7 +18,9 @@ import {
   getGame,
   gameDay,
   getLive,
+  getStandings,
   inProgress,
+  seasonOf,
   notStarted,
   type BoxScore,
   type Game,
@@ -140,6 +142,18 @@ export default async function GamePage({
   }
   if (!game) notFound();
 
+  /* In October MLB's record is the series one; the header wants the 162. */
+  const standings = game.series
+    ? await getStandings(seasonOf(game.startTime)).catch(() => null)
+    : null;
+  const season162 = (s: Game["away"]): Game["away"] => {
+    const r = standings?.flatMap((d) => d.teams).find((t) => t.id === s.id);
+    return r ? { ...s, wins: r.wins, losses: r.losses } : s;
+  };
+  const header = standings
+    ? { ...game, away: season162(game.away), home: season162(game.home) }
+    : game;
+
   const playing = inProgress(game);
   const sp = await searchParams;
   const tab = TABS.some((t) => t.value === sp.tab) ? sp.tab! : "gamecast";
@@ -155,7 +169,7 @@ export default async function GamePage({
     <div className="mx-auto max-w-[96rem] space-y-2 p-3">
       <ScrollToTop />
       <div className={NARROW}>
-        <BoxScoreView game={game} box={box}>
+        <BoxScoreView game={header} box={box}>
           {/* Any game with lines puts its box behind the tabs below; one
             without them says so on the card. */}
           {tabbed || notStarted(game) ? null : <NoBoxYet game={game} />}

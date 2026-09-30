@@ -16,7 +16,7 @@ import {
   halfInnings,
   immaculatePlays,
   headToHead,
-  homerKind,
+  playLine,
   inProgress,
   scoringPlays,
   seasonOf,
@@ -625,14 +625,6 @@ function Tag({ text }: { text: string | null }) {
 
 /* ── Scoring summary ────────────────────────────────────────────────── */
 
-/* MLB writes a home run as "homers (18)" — the hitter's season total, which
-   the box score already carries. How far it went, it does not say anywhere
-   else, so the distance takes that slot. */
-const withDistance = (p: PlayProb) =>
-  p.distance === null
-    ? p.description
-    : p.description.replace(/\(\d+\)/, `(${p.distance} ft)`);
-
 /** The plays that put a run on the board. Shown twice on the page — once
  *  beside the running totals, once under the full box score. */
 export function ScoringSummary({ plays }: { plays: PlayProb[] }) {
@@ -652,8 +644,7 @@ export function ScoringSummary({ plays }: { plays: PlayProb[] }) {
                 {p.half === "top" ? "TOP" : "BOT"} {p.inning}
               </span>
               <span className="min-w-0 flex-1 text-ink-2">
-                {withDistance(p)}
-                <Tag text={homerKind(p)} />
+                {playLine(p)}
               </span>
               <span className="shrink-0 tabular-nums text-ink">
                 {p.awayScore}-{p.homeScore}
@@ -729,8 +720,8 @@ export function PlayByPlay({
                     >
                       {/* The at-bat under way is in the log with nothing to
                           say about itself yet. */}
-                      {p.description || "AT BAT"}
-                      <Tag text={immaculate.get(p) ?? homerKind(p)} />
+                      {playLine(p) || "AT BAT"}
+                      <Tag text={immaculate.get(p) ?? null} />
                     </span>
                     <span className="shrink-0 tabular-nums text-ink-3">
                       {p.awayScore}-{p.homeScore}

@@ -120,12 +120,12 @@ const live = toSeries({ series: { id: "F_2" }, games: [game(NYY, BOS, false), ga
 assert.equal(live.round, "WC");
 assert.equal(live.label, "AL WILD CARD");
 assert.equal(live.winner, null);
-assert.equal(seriesLine(live), "TIED 1-1");
+assert.equal(seriesLine(live), "TIED (1-1)");
 assert.equal(clubLine([live], 111), "TIED AL WILD CARD 1-1");
 
 const done = toSeries({ series: { id: "F_2" }, games: [game(NYY, BOS, false), game(NYY, BOS, false)] });
 assert.equal(done.winner, 111);
-assert.equal(seriesLine(done), "BOS WINS 2-0");
+assert.equal(seriesLine(done), "BOS WINS (2-0)");
 assert.equal(clubLine([done], 147), "LOST AL WILD CARD 0-2");
 
 /* A division series with its wild-card side still a placeholder is a bye —
