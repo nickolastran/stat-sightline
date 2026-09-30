@@ -22,7 +22,7 @@ import {
   gameStatus,
   gamesBack,
   halfInnings,
-  homerKind,
+  playLine,
   immaculatePlays,
   inRotation,
   qualifiesForTitle,
@@ -1633,39 +1633,70 @@ assert.equal(addDays("2024-02-28", 1), "2024-02-29", "a leap day is a day");
 assert.equal(addDays("2026-09-19", 0), "2026-09-19", "and today is today");
 console.log("addDays ok");
 
-/* A batted ball's tag: inside-the-park off MLB's own wording, which wins over
-   whatever Savant counted for it; the unicorn, its reverse and the no-doubter
-   at exactly one, twenty-nine and thirty parks — whatever the ball became, so
-   a double off the wall and a flyout at the fence are tagged too; nothing for
-   the ordinary home run, nor for one not yet measured. */
+/* A play the way a broadcaster says it: the runs it drove in, how far a home
+   run went, the play, its kind, then MLB's own words. A no-doubter and a
+   unicorn are home runs; a reverse unicorn never is, since the one park it
+   stays in is this one. A play with neither runs nor a kind keeps MLB's words. */
 {
-  const hr = (description: string, parks: number | null, event = "home_run") =>
-    homerKind({ event, description, parks } as any);
+  const say = (
+    description: string,
+    event: string,
+    parks: number | null = null,
+    distance: number | null = null,
+  ) => playLine({ event, description, parks, distance } as any);
   assert.equal(
-    hr("Bobby Witt Jr. hits an inside-the-park home run (10) on a line drive.", 0),
-    "Inside-the-park home run",
-  );
-  assert.equal(hr("Jose Altuve homers (16).", 1), "Unicorn · HR in 1/30 parks");
-  assert.equal(hr("Alec Burleson homers (22).", 30), "No-doubter · HR in 30/30 parks");
-  assert.equal(hr("Pete Alonso homers (39).", 21), null, "an ordinary one");
-  assert.equal(hr("Pete Alonso homers (40).", null), null, "nor one not yet measured");
-  assert.equal(
-    hr("Rafael Devers doubles (35) on a fly ball.", 29, "double"),
-    "Reverse unicorn · HR in 29/30 parks",
-    "a double off the wall",
+    say("Kyle Teel singles on a ground ball to right fielder Cam Smith. Sam Antonacci scores.", "single"),
+    "Kyle Teel 1-run single on a ground ball to right fielder Cam Smith. Sam Antonacci scores.",
   );
   assert.equal(
-    hr("Nolan Gorman flies out sharply to center fielder.", 1, "field_out"),
-    "Unicorn · HR in 1/30 parks",
-    "and a flyout at the fence",
+    say("Jeremy Peña homers (12) on a fly ball to left center field.", "home_run", 29, 395),
+    "Jeremy Peña solo 395' homer on a fly ball to left center field.",
+    "gone here, so not a reverse unicorn",
   );
   assert.equal(
-    hr("Someone hits an inside-the-park home run (1).", 0, "double"),
-    null,
-    "inside-the-park only on a home run — a double's description never says it",
+    say("Cam Smith homers (5) on a fly ball to left field.", "home_run", 30, 440),
+    "Cam Smith solo 440' no-doubter on a fly ball to left field.",
+  );
+  assert.equal(
+    say("Kyle Tucker homers (20) on a line drive to right field.   Jose Altuve scores.", "home_run", 1, 352),
+    "Kyle Tucker 2-run 352' unicorn on a line drive to right field.   Jose Altuve scores.",
+  );
+  assert.equal(
+    say("Dylan Beavers hits a grand slam (8) to right center field. A scores. B scores. C scores.", "home_run", 21, 408),
+    "Dylan Beavers 408' grand-slam to right center field. A scores. B scores. C scores.",
+  );
+  assert.equal(
+    say("Rafael Devers doubles (35) on a fly ball to right fielder X. Y scores. Z to 3rd.", "double", 29),
+    "Rafael Devers 1-run double reverse unicorn on a fly ball to right fielder X. Y scores. Z to 3rd.",
+  );
+  assert.equal(
+    say("Cody Bellinger out on a sacrifice fly to center fielder Cole Carrigg. Austin Wells scores.", "sac_fly"),
+    "Cody Bellinger 1-run sac fly to center fielder Cole Carrigg. Austin Wells scores.",
+  );
+  assert.equal(
+    say("Andrés Giménez grounds out, second baseman Jackson Holliday to first baseman Pete Alonso. Nathan Lukes scores.", "field_out"),
+    "Andrés Giménez 1-run groundout, second baseman Jackson Holliday to first baseman Pete Alonso. Nathan Lukes scores.",
+  );
+  assert.equal(
+    say("Matt Shaw walks. Pedro Ramírez scores. Alex Bregman to 3rd.", "walk"),
+    "Matt Shaw 1-run walk. Pedro Ramírez scores. Alex Bregman to 3rd.",
+  );
+  assert.equal(
+    say("Ben Rice doubles (12) on a line drive to right fielder X.", "double"),
+    "Ben Rice doubles (12) on a line drive to right fielder X.",
+    "nothing to add, so MLB's words",
+  );
+  assert.equal(
+    say("With X batting, wild pitch by pitcher Y. Z scores.", "wild_pitch"),
+    "With X batting, wild pitch by pitcher Y. Z scores.",
+  );
+  assert.equal(
+    say("Nolan Gorman flies out sharply to center fielder X.", "field_out", 1),
+    "Nolan Gorman flies out sharply to center fielder X.",
+    "the one park it clears is not this one, so no unicorn",
   );
 }
-console.log("homerKind ok");
+console.log("playLine ok");
 
 /* ── qualifiesForTitle: MLB's batting and ERA title bars ───────────── */
 assert.equal(qualifiesForTitle("hitting", { plateAppearances: 502 }, 162), true, "502 PA over 162 is the bar");

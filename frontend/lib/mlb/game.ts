@@ -592,18 +592,71 @@ export function scoringPlays(plays: PlayProb[]): PlayProb[] {
 }
 
 /**
- * What sets a ball hit for distance apart, when anything does: a home run
- * that never left the park, and — whatever became of the ball — one that was
- * a home run in only one park (a unicorn), in every park but one (a reverse
- * unicorn: a double off the wall here, most likely), or in every park.
+ * What sets a ball hit for distance apart, when anything does. A no-doubter
+ * clears all 30 parks; a unicorn only one, which has to be this one, so it is
+ * a home run; a reverse unicorn every park but one, which has to be this one,
+ * so it is not — a double off the wall here, most likely.
  */
 export function homerKind(p: PlayProb): string | null {
-  if (p.event === "home_run" && /inside-the-park/i.test(p.description))
-    return "Inside-the-park home run";
-  if (p.parks === 1) return "Unicorn · HR in 1/30 parks";
-  if (p.parks === 29) return "Reverse unicorn · HR in 29/30 parks";
-  if (p.parks === 30) return "No-doubter · HR in 30/30 parks";
+  const hr = p.event === "home_run";
+  if (hr && p.parks === 30) return "no-doubter";
+  if (hr && p.parks === 1) return "unicorn";
+  if (!hr && p.parks === 29) return "reverse unicorn";
   return null;
+}
+
+/* How MLB names what the batter did, and what we call it. */
+const PLAYS: Record<string, string> = {
+  singles: "single",
+  doubles: "double",
+  triples: "triple",
+  homers: "homer",
+  "hits a ground-rule double": "ground-rule double",
+  "hits a grand slam": "grand-slam",
+  "hits an inside-the-park home run": "inside-the-park homer",
+  "out on a sacrifice fly": "sac fly",
+  "out on a sacrifice bunt": "sac bunt",
+  "grounds into a double play": "double-play grounder",
+  "grounds into a force out": "force-out grounder",
+  "flies into a force out": "force-out fly",
+  "grounds out": "groundout",
+  "flies out": "flyout",
+  "lines out": "lineout",
+  "pops out": "popout",
+  walks: "walk",
+  "hit by pitch": "hit-by-pitch",
+};
+/* The batter, the verb, and the season count MLB tacks on after a hit. */
+const PLAY = new RegExp(`^(.+?) (${Object.keys(PLAYS).join("|")})(?: \\(\\d+\\))?`);
+
+/**
+ * A play that drove in runs, or has a kind, told the way a broadcaster would:
+ * "Kyle Teel 1-run single on a ground ball to right fielder Cam Smith. Sam
+ * Antonacci scores.", "Jeremy Peña solo 395' homer on a fly ball to left
+ * center field.", "Rafael Devers 1-run double reverse unicorn on a fly ball
+ * …". A home run's kind takes the place of "homer". Everything after the
+ * verb is MLB's own; anything else keeps MLB's words whole.
+ */
+export function playLine(p: PlayProb): string {
+  const kind = homerKind(p);
+  const homer = p.event === "home_run";
+  const runs = (p.description.match(/ scores\./g) ?? []).length + (homer ? 1 : 0);
+  const m = p.description.match(PLAY);
+  if (!m || (!runs && !kind))
+    return kind ? `${p.description.trimEnd()} A ${kind}.` : p.description;
+  const noun = PLAYS[m[2]];
+  const tally =
+    noun === "grand-slam" || !runs ? "" : homer && runs === 1 ? "solo" : `${runs}-run`;
+  return (
+    [
+      m[1],
+      tally,
+      homer && p.distance !== null ? `${p.distance}'` : "",
+      noun === "homer" && kind ? kind : kind ? `${noun} ${kind}` : noun,
+    ]
+      .filter(Boolean)
+      .join(" ") + p.description.slice(m[0].length)
+  );
 }
 
 /** One half-inning of the play log, in the order it was played. */
