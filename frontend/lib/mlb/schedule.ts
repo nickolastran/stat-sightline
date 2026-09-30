@@ -88,8 +88,8 @@ export const toGame = (g: any): Game => ({
 });
 
 /**
- * "ALDS G4 · TOR 3-1", "NLWC G1 · TIED 0-0", "WS G7 · LAD WINS 4-3" — short
- * enough to sit beside a first-pitch time on the strip's 220px card. Built
+ * "ALDS G4 · TOR LEAD SERIES 3-1", "NLWC G1 · SERIES TIED 0-0", "WS G7 · LAD
+ * WIN SERIES 4-3". The strip's cards keep only the part before the dot. Built
  * from the parts rather than MLB's own `result`, which is longer ("TOR leads
  * 3-1") and absent altogether before a series' first pitch.
  */
@@ -99,7 +99,9 @@ function seriesLine(g: any): string {
     (t) => s.winningTeam && t?.team?.id === s.winningTeam.id,
   )?.team?.abbreviation;
   const score = `${s.wins ?? 0}-${s.losses ?? 0}`;
-  const standing = lead ? `${lead}${s.isOver ? " WINS" : ""} ${score}` : `TIED ${score}`;
+  const standing = lead
+    ? `${lead} ${s.isOver ? "WIN" : "LEAD"} SERIES ${score}`
+    : `SERIES TIED ${score}`;
   return `${s.abbreviation} G${s.gameNumber} · ${standing}`;
 }
 
