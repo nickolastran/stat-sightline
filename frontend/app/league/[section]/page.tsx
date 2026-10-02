@@ -240,7 +240,7 @@ async function SectionBody({
       case "abs":
         return <AbsBoard board={await getAbsLeaders(season, abs)} type={abs.type} />;
       case "players": {
-        const columns = leaderCols(players.group);
+        const columns = leaderCols(players.group, players.type);
         const board = await getStatLeaders({
           season,
           group: players.group,
@@ -353,12 +353,13 @@ export default async function LeagueSectionPage({
       : null;
   const october = start && today >= start ? "P" : "R";
   const leaderType = pickPlayerGameType(sp.type, october);
+  /* Player boards carry a post-season of their own, which no standings or
+     team table does — so this is the three-way game type, not the two. */
+  const playerType = pickPlayerGameType(sp.type, october);
   const players: PlayerQuery = {
     group,
-    /* Player boards carry a post-season of their own, which no standings or
-       team table does — so this is the three-way game type, not the two. */
-    type: pickPlayerGameType(sp.type, october),
-    stat: pickLeaderStat(sp.stat, group),
+    type: playerType,
+    stat: pickLeaderStat(sp.stat, group, playerType),
     league: inList(sp.league, LEADER_LEAGUES),
     position: inList(sp.pos, leaderPositions(group)),
     order: pickLeaderOrder(sp.order),

@@ -43,11 +43,12 @@ export async function moreStatLeaders(q: {
   const inList = (raw: string, options: { value: string }[]) =>
     options.some((o) => o.value === raw) ? raw : "all";
 
+  const gameType = pickPlayerGameType(q.type);
   const { rows } = await getStatLeaders({
     season,
     group,
-    gameType: pickPlayerGameType(q.type),
-    stat: pickLeaderStat(q.stat, group),
+    gameType,
+    stat: pickLeaderStat(q.stat, group, gameType),
     league: inList(q.league, LEADER_LEAGUES),
     position: inList(q.position, leaderPositions(group)),
     order: pickLeaderOrder(q.order),
