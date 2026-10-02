@@ -9,6 +9,7 @@ import {
 } from "@/components/ui/StatTable";
 import PlayerLink from "@/components/mlb/PlayerLink";
 import TeamLink from "@/components/mlb/TeamLink";
+import Glossary from "@/components/mlb/Glossary";
 import {
   cols,
   gameStatus,
@@ -361,34 +362,8 @@ export function SplitsPanels({
           </Panel>
         );
       })}
-      <Glossary columns={columns} title="Glossary" />
+      <Glossary entries={columns} />
     </div>
-  );
-}
-
-/* Every abbreviation on the table above, spelled out — the same `title` text
-   the column tooltips carry, for a reader who is not going to hover fourteen
-   headers to find the one they didn't know. The columns are the group's own,
-   so a pitching page never explains SLG. */
-export function Glossary({
-  columns,
-  title = "GLOSSARY",
-}: {
-  columns: TeamStatCol[];
-  /** Set in mixed case where the page around it is — the splits tabs. */
-  title?: string;
-}) {
-  return (
-    <Panel title={title}>
-      <dl className="grid gap-x-6 gap-y-1 text-xs sm:grid-cols-2">
-        {columns.map((c) => (
-          <div key={c.key} className="flex gap-2">
-            <dt className="w-12 shrink-0 text-ink">{c.label}</dt>
-            <dd className="min-w-0 text-ink-2">{c.title}</dd>
-          </div>
-        ))}
-      </dl>
-    </Panel>
   );
 }
 

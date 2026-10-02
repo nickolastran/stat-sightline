@@ -76,14 +76,12 @@ function Board({
   teams: boolean;
 }) {
   const tied = tiedRanks(board.leaders);
-  /* A club card hands off to the team table, which has no October of its
-     own — so a postseason club card is the whole board. */
+  /* A club card hands off to the team table on the same season, type and
+     group. */
   const href = !board.stat
     ? null
     : teams
-      ? gameType === "P"
-        ? null
-        : `/league/teams?season=${season}${gameType === "S" ? "&type=S" : ""}`
+      ? `/league/teams?season=${season}&group=${board.group}${gameType === "R" ? "" : `&type=${gameType}`}`
       : `/league/players?season=${season}&group=${board.group}&stat=${board.stat}&type=${gameType}`;
 
   return (

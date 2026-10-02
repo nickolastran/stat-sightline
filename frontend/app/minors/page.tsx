@@ -10,7 +10,7 @@ import TeamLink from "@/components/mlb/TeamLink";
 import ParamSelect from "@/components/mlb/ParamSelect";
 import ParamTabs from "@/components/mlb/ParamTabs";
 import SeasonSelect from "@/components/mlb/SeasonSelect";
-import { Glossary } from "@/components/mlb/TeamPanels";
+import Glossary from "@/components/mlb/Glossary";
 import {
   getTeamStats,
   playerCols,
@@ -186,7 +186,7 @@ function PlayerBoard({
           ? " — EVERY FIELDER, BY POSITION"
           : " QUALIFIED PLAYERS"}
       </p>
-      <Glossary columns={columns} />
+      <Glossary entries={columns} />
     </div>
   );
 }
