@@ -4,6 +4,8 @@ import { notFound } from "next/navigation";
 import Panel from "@/components/ui/Panel";
 import { Skeleton, SkeletonPanel, SkeletonTiles } from "@/components/ui/Skeleton";
 import SeasonSelect from "@/components/mlb/SeasonSelect";
+import SprayChart from "@/components/mlb/SprayChart";
+import { getHomePark, getSprayHits } from "@/lib/spray";
 import ParamTabs from "@/components/mlb/ParamTabs";
 import ParamSelect from "@/components/mlb/ParamSelect";
 import PlayerTabs, {
@@ -162,6 +164,16 @@ async function nextUp(teamId: number | null, game: Game | null) {
   };
 }
 
+/** Every hit of the career on the club's own park — Savant is slow, so this
+ *  streams in on its own rather than holding the overview. */
+async function Spray({ player, seasons }: { player: PlayerSummary; seasons: number[] }) {
+  const [hits, park] = await Promise.all([
+    getSprayHits(player.id, seasons),
+    player.teamId ? getHomePark(player.teamId).catch(() => null) : null,
+  ]);
+  return <SprayChart hits={hits} park={park} />;
+}
+
 /**
  * A little of every other tab: what's next, how the season has gone in the
  * slices anyone checks first, the season against the career, and the last few
@@ -172,12 +184,15 @@ async function Overview({
   season,
   group,
   href,
+  seasons,
 }: {
   player: PlayerSummary;
   season: number;
   group: StatGroup;
   /** The player's URL prefix, for the SEE ALL links. */
   href: string;
+  /** Every season they batted in, for the spray chart — none for a pitcher. */
+  seasons: number[];
 }) {
   /* No fielding splits — MLB doesn't report one, so that dropdown falls back
      to the batting slices the rest of the page is being read with. */
@@ -252,6 +267,17 @@ async function Overview({
         career={career.total}
         href={`${href}/stats?group=${group}`}
       />
+      {seasons.length > 0 && (
+        <Suspense
+          fallback={
+            <SkeletonPanel right>
+              <Skeleton className="h-96 w-full" />
+            </SkeletonPanel>
+          }
+        >
+          <Spray player={player} seasons={seasons} />
+        </Suspense>
+      )}
     </div>
   );
 }
@@ -267,6 +293,7 @@ async function TabBody({
   group,
   groups,
   gameType,
+  seasons,
   controls,
 }: {
   tab: PlayerTab;
@@ -280,6 +307,8 @@ async function TabBody({
   groups: StatGroup[];
   /** Which half of the calendar the game log reads. */
   gameType: PlayerGameType;
+  /** Every season with a major-league line, newest first. */
+  seasons: number[];
   controls: React.ReactNode;
 }) {
   const id = player.id;
@@ -292,6 +321,7 @@ async function TabBody({
             season={season}
             group={group}
             href={`/player/${id}`}
+            seasons={groups.includes("hitting") ? seasons : []}
           />
         );
       case "stats": {
@@ -541,6 +571,7 @@ export default async function PlayerPage({
           group={group}
           groups={groups}
           gameType={gameType}
+          seasons={seasons}
           controls={controls}
         />
       </Suspense>
