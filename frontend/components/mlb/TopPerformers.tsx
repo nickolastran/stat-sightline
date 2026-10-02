@@ -16,7 +16,7 @@ import type { TopCard } from "@/lib/advanced";
 /** The bands the cards fill in, in the order they appear. */
 const ORDER = ["BATTING", "PITCHING", "FIELDING", "CATCHER"];
 
-function Card({ card }: { card: TopCard }) {
+export function Card({ card }: { card: TopCard }) {
   return (
     <div className="self-start border border-line bg-bg">
       <h3

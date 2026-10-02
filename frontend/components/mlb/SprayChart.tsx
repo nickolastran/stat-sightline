@@ -128,9 +128,12 @@ function Dims({ park }: { park: Park }) {
 export default function SprayChart({
   hits,
   park,
+  title,
 }: {
   hits: SprayHit[];
   park: Park | null;
+  /** Overrides the season-named heading — the landing rail names the batter. */
+  title?: string;
 }) {
   const seasons = [...new Set(hits.map((h) => h.season))].sort((a, b) => b - a);
   const [pick, setPick] = useState<string>(String(seasons[0] ?? "career"));
@@ -140,9 +143,10 @@ export default function SprayChart({
 
   return (
     <Panel
-      title={`${pick === "career" ? "Career" : pick} Hits Spray Chart`}
+      className="@container"
+      title={title ?? `${pick === "career" ? "Career" : pick} Hits Spray Chart`}
       right={
-        seasons.length > 0 && (
+        seasons.length > 1 && (
           <label className="flex items-center gap-1.5 text-[10px] tracking-[0.2em] text-ink-3">
             SEASON
             <select
@@ -166,7 +170,7 @@ export default function SprayChart({
           NO BATTED-BALL DATA ON RECORD
         </p>
       ) : (
-        <div className="flex flex-col items-center gap-3 sm:flex-row sm:items-start sm:justify-center">
+        <div className="flex flex-col items-center gap-3 @lg:flex-row @lg:items-start @lg:justify-center">
           <svg
             viewBox="-360 -500 720 530"
             className="w-full max-w-xl"

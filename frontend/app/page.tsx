@@ -1,15 +1,21 @@
 import Link from "next/link";
-import { Suspense } from "react";
+import { connection } from "next/server";
+import { cache, Suspense } from "react";
 import PlayerSearch from "@/components/landing/PlayerSearch";
 import AccessCta from "@/components/landing/AccessCta";
+import { Card } from "@/components/mlb/TopPerformers";
+import SprayChart from "@/components/mlb/SprayChart";
+import { Skeleton, SkeletonPanel } from "@/components/ui/Skeleton";
 import { searchPitchers, type Pitcher } from "@/lib/api";
+import { getTopPerformers, type TopCard } from "@/lib/advanced";
+import { getHomePark, getSprayHits } from "@/lib/spray";
+import { seasonOf, todayPT } from "@/lib/mlb";
 
 const FEATURES: {
   index: string;
   code: string;
   title: string;
   body: string;
-  specs: string[];
   href?: string;
 }[] = [
   {
@@ -17,21 +23,18 @@ const FEATURES: {
     code: "K-PROB",
     title: "STRIKEOUT PREDICTION",
     body: "Per-plate-appearance strikeout probability from pitch-level inputs: arsenal shape, whiff profiles, count leverage, and platoon splits.",
-    specs: ["PITCH-LEVEL GRAIN", "COUNT-STATE PRIORS", "ROLLING FORM WINDOWS"],
   },
   {
     index: "02",
     code: "MATCHUP",
     title: "BATTER VS PITCHER FORECAST",
     body: "Head-to-head projection built on shared pitch-type exposure — not thin historical BvP samples. Expected contact quality per pitch class.",
-    specs: ["ARSENAL × SWING MAP", "xWOBA BY PITCH CLASS", "PLATOON ADJUSTED"],
   },
   {
     index: "03",
     code: "QUERY",
     title: "CUSTOM STATCAST QUERIES",
     body: "Direct filtered access to the pitch warehouse: every tracked pitch with location, movement, spin, and batted-ball outcome fields. Ask for a slice in plain English.",
-    specs: ["SQL-BACKED FACTS", "14-ZONE LOCATION GRID", "EXPORTABLE SLICES"],
     href: "/ask",
   },
 ];
@@ -66,25 +69,153 @@ async function TopPitcherChips() {
   );
 }
 
+/* ── Side rails ─────────────────────────────────────────────────────── */
+
+const SEASON = () => seasonOf(todayPT());
+
+/*
+ * A fresh draw of leader cards per visit. `connection()` keeps the shuffle
+ * out of the prerender (the boards themselves stay fetch-cached an hour), and
+ * `cache` hands both rails the same draw, so no card shows up twice.
+ */
+const draw = cache(async (): Promise<TopCard[]> => {
+  await connection();
+  let cards: TopCard[] = [];
+  try {
+    cards = await getTopPerformers(SEASON());
+  } catch {
+    /* Stats API down — the rails go empty, the page does not */
+  }
+  const shuffled = [...cards];
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+  return shuffled;
+});
+
+function RailHeading() {
+  return (
+    <div className="flex items-baseline justify-between text-[10px] tracking-[0.25em] text-ink-3">
+      <span>{SEASON()} TOP PERFORMERS</span>
+      <Link href="/stats/top" className="hover:text-ink">
+        ALL →
+      </Link>
+    </div>
+  );
+}
+
+function RailSkeleton({ cards }: { cards: number }) {
+  return (
+    <div className="space-y-3">
+      {Array.from({ length: cards }, (_, i) => (
+        <SkeletonPanel key={i} delay={i * 0.1}>
+          <div className="space-y-2">
+            {Array.from({ length: 5 }, (_, r) => (
+              <Skeleton key={r} className="h-3 w-full" delay={i * 0.1 + r * 0.05} />
+            ))}
+          </div>
+        </SkeletonPanel>
+      ))}
+    </div>
+  );
+}
+
+/** The first `n` cards of this draw from the given bands. */
+const take = (cards: TopCard[], groups: string[], n: number) =>
+  cards.filter((c) => groups.includes(c.group)).slice(0, n);
+
+/* Hitters on the left (and one glove), arms on the right. */
+async function LeftRail() {
+  const cards = await draw();
+  const shown = [
+    ...take(cards, ["BATTING"], 2),
+    ...take(cards, ["FIELDING", "CATCHER"], 1),
+  ];
+  if (shown.length === 0) return null;
+  return (
+    <div className="space-y-3">
+      <RailHeading />
+      {shown.map((c) => (
+        <Card key={c.key} card={c} />
+      ))}
+    </div>
+  );
+}
+
+async function RightRail() {
+  const cards = await draw();
+  const shown = take(cards, ["PITCHING"], 2);
+  if (shown.length === 0) return null;
+  return (
+    <div className="space-y-3">
+      <RailHeading />
+      {shown.map((c) => (
+        <Card key={c.key} card={c} />
+      ))}
+      <Suspense fallback={<RailSkeleton cards={1} />}>
+        <Trending cards={cards} />
+      </Suspense>
+    </div>
+  );
+}
+
+/*
+ * "Trending": a hitter off the left rail's first batting board, and where
+ * this season's hits of theirs landed. Streamed on its own — Savant's CSV is
+ * the slowest call on the page.
+ */
+async function Trending({ cards }: { cards: TopCard[] }) {
+  const batting = cards.find((c) => c.group === "BATTING");
+  if (!batting) return null;
+  const pick =
+    batting.leaders[Math.floor(Math.random() * batting.leaders.length)];
+  const [hits, park] = await Promise.all([
+    getSprayHits(pick.id, [SEASON()]),
+    pick.teamId ? getHomePark(pick.teamId).catch(() => null) : null,
+  ]);
+  if (hits.length === 0) return null;
+  return (
+    <div className="space-y-1">
+      <p className="text-[10px] tracking-[0.25em] text-ink-3">
+        TRENDING // #{pick.rank} {batting.label}
+      </p>
+      <SprayChart
+        hits={hits}
+        park={park}
+        title={`${pick.name} · ${SEASON()} Hits`}
+      />
+      <Link
+        href={`/player/${pick.id}`}
+        className="block text-right text-[10px] tracking-[0.2em] text-ink-3 hover:text-ink"
+      >
+        PLAYER PAGE →
+      </Link>
+    </div>
+  );
+}
+
+/* ── Page ───────────────────────────────────────────────────────────── */
+
 export default function LandingPage() {
   return (
-    <div className="mx-auto max-w-6xl px-4">
-      {/* ── HERO ─────────────────────────────────────────────── */}
-      <section className="border-x border-line">
-        <div className="border-b border-line px-6 py-16 sm:px-10 sm:py-24">
-          <p className="mb-4 text-xs tracking-[0.3em] text-ink-3">
+    <div className="mx-auto grid max-w-[96rem] grid-cols-1 gap-6 px-4 py-6 lg:grid-cols-[17rem_minmax(0,1fr)_17rem] xl:grid-cols-[19rem_minmax(0,1fr)_19rem]">
+      {/* ── CENTER ──────────────────────────────────────────── */}
+      <section className="border border-line bg-bg lg:col-start-2 lg:row-start-1">
+        <div className="border-b border-line px-6 py-10 sm:px-8">
+          <p className="mb-3 text-xs tracking-[0.3em] text-ink-3">
             PITCH-LEVEL MLB ANALYTICS // STATCAST WAREHOUSE
           </p>
-          <h1 className="max-w-3xl text-4xl font-bold leading-tight tracking-tight sm:text-6xl">
+          <h1 className="text-4xl font-bold leading-tight tracking-tight sm:text-5xl">
             EVERY PITCH.
             <br />
             <span className="text-accent">MEASURED.</span> QUERYABLE.
           </h1>
-          <p className="mt-6 max-w-xl text-sm leading-6 text-ink-2">
-            Strike-zone plots, arsenal breakdowns, and matchup forecasts from a
-            one-row-per-pitch Statcast fact table. No narrative. Numbers.
+          <p className="mt-4 max-w-xl text-sm leading-6 text-ink-2">
+            Live game feeds, standings, playoff odds, Statcast leaderboards and
+            pitch-level breakdowns. No narrative. Numbers.
           </p>
-          <div className="mt-10 max-w-2xl">
+          <div className="mt-6 max-w-2xl">
             <PlayerSearch autoFocus />
             <Suspense fallback={null}>
               <TopPitcherChips />
@@ -93,22 +224,15 @@ export default function LandingPage() {
         </div>
 
         {/* ── FEATURES ──────────────────────────────────────── */}
-        <div className="border-b border-line">
-          <h2 className="border-b border-line px-6 py-3 text-xs tracking-[0.3em] text-ink-3 sm:px-10">
-            SYSTEM MODULES
-          </h2>
-          <div className="grid grid-cols-1 divide-y divide-line md:grid-cols-3 md:divide-x md:divide-y-0">
-            {FEATURES.map((f) => (
-              <article key={f.code} className="flex flex-col gap-4 p-6 sm:p-8">
-                <div className="flex items-baseline justify-between">
-                  <span className="text-3xl font-bold text-ink-3">
-                    {f.index}
-                  </span>
-                  <span className="border border-line px-2 py-0.5 text-[10px] tracking-widest text-ink-2">
-                    {f.code}
-                  </span>
-                </div>
-                <h3 className="text-sm font-bold tracking-wide">
+        <h2 className="border-b border-line px-6 py-2 text-xs tracking-[0.3em] text-ink-3 sm:px-8">
+          SYSTEM MODULES
+        </h2>
+        <ul className="divide-y divide-line border-b border-line">
+          {FEATURES.map((f) => (
+            <li key={f.code} className="flex gap-4 px-6 py-4 sm:px-8">
+              <span className="text-xl font-bold text-ink-3">{f.index}</span>
+              <div className="min-w-0 flex-1">
+                <h3 className="flex flex-wrap items-baseline gap-2 text-sm font-bold tracking-wide">
                   {f.href ? (
                     <Link href={f.href} className="hover:text-accent">
                       {f.title} →
@@ -116,39 +240,44 @@ export default function LandingPage() {
                   ) : (
                     f.title
                   )}
+                  <span className="border border-line px-1.5 py-0.5 text-[10px] font-normal tracking-widest text-ink-2">
+                    {f.code}
+                  </span>
                 </h3>
-                <p className="text-xs leading-5 text-ink-2">{f.body}</p>
-                <ul className="mt-auto space-y-1 pt-2 text-[10px] tracking-wider text-ink-3">
-                  {f.specs.map((s) => (
-                    <li key={s}>+ {s}</li>
-                  ))}
-                </ul>
-              </article>
-            ))}
-          </div>
-        </div>
+                <p className="mt-1 text-xs leading-5 text-ink-2">{f.body}</p>
+              </div>
+            </li>
+          ))}
+        </ul>
 
         {/* ── ACCESS / AUTH CTA ─────────────────────────────── */}
-        <div id="access" className="px-6 py-14 sm:px-10">
-          <div className="max-w-2xl">
-            <h2 className="text-xs tracking-[0.3em] text-ink-3">ACCESS</h2>
-            <p className="mt-3 text-2xl font-bold tracking-tight">
-              TERMINAL ACCESS IS GATED.
-            </p>
-            <p className="mt-2 mb-8 text-xs leading-5 text-ink-2">
-              Request an operator account, or enter the dashboard read-only
-              with the public dataset.
-            </p>
-            <AccessCta />
-            <Link
-              href="/dashboard"
-              className="mt-4 inline-block border border-line px-4 py-2 text-xs text-ink-2 hover:border-accent hover:text-ink"
-            >
-              ENTER READ-ONLY →
-            </Link>
-          </div>
+        <div id="access" className="px-6 py-8 sm:px-8">
+          <h2 className="text-xs tracking-[0.3em] text-ink-3">ACCESS</h2>
+          <p className="mt-2 mb-5 text-xs leading-5 text-ink-2">
+            Terminal access is gated. Request an operator account, or enter the
+            dashboard read-only with the public dataset.
+          </p>
+          <AccessCta />
+          <Link
+            href="/dashboard"
+            className="mt-4 inline-block border border-line px-4 py-2 text-xs text-ink-2 hover:border-accent hover:text-ink"
+          >
+            ENTER READ-ONLY →
+          </Link>
         </div>
       </section>
+
+      {/* ── RAILS ───────────────────────────────────────────── */}
+      <aside className="lg:col-start-1 lg:row-start-1">
+        <Suspense fallback={<RailSkeleton cards={3} />}>
+          <LeftRail />
+        </Suspense>
+      </aside>
+      <aside className="lg:col-start-3 lg:row-start-1">
+        <Suspense fallback={<RailSkeleton cards={2} />}>
+          <RightRail />
+        </Suspense>
+      </aside>
     </div>
   );
 }
