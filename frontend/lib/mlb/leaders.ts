@@ -494,13 +494,17 @@ export const QS_COL: TeamStatCol = {
 /**
  * The player board's columns: WAR ahead of the standard line, and quality
  * starts beside the starts they are counted from. Fielding has no
- * sabermetric line at all, so it has neither column.
+ * sabermetric line at all, so it has neither column, and WAR is the regular
+ * season's alone — the sabermetrics feed has no October or spring of its own.
  */
-export const leaderCols = (group: StatGroup): TeamStatCol[] =>
+export const leaderCols = (
+  group: StatGroup,
+  gameType: PlayerGameType = "R",
+): TeamStatCol[] =>
   group === "fielding"
     ? playerCols(group)
     : [
-        WAR_COL,
+        ...(gameType === "R" ? [WAR_COL] : []),
         ...playerCols(group).flatMap((c) =>
           c.key === "gamesStarted" ? [c, QS_COL] : [c],
         ),
@@ -509,8 +513,9 @@ export const leaderCols = (group: StatGroup): TeamStatCol[] =>
 export const pickLeaderStat = (
   raw: string | undefined,
   group: StatGroup,
+  gameType: PlayerGameType = "R",
 ): string =>
-  leaderCols(group).some((c) => c.key === raw)
+  leaderCols(group, gameType).some((c) => c.key === raw)
     ? raw!
     : defaultLeaderStat(group);
 
@@ -637,7 +642,9 @@ export async function getStatLeaders({
         (position === "all" || byRole ? "" : `&position=${position}`),
       1800,
     ),
-    seasonWar(season, group, gameType),
+    gameType === "R"
+      ? seasonWar(season, group, gameType)
+      : { player: new Map<number, number>() },
     group === "pitching" ? seasonQualityStarts(season, gameType) : [],
   ]);
   const qsBy = new Map(qs.map((l) => [l.id, l.qs]));

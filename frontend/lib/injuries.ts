@@ -98,6 +98,21 @@ export function clubInjuries(
     .sort((a, b) => a.name.localeCompare(b.name));
 }
 
+/** One club's injured players — both of its feeds, joined. */
+export async function getClubInjuries(
+  club: { id: number; name: string; abbr: string },
+): Promise<Injury[]> {
+  const season = seasonOf(todayPT());
+  const [roster, log] = await Promise.all([
+    mlb(`/teams/${club.id}/roster?rosterType=40Man`, 1800),
+    mlb(
+      `/transactions?teamId=${club.id}&startDate=${season}-01-01&endDate=${todayPT()}`,
+      3600,
+    ).catch(() => null),
+  ]);
+  return clubInjuries(club, roster?.roster ?? [], log?.transactions ?? []);
+}
+
 /**
  * Every club's injured players. A club whose feed doesn't answer contributes
  * nothing rather than taking the board down with it — 29 clubs' injuries is a
@@ -105,25 +120,10 @@ export function clubInjuries(
  */
 export async function getInjuries(): Promise<Injury[]> {
   const clubs = await getClubs();
-  const season = seasonOf(todayPT());
-  const [rosters, logs] = await Promise.all([
-    Promise.all(
-      clubs.map((c) =>
-        mlb(`/teams/${c.id}/roster?rosterType=40Man`, 1800).catch(() => null),
-      ),
-    ),
-    Promise.all(
-      clubs.map((c) =>
-        mlb(
-          `/transactions?teamId=${c.id}&startDate=${season}-01-01&endDate=${todayPT()}`,
-          3600,
-        ).catch(() => null),
-      ),
-    ),
-  ]);
   /* Clubs keep the order getClubs sorts them into — east to west down each
      league, the way every board on the site reads them. */
-  return clubs.flatMap((c, i) =>
-    clubInjuries(c, rosters[i]?.roster ?? [], logs[i]?.transactions ?? []),
+  const each = await Promise.all(
+    clubs.map((c) => getClubInjuries(c).catch(() => [])),
   );
+  return each.flat();
 }
