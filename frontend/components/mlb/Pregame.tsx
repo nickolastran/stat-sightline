@@ -1,5 +1,6 @@
 import DivisionTable from "@/components/mlb/DivisionTable";
 import FirstPitch from "@/components/mlb/FirstPitch";
+import InjuryReport from "@/components/mlb/InjuryReport";
 import LineupCard from "@/components/mlb/LineupCard";
 import Notice from "@/components/ui/Notice";
 import Panel from "@/components/ui/Panel";
@@ -29,6 +30,7 @@ import {
   type PlayerSummary,
   type Pregame as PregameData,
 } from "@/lib/mlb";
+import { getClubInjuries } from "@/lib/injuries";
 
 /*
  * Everything a game is worth reading before it starts, since there is no box
@@ -149,6 +151,10 @@ export default async function Pregame({ game }: { game: Game }) {
     standings,
     awayVs,
     homeVs,
+    awayOctober,
+    homeOctober,
+    awayHurt,
+    homeHurt,
   ] = await Promise.all([
     game.away.probable ? getPlayer(game.away.probable.id, season).catch(() => null) : null,
     game.home.probable ? getPlayer(game.home.probable.id, season).catch(() => null) : null,
@@ -167,6 +173,12 @@ export default async function Pregame({ game }: { game: Game }) {
     pre && game.away.probable
       ? getVsPitcher(pre.home.map((s) => s.id), game.away.probable.id).catch(() => ({}))
       : {},
+    /* A playoff game reads the clubs' October leaders ahead of their season
+       ones — the same boards over the postseason line. */
+    game.series ? getTeamLeaders(game.away.id, season, "P", true).catch(() => null) : null,
+    game.series ? getTeamLeaders(game.home.id, season, "P", true).catch(() => null) : null,
+    game.series ? getClubInjuries(game.away).catch(() => null) : null,
+    game.series ? getClubInjuries(game.home).catch(() => null) : null,
   ]);
 
   /* In October a side's record is its series one, which says nothing about
@@ -309,6 +321,27 @@ export default async function Pregame({ game }: { game: Game }) {
           )}
         </Panel>
 
+        {game.series &&
+          (awayOctober && homeOctober ? (
+            [...awayOctober, ...homeOctober].some((b) => b.leaders.length) ? (
+              <TeamLeaders
+                title="Playoff Team Leaders"
+                away={awayOctober}
+                home={homeOctober}
+                awayAbbr={game.away.abbr}
+                homeAbbr={game.home.abbr}
+              />
+            ) : (
+              <Panel title="Playoff Team Leaders" tight>
+                <Notice what="NO PLAYOFF GAMES PLAYED YET" />
+              </Panel>
+            )
+          ) : (
+            <Panel title="Playoff Team Leaders" tight>
+              <Notice what="LEADERS UNAVAILABLE — MLB API UNREACHABLE" />
+            </Panel>
+          ))}
+
         {awayLeaders && homeLeaders ? (
           <TeamLeaders
             away={awayLeaders}
@@ -320,6 +353,15 @@ export default async function Pregame({ game }: { game: Game }) {
           <Panel title="Team Leaders" tight>
             <Notice what="LEADERS UNAVAILABLE — MLB API UNREACHABLE" />
           </Panel>
+        )}
+
+        {game.series && (
+          <InjuryReport
+            clubs={[
+              { id: game.away.id, name: game.away.name, injuries: awayHurt },
+              { id: game.home.id, name: game.home.name, injuries: homeHurt },
+            ]}
+          />
         )}
       </div>
 

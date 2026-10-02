@@ -55,18 +55,20 @@ export default function TeamLeaders({
   home,
   awayAbbr,
   homeAbbr,
+  title = "Team Leaders",
 }: {
   /** Both clubs' boards, in the same order — one spec per index. */
   away: TeamLeaderBoard[];
   home: TeamLeaderBoard[];
   awayAbbr: string;
   homeAbbr: string;
+  title?: string;
 }) {
   const [group, setGroup] = useState<"hitting" | "pitching">("hitting");
 
   return (
     <Panel
-      title="Team Leaders"
+      title={title}
       right={
         <SegmentedControl
           ariaLabel="Leader board"
