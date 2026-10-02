@@ -7,7 +7,7 @@ import type { Injury } from "@/lib/injuries";
 /*
  * The two clubs' injured lists, one table each, under the game they are
  * missing. MLB publishes no expected return, so the date beside the list is
- * when the player went on it; the reason is the row's hover.
+ * when the player went on it; the reason sits under the name.
  */
 
 /** "Injured 10-Day" → "10-Day IL", the way a box score prints it. */
@@ -61,7 +61,6 @@ export default function InjuryReport({
                     {c.injuries.map((i) => (
                       <tr
                         key={i.id}
-                        title={i.note || undefined}
                         className="border-b border-grid last:border-b-0"
                       >
                         <td className="px-2 py-1.5">
@@ -69,11 +68,14 @@ export default function InjuryReport({
                             {i.name}
                           </PlayerLink>{" "}
                           <span className="text-[10px] text-ink-3">{i.position}</span>
+                          {i.note && (
+                            <span className="block text-[10px] text-ink-3">{i.note}</span>
+                          )}
                         </td>
-                        <td className="px-2 py-1.5 text-right whitespace-nowrap text-ink-2">
+                        <td className="px-2 py-1.5 text-right align-top whitespace-nowrap text-ink-2">
                           {list(i.status)}
                         </td>
-                        <td className="px-2 py-1.5 text-right tabular-nums whitespace-nowrap">
+                        <td className="px-2 py-1.5 text-right align-top tabular-nums whitespace-nowrap">
                           {placed(i.since)}
                         </td>
                       </tr>
