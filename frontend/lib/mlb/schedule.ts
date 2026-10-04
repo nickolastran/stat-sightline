@@ -48,6 +48,9 @@ export interface Game {
   /** A postseason game's place in its series — "ALDS G4 · TOR 3-1".
    *  Null in the regular season, whose series nobody reads a score of. */
   series: string | null;
+  /** Wild card through World Series — set off the game type alone, so it
+   *  holds on reads too lean to carry the series status. */
+  postseason?: boolean;
 }
 
 function side(raw: any, line: any): GameSide {
@@ -85,6 +88,7 @@ export const toGame = (g: any): Game => ({
   },
   attendance: g.gameInfo?.attendance ?? null,
   series: /^[FDLW]$/.test(g.gameType) && g.seriesStatus ? seriesLine(g) : null,
+  postseason: /^[FDLW]$/.test(g.gameType),
 });
 
 /**

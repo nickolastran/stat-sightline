@@ -651,6 +651,16 @@ assert.equal(
   "a game with no decision has no line",
 );
 
+const october = runningRecords([
+  decided(1, "2026-09-27T23:05:00Z", 425844, 657277, null),
+  { ...decided(2, "2026-10-03T23:05:00Z", 425844, 657277, null), postseason: true },
+]);
+assert.deepEqual(
+  october.get("2:425844"),
+  { wins: 1, losses: 0, saves: 0 },
+  "a playoff win starts its own line rather than adding to the season's",
+);
+
 /*
  * Where the halves part — the All-Star break, so a club that played 95 before
  * it and 67 after still splits at the break rather than at game 81.
