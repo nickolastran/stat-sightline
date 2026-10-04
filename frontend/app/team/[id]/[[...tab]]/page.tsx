@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Suspense } from "react";
 import { notFound } from "next/navigation";
 import { Skeleton, SkeletonPanel } from "@/components/ui/Skeleton";
+import JsonLd, { breadcrumbs } from "@/components/JsonLd";
 import TeamTabs, { isTeamTab, type TeamTab } from "@/components/mlb/TeamTabs";
 import TeamHome from "@/components/mlb/TeamHome";
 import PlayerStatTables from "@/components/mlb/PlayerStatTables";
@@ -31,6 +32,7 @@ import {
   pickPlayerGameType,
   playerCols,
   seasonOf,
+  teamHref,
   teamIdOf,
   FIRST_SEASON,
   PLAYER_GAME_TYPES,
@@ -65,11 +67,20 @@ export async function generateMetadata({
 }: {
   params: Promise<{ id: string; tab?: string[] }>;
 }): Promise<Metadata> {
-  const { id } = await params;
-  const t = await getTeamIdentity(teamIdOf(id), seasonOf(todayPT())).catch(
-    () => null
-  );
-  return t ? { title: t.name } : {};
+  const { id, tab } = await params;
+  const season = seasonOf(todayPT());
+  const t = await getTeamIdentity(teamIdOf(id), season).catch(() => null);
+  if (!t) return {};
+  const facts = [t.division, t.venue && `home of ${t.venue}`].filter(Boolean);
+  return {
+    title: t.name,
+    description: `${t.name} ${season} — roster, schedule, stats, splits, injuries and transactions.${facts.length ? ` ${facts.join(", ")}.` : ""}`,
+    /* The slug is part of the club's URL, but a bare /team/147 renders too;
+       both name the slugged one, so they read as one page. */
+    alternates: {
+      canonical: teamHref(t.id, t.name, tab?.[0] === "home" ? "" : (tab?.[0] ?? "")),
+    },
+  };
 }
 
 function Unavailable({ what }: { what: string }) {
@@ -393,6 +404,13 @@ export default async function TeamPage({
 
   return (
     <div className="mx-auto max-w-7xl space-y-3 p-3">
+      <JsonLd
+        data={breadcrumbs([
+          ["Home", "/"],
+          ["Standings", "/league/standings"],
+          [team.name, teamHref(team.id, team.name)],
+        ])}
+      />
       <Identity t={team} season={season} first={first} last={current} />
       <TeamTabs
         id={teamId}

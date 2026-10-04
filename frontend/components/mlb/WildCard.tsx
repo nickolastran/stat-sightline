@@ -23,16 +23,8 @@ const COLS = [
   { label: "W", title: "Wins" },
   { label: "L", title: "Losses" },
   { label: "PCT", title: "Winning percentage" },
-  {
-    label: "WCGB",
-    title:
-      "Wild-card games back — games behind the last playoff berth; a leading + is games clear of it",
-  },
-  {
-    label: "E#",
-    title:
-      "Wild-card elimination number — combined wins by the clubs holding a berth and losses by this one that would end its chase; E once it already has",
-  },
+  { label: "WCGB", title: "Wild-card games back" },
+  { label: "E#", title: "Wild-card elimination number" },
   { label: "STRK", title: "Current streak" },
   { label: "L10", title: "Record over the last ten games" },
 ];

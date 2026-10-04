@@ -13,7 +13,7 @@ import ScoreboardDate from "@/components/mlb/ScoreboardDate";
 import ParamSelect from "@/components/mlb/ParamSelect";
 import ParamTabs from "@/components/mlb/ParamTabs";
 import StatLeaders from "@/components/mlb/StatLeaders";
-import { Glossary } from "@/components/mlb/TeamPanels";
+import Glossary from "@/components/mlb/Glossary";
 import WildCard from "@/components/mlb/WildCard";
 import AbsBoard from "@/components/mlb/AbsBoard";
 import GameFeed from "@/components/mlb/GameFeed";
@@ -86,7 +86,9 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { section } = await params;
   const found = findSection(section);
-  return found ? { title: titleCase(found.title) } : {};
+  return found
+    ? { title: titleCase(found.title), description: found.description }
+    : {};
 }
 
 /** A `?season=` the boards can actually serve, else the running season. */
@@ -146,6 +148,7 @@ async function SectionBody({
   date,
   season,
   gameType,
+  teamType,
   leaderType,
   players,
   abs,
@@ -156,6 +159,8 @@ async function SectionBody({
   date: string;
   season: number;
   gameType: GameType;
+  /** The team table's type — October included, which the standings lack. */
+  teamType: PlayerGameType;
   /** Which part of the year the leader cards read — spring, season or October. */
   leaderType: PlayerGameType;
   /** What the player table is showing — group, sort, filters, page size. */
@@ -233,7 +238,7 @@ async function SectionBody({
       case "teams":
         return (
           <TeamStats
-            tables={await getTeamStats(season, gameType)}
+            tables={await getTeamStats(season, teamType)}
             season={season}
           />
         );
@@ -260,7 +265,7 @@ async function SectionBody({
               query={{ ...players, season }}
               note={qualifierNote(players.group, players.position)}
             />
-            <Glossary columns={columns} />
+            <Glossary entries={columns} />
           </div>
         );
       }
@@ -340,6 +345,9 @@ export default async function LeagueSectionPage({
   const date =
     probables && (picked < today || picked > lastProbable) ? today : picked;
   const gameType = typed ? pickGameType(sp.type) : "R";
+  /* The team table reads October too, which the standings have no table
+     for. */
+  const teamType = found.id === "teams" ? pickPlayerGameType(sp.type) : "R";
   const group = pickGroup(sp.group);
   /* Once this October's first pitch is thrown, the player boards and the
      leaders open on the postseason — the regular season is settled and the
@@ -390,6 +398,7 @@ export default async function LeagueSectionPage({
            that isn't shouted takes the tighter spacing with it — capitals
            need the letter-spacing, mixed case reads as a gap in the word. */
         title={title}
+        heading="h1"
         right={
           dated ? (
             <ScoreboardDate
@@ -428,8 +437,8 @@ export default async function LeagueSectionPage({
                 <ParamSelect
                   param="type"
                   label="TYPE"
-                  value={gameType}
-                  options={GAME_TYPES}
+                  value={found.id === "teams" ? teamType : gameType}
+                  options={found.id === "teams" ? PLAYER_GAME_TYPES : GAME_TYPES}
                 />
               )}
               {/* The leaders read all three halves of the year, spring and
@@ -464,7 +473,7 @@ export default async function LeagueSectionPage({
         {/* Keyed on what the section is showing, so switching year or day
             re-suspends into the skeleton rather than holding the last one. */}
         <Suspense
-          key={`${season}-${date}-${gameType}-${leaderType}-${Object.values(abs).join("-")}-${Object.values(players).join("-")}`}
+          key={`${season}-${date}-${gameType}-${teamType}-${leaderType}-${Object.values(abs).join("-")}-${Object.values(players).join("-")}`}
           fallback={<SectionSkeleton section={found.id} />}
         >
           <SectionBody
@@ -472,6 +481,7 @@ export default async function LeagueSectionPage({
             date={date}
             season={season}
             gameType={gameType}
+            teamType={teamType}
             leaderType={leaderType}
             players={players}
             abs={abs}

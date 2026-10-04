@@ -2,8 +2,11 @@ import type { Metadata } from "next";
 import { Suspense } from "react";
 import { notFound } from "next/navigation";
 import Panel from "@/components/ui/Panel";
+import JsonLd, { breadcrumbs } from "@/components/JsonLd";
 import { Skeleton, SkeletonPanel, SkeletonTiles } from "@/components/ui/Skeleton";
 import SeasonSelect from "@/components/mlb/SeasonSelect";
+import SprayChart from "@/components/mlb/SprayChart";
+import { getHomePark, getSprayHits } from "@/lib/spray";
 import ParamTabs from "@/components/mlb/ParamTabs";
 import ParamSelect from "@/components/mlb/ParamSelect";
 import PlayerTabs, {
@@ -50,6 +53,7 @@ import {
   playerHeadshot,
   seasonOf,
   seriesTotals,
+  teamHref,
   teamLogo,
   todayPT,
   type Game,
@@ -79,7 +83,12 @@ export async function generateMetadata({
   const { id } = await params;
   const p = await getPlayer(Number(id), seasonOf(todayPT())).catch(() => null);
   /* No player, no title of our own — the tab falls back to the site's. */
-  return p ? { title: p.name } : {};
+  return p
+    ? {
+        title: p.name,
+        description: `${p.name} stats — ${[p.pos, p.team].filter(Boolean).join(", ")}. Season and career lines, splits, game logs and bio.`,
+      }
+    : {};
 }
 
 /** What the splits tab can be read over — one season, or all of them. */
@@ -113,6 +122,8 @@ function Identity({ p }: { p: PlayerSummary }) {
         alt=""
         width={56}
         height={56}
+        /* The largest thing above the fold — fetched ahead of the rest. */
+        fetchPriority="high"
         className="h-14 w-14 shrink-0"
       />
       {p.teamId && (
@@ -162,6 +173,16 @@ async function nextUp(teamId: number | null, game: Game | null) {
   };
 }
 
+/** Every hit of the career on the club's own park — Savant is slow, so this
+ *  streams in on its own rather than holding the overview. */
+async function Spray({ player, seasons }: { player: PlayerSummary; seasons: number[] }) {
+  const [hits, park] = await Promise.all([
+    getSprayHits(player.id, seasons),
+    player.teamId ? getHomePark(player.teamId).catch(() => null) : null,
+  ]);
+  return <SprayChart hits={hits} park={park} />;
+}
+
 /**
  * A little of every other tab: what's next, how the season has gone in the
  * slices anyone checks first, the season against the career, and the last few
@@ -172,12 +193,15 @@ async function Overview({
   season,
   group,
   href,
+  seasons,
 }: {
   player: PlayerSummary;
   season: number;
   group: StatGroup;
   /** The player's URL prefix, for the SEE ALL links. */
   href: string;
+  /** Every season they batted in, for the spray chart — none for a pitcher. */
+  seasons: number[];
 }) {
   /* No fielding splits — MLB doesn't report one, so that dropdown falls back
      to the batting slices the rest of the page is being read with. */
@@ -252,6 +276,17 @@ async function Overview({
         career={career.total}
         href={`${href}/stats?group=${group}`}
       />
+      {seasons.length > 0 && (
+        <Suspense
+          fallback={
+            <SkeletonPanel right>
+              <Skeleton className="h-96 w-full" />
+            </SkeletonPanel>
+          }
+        >
+          <Spray player={player} seasons={seasons} />
+        </Suspense>
+      )}
     </div>
   );
 }
@@ -267,6 +302,7 @@ async function TabBody({
   group,
   groups,
   gameType,
+  seasons,
   controls,
 }: {
   tab: PlayerTab;
@@ -280,6 +316,8 @@ async function TabBody({
   groups: StatGroup[];
   /** Which half of the calendar the game log reads. */
   gameType: PlayerGameType;
+  /** Every season with a major-league line, newest first. */
+  seasons: number[];
   controls: React.ReactNode;
 }) {
   const id = player.id;
@@ -292,6 +330,7 @@ async function TabBody({
             season={season}
             group={group}
             href={`/player/${id}`}
+            seasons={groups.includes("hitting") ? seasons : []}
           />
         );
       case "stats": {
@@ -511,6 +550,15 @@ export default async function PlayerPage({
 
   return (
     <div className="mx-auto max-w-[96rem] space-y-3 p-3">
+      <JsonLd
+        data={breadcrumbs([
+          ["Home", "/"],
+          ...(player.teamId && player.team
+            ? [[player.team, teamHref(player.teamId, player.team)] as [string, string]]
+            : []),
+          [player.name, `/player/${player.id}`],
+        ])}
+      />
       <Identity p={player} />
       <PlayerTabs id={playerId} active={section} query={query} />
       {/* The career and game-log tables carry the controls in their own
@@ -541,6 +589,7 @@ export default async function PlayerPage({
           group={group}
           groups={groups}
           gameType={gameType}
+          seasons={seasons}
           controls={controls}
         />
       </Suspense>

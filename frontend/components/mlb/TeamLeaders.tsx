@@ -82,7 +82,15 @@ export default function TeamLeaders({
       }
     >
       <div className="overflow-x-auto border border-line">
-        <table className="w-full border-collapse text-xs">
+        {/* Fixed layout, the two clubs' columns split evenly around the label —
+            auto widths size each side to its longest name and push the label
+            off center. */}
+        <table className="w-full table-fixed border-collapse text-xs">
+          <colgroup>
+            <col />
+            <col className="w-28" />
+            <col />
+          </colgroup>
           <thead>
             <tr>
               {[awayAbbr, " ", homeAbbr].map((h, i) => (

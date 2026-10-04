@@ -10,7 +10,7 @@ import TeamLink from "@/components/mlb/TeamLink";
 import ParamSelect from "@/components/mlb/ParamSelect";
 import ParamTabs from "@/components/mlb/ParamTabs";
 import SeasonSelect from "@/components/mlb/SeasonSelect";
-import { Glossary } from "@/components/mlb/TeamPanels";
+import Glossary from "@/components/mlb/Glossary";
 import {
   getTeamStats,
   playerCols,
@@ -44,7 +44,11 @@ import {
  * controls diverge enough that a shared page stops paying for itself.
  */
 
-export const metadata: Metadata = { title: "Minor Leagues" };
+export const metadata: Metadata = {
+  title: "Minor Leagues",
+  description:
+    "Minor league standings, player stats and team stats for every level, Triple-A down to Rookie ball.",
+};
 
 const VIEWS = [
   { value: "standings", label: "STANDINGS" },
@@ -186,7 +190,7 @@ function PlayerBoard({
           ? " — EVERY FIELDER, BY POSITION"
           : " QUALIFIED PLAYERS"}
       </p>
-      <Glossary columns={columns} />
+      <Glossary entries={columns} />
     </div>
   );
 }
@@ -285,6 +289,7 @@ export default async function MinorsPage({
   return (
     <div className="mx-auto max-w-[88rem] space-y-3 p-3">
       <Panel
+        heading="h1"
         title={titleCase(`MINOR LEAGUES — ${level.label}`)}
         right={
           <div className="flex flex-wrap items-center gap-3">

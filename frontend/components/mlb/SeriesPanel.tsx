@@ -4,6 +4,7 @@ import { useState } from "react";
 import Panel from "@/components/ui/Panel";
 import ResultTable from "@/components/mlb/ResultTable";
 import SegmentedControl from "@/components/ui/SegmentedControl";
+import { FILTER_CONTROL } from "@/components/ui/FilterSelect";
 import type { Game } from "@/lib/mlb";
 
 /*
@@ -32,10 +33,16 @@ export default function SeriesPanel({
   label: string;
 }) {
   const [scope, setScope] = useState<"series" | "season">("series");
-  const games = scope === "series" ? series : matchups;
-  const played = matchups.filter((g) => g.state === "Final");
+  /* In October the schedule holds both: the postseason games carry a
+     series tag, the 162's meetings don't. A playoff game reads its playoff
+     series first and the regular-season meetings behind a dropdown. */
+  const postseason = matchups.filter((g) => g.series);
+  const regular = matchups.filter((g) => !g.series);
+  const playoff = postseason.length > 0;
+  const games = scope === "series" ? (playoff ? postseason : series) : regular;
+  const played = regular.filter((g) => g.state === "Final");
   const awayWins = played.filter(
-    (g) => (g.home.id === teamId ? g.home : g.away).isWinner
+    (g) => (g.home.id === teamId ? g.home : g.away).isWinner,
   ).length;
 
   return (
@@ -43,15 +50,27 @@ export default function SeriesPanel({
       title="Series"
       tight
       right={
-        <SegmentedControl
-          ariaLabel="Series range"
-          value={scope}
-          onChange={setScope}
-          options={[
-            { value: "series" as const, label: "THIS SERIES" },
-            { value: "season" as const, label: "SEASON SERIES" },
-          ]}
-        />
+        playoff ? (
+          <select
+            aria-label="Series range"
+            value={scope}
+            onChange={(e) => setScope(e.target.value as "series" | "season")}
+            className={FILTER_CONTROL}
+          >
+            <option value="series">PLAYOFF SERIES</option>
+            <option value="season">SEASON SERIES</option>
+          </select>
+        ) : (
+          <SegmentedControl
+            ariaLabel="Series range"
+            value={scope}
+            onChange={setScope}
+            options={[
+              { value: "series" as const, label: "THIS SERIES" },
+              { value: "season" as const, label: "SEASON SERIES" },
+            ]}
+          />
+        )
       }
     >
       <div className="space-y-2">

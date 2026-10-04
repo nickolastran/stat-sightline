@@ -68,12 +68,12 @@ export const TEAM_HITTING_COLS: TeamStatCol[] = [
   {
     key: "obp",
     label: "OBP",
-    title: "On-base percentage — how often a batter reaches base",
+    title: "On-base percentage",
   },
   {
     key: "slg",
     label: "SLG",
-    title: "Slugging percentage — total bases per at-bat",
+    title: "Slugging percentage",
   },
   { key: "ops", label: "OPS", title: "On-base plus slugging (OBP + SLG)" },
 ];
@@ -233,8 +233,9 @@ async function teamStatTable(
   const splits = (data.stats?.[0]?.splits ?? []) as any[];
   const standard = cols(group);
   /* Sortable here, unlike on the player board: this table does its own
-     ordering in the browser, over rows it already holds. */
-  const columns = [WAR_COL, ...standard];
+     ordering in the browser, over rows it already holds. Spring and October
+     have no published WAR, so no column for it. */
+  const columns = gameType === "R" ? [WAR_COL, ...standard] : standard;
   return {
     group,
     columns,
@@ -259,8 +260,6 @@ async function teamStatTable(
  */
 export async function getTeamStats(
   season: number,
-  /* The postseason too, for the team leader cards; the table itself offers
-     only the regular season and spring. */
   gameType: GameType | "P" = "R",
   /** The level, as StatsAPI numbers it — 1 for the majors, 11 for Triple-A. */
   sportId = 1,

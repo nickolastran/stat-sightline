@@ -757,7 +757,7 @@ export interface PitcherRecord {
 
 /** Records as they stood after each game, keyed `${gamePk}:${pitcherId}`. */
 export function runningRecords(games: Game[]): Map<string, PitcherRecord> {
-  const running = new Map<number, PitcherRecord>();
+  const running = new Map<string, PitcherRecord>();
   const asOf = new Map<string, PitcherRecord>();
   for (const g of games) {
     for (const [role, key] of [
@@ -767,9 +767,11 @@ export function runningRecords(games: Game[]): Map<string, PitcherRecord> {
     ] as const) {
       const p = g.decisions[role];
       if (!p) continue;
-      const r = running.get(p.id) ?? { wins: 0, losses: 0, saves: 0 };
+      /* October keeps its own line: a playoff win is (1-0), not a 17th. */
+      const who = `${p.id}:${g.postseason ? "P" : "R"}`;
+      const r = running.get(who) ?? { wins: 0, losses: 0, saves: 0 };
       r[key] += 1;
-      running.set(p.id, r);
+      running.set(who, r);
       asOf.set(`${g.pk}:${p.id}`, { ...r });
     }
   }
@@ -781,7 +783,7 @@ export async function getPitcherRecords(
 ): Promise<Map<string, PitcherRecord>> {
   const data = await mlb(
     `/schedule?sportId=1&season=${season}&gameType=R,F,D,L,W&hydrate=decisions` +
-      `&fields=dates,games,gamePk,gameDate,decisions,winner,loser,save,id,fullName`,
+      `&fields=dates,games,gamePk,gameDate,gameType,decisions,winner,loser,save,id,fullName`,
     1800,
   );
   return runningRecords(
@@ -792,10 +794,14 @@ export async function getPitcherRecords(
 }
 
 /** Every pitcher's season ERA, keyed by id — the figure a decision is read
- *  with. One filtered read of the season feed, which is under a thousand arms. */
-async function seasonEras(season: number): Promise<Map<number, string>> {
+ *  with. One filtered read of the season feed, which is under a thousand arms.
+ *  "P" reads the postseason's instead. */
+async function seasonEras(
+  season: number,
+  gameType: "R" | "P" = "R",
+): Promise<Map<number, string>> {
   const data = await mlb(
-    `/stats?stats=season&group=pitching&season=${season}&sportId=1` +
+    `/stats?stats=season&group=pitching&season=${season}&sportId=1&gameType=${gameType}` +
       `&playerPool=all&limit=2000&fields=stats,splits,player,id,stat,era`,
     1800,
   );
@@ -811,7 +817,8 @@ async function seasonEras(season: number): Promise<Map<number, string>> {
  * `${gamePk}:${pitcherId}`.
  *
  * The record is the one the pitcher carried out of that game, the way the
- * schedule already works it out for a club's season. Either feed failing
+ * schedule already works it out for a club's season. A playoff game reads
+ * the October record and ERA, which start over. Either feed failing
  * leaves the names on the card without their line rather than no card.
  *
  * ponytail: the ERA is the season's to date, not the one he took off the
@@ -822,9 +829,14 @@ export async function getDecisionLines(
   games: Game[],
   season: number,
 ): Promise<Map<string, string>> {
-  const [records, eras] = await Promise.all([
+  const none = new Map<number, string>();
+  const [records, eras, postEras] = await Promise.all([
     getPitcherRecords(season).catch(() => new Map<string, PitcherRecord>()),
-    seasonEras(season).catch(() => new Map<number, string>()),
+    seasonEras(season).catch(() => none),
+    /* A playoff game is read with the pitcher's October line. */
+    games.some((g) => g.postseason)
+      ? seasonEras(season, "P").catch(() => none)
+      : none,
   ]);
   const out = new Map<string, string>();
   for (const g of games) {
@@ -832,7 +844,7 @@ export async function getDecisionLines(
       const p = g.decisions[role];
       if (!p) continue;
       const r = records.get(`${g.pk}:${p.id}`);
-      const era = eras.get(p.id);
+      const era = (g.postseason ? postEras : eras).get(p.id);
       const parts =
         role === "save"
           ? r

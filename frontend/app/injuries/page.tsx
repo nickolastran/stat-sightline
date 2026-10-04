@@ -12,7 +12,11 @@ import { getInjuries } from "@/lib/injuries";
  * board on the site.
  */
 
-export const metadata: Metadata = { title: "Injury Report" };
+export const metadata: Metadata = {
+  title: "Injury Report",
+  description:
+    "Every MLB player on the injured list — club, position, which IL, the date placed and the injury.",
+};
 
 async function Body() {
   try {
@@ -36,7 +40,7 @@ async function Body() {
 export default function InjuriesPage() {
   return (
     <div className="mx-auto max-w-[88rem] space-y-3 p-3">
-      <Panel title="Injury Report">
+      <Panel title="Injury Report" heading="h1">
         <Suspense fallback={<SkeletonTable rows={12} heading={false} />}>
           <Body />
         </Suspense>

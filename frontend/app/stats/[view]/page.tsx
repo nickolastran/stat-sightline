@@ -47,7 +47,9 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { view } = await params;
   const found = findAdvView(view);
-  return found ? { title: titleCase(found.title) } : {};
+  return found
+    ? { title: titleCase(found.title), description: found.description }
+    : {};
 }
 
 /** The four boards and the cards, as the row of tabs over each of them. */
@@ -184,6 +186,7 @@ export default async function AdvancedPage({
   return (
     <div className="mx-auto max-w-[110rem] space-y-3 p-3">
       <Panel
+        heading="h1"
         title={titleCase(index ? `${found.title} — BY SEASON` : found.title)}
         right={
           index ? (

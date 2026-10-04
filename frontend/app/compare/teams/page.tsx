@@ -28,7 +28,11 @@ import {
  * full hitting or pitching table with a column picker.
  */
 
-export const metadata: Metadata = { title: "Compare Teams" };
+export const metadata: Metadata = {
+  title: "Compare Teams",
+  description:
+    "Compare up to four MLB clubs side by side — batting and pitching, season by season.",
+};
 
 const MAX = 4;
 

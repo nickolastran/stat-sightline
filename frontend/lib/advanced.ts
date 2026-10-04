@@ -39,27 +39,37 @@ export const ADV_VIEWS = [
     id: "player-batting",
     label: "PLAYER BATTING",
     title: "ADVANCED BATTING — PLAYERS",
+    description: "Advanced MLB batting stats for every hitter — WAR, wRC+, exit velocity, barrels, bat speed and expected stats.",
   },
   {
     id: "player-pitching",
     label: "PLAYER PITCHING",
     title: "ADVANCED PITCHING — PLAYERS",
+    description: "Advanced MLB pitching stats for every pitcher — WAR, FIP, xFIP, strikeout and walk rates and expected stats.",
   },
   {
     id: "league-batting",
     label: "LEAGUE BATTING",
     title: "ADVANCED BATTING — CLUBS",
+    description: "Advanced batting stats for all thirty MLB clubs — wRC+, exit velocity, barrels and expected stats.",
   },
   {
     id: "league-pitching",
     label: "LEAGUE PITCHING",
     title: "ADVANCED PITCHING — CLUBS",
+    description: "Advanced pitching stats for all thirty MLB clubs — FIP, xFIP, strikeout and walk rates and expected stats.",
   },
-  { id: "top", label: "TOP PERFORMERS", title: "ADVANCED TOP PERFORMERS" },
+  {
+    id: "top",
+    label: "TOP PERFORMERS",
+    title: "ADVANCED TOP PERFORMERS",
+    description: "The MLB leaders in the advanced stats — WAR, wRC+, exit velocity, barrels and more.",
+  },
   {
     id: "custom",
     label: "CUSTOM LEADERBOARD",
     title: "CUSTOM LEADERBOARD",
+    description: "Build your own MLB leaderboard — pick the stats, filter the players and export to CSV.",
   },
 ] as const;
 
