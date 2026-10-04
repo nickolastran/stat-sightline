@@ -15,7 +15,11 @@ import { getSalaries, salaryYears, SALARY_FILE } from "@/lib/salaries";
  * fill it rather than a page that looks broken.
  */
 
-export const metadata: Metadata = { title: "Salaries" };
+export const metadata: Metadata = {
+  title: "Salaries",
+  description:
+    "MLB player salaries and team payrolls by season.",
+};
 
 /** What to put on screen before the file exists. */
 function Missing() {
@@ -56,6 +60,7 @@ export default async function SalariesPage({
   return (
     <div className="mx-auto max-w-[88rem] space-y-3 p-3">
       <Panel
+        heading="h1"
         title={year ? `Salaries — ${year}` : "Salaries"}
         right={
           years.length > 0 && (

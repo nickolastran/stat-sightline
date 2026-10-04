@@ -27,7 +27,11 @@ import { fieldSet, getPostseason, realSeeds, type PostSeries } from "@/lib/playo
  * series joins, and the bracket fills in off MLB's own series.
  */
 
-export const metadata: Metadata = { title: "Playoffs" };
+export const metadata: Metadata = {
+  title: "Playoffs",
+  description:
+    "MLB playoff odds, the wild-card race, the postseason bracket and the series schedule — projected through September, live through October.",
+};
 
 /** The first season under the twelve-club bracket this page draws. */
 const FIRST_SEASON = 2022;
@@ -146,6 +150,7 @@ export default async function PlayoffsPage({
   return (
     <div className="mx-auto max-w-[100rem] space-y-3 p-3">
       <Panel
+        heading="h1"
         title="Playoffs"
         right={
           <SeasonSelect value={season} first={FIRST_SEASON} last={current} />

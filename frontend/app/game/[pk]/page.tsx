@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Suspense } from "react";
 import { notFound } from "next/navigation";
 import ScrollToTop from "@/components/ScrollToTop";
+import JsonLd from "@/components/JsonLd";
 import AutoRefresh from "@/components/mlb/AutoRefresh";
 import GameSkeleton from "@/components/mlb/GameSkeleton";
 import BoxScoreView, { FullBox, NoBoxYet } from "@/components/mlb/BoxScoreView";
@@ -114,7 +115,10 @@ export async function generateMetadata({
   const { pk } = await params;
   const game = await getGame(Number(pk)).catch(() => null);
   return game
-    ? { title: `${game.away.name} vs. ${game.home.name} - ${gameDay(game.startTime)}` }
+    ? {
+        title: `${game.away.name} vs. ${game.home.name} - ${gameDay(game.startTime)}`,
+        description: `${game.away.name} at ${game.home.name}, ${gameDay(game.startTime)}${game.venue ? ` at ${game.venue}` : ""} — box score, play-by-play, win probability and the pitch-by-pitch gamecast.`,
+      }
     : {};
 }
 
@@ -168,6 +172,23 @@ export default async function GamePage({
   return (
     <div className="mx-auto max-w-[96rem] space-y-2 p-3">
       <ScrollToTop />
+      {/* The scorecard is the page's heading to the eye; this is the same
+          thing as text, for screen readers and search engines. */}
+      <h1 className="sr-only">
+        {game.away.name} at {game.home.name}, {gameDay(game.startTime)}
+      </h1>
+      <JsonLd
+        data={{
+          "@context": "https://schema.org",
+          "@type": "SportsEvent",
+          name: `${game.away.name} at ${game.home.name}`,
+          sport: "Baseball",
+          startDate: game.startTime,
+          ...(game.venue && { location: { "@type": "Place", name: game.venue } }),
+          awayTeam: { "@type": "SportsTeam", name: game.away.name },
+          homeTeam: { "@type": "SportsTeam", name: game.home.name },
+        }}
+      />
       <div className={NARROW}>
         <BoxScoreView game={header} box={box}>
           {/* Any game with lines puts its box behind the tabs below; one

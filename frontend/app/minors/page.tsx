@@ -44,7 +44,11 @@ import {
  * controls diverge enough that a shared page stops paying for itself.
  */
 
-export const metadata: Metadata = { title: "Minor Leagues" };
+export const metadata: Metadata = {
+  title: "Minor Leagues",
+  description:
+    "Minor league standings, player stats and team stats for every level, Triple-A down to Rookie ball.",
+};
 
 const VIEWS = [
   { value: "standings", label: "STANDINGS" },
@@ -285,6 +289,7 @@ export default async function MinorsPage({
   return (
     <div className="mx-auto max-w-[88rem] space-y-3 p-3">
       <Panel
+        heading="h1"
         title={titleCase(`MINOR LEAGUES — ${level.label}`)}
         right={
           <div className="flex flex-wrap items-center gap-3">

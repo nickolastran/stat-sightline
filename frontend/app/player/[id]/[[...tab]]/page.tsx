@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Suspense } from "react";
 import { notFound } from "next/navigation";
 import Panel from "@/components/ui/Panel";
+import JsonLd, { breadcrumbs } from "@/components/JsonLd";
 import { Skeleton, SkeletonPanel, SkeletonTiles } from "@/components/ui/Skeleton";
 import SeasonSelect from "@/components/mlb/SeasonSelect";
 import SprayChart from "@/components/mlb/SprayChart";
@@ -52,6 +53,7 @@ import {
   playerHeadshot,
   seasonOf,
   seriesTotals,
+  teamHref,
   teamLogo,
   todayPT,
   type Game,
@@ -81,7 +83,12 @@ export async function generateMetadata({
   const { id } = await params;
   const p = await getPlayer(Number(id), seasonOf(todayPT())).catch(() => null);
   /* No player, no title of our own — the tab falls back to the site's. */
-  return p ? { title: p.name } : {};
+  return p
+    ? {
+        title: p.name,
+        description: `${p.name} stats — ${[p.pos, p.team].filter(Boolean).join(", ")}. Season and career lines, splits, game logs and bio.`,
+      }
+    : {};
 }
 
 /** What the splits tab can be read over — one season, or all of them. */
@@ -115,6 +122,8 @@ function Identity({ p }: { p: PlayerSummary }) {
         alt=""
         width={56}
         height={56}
+        /* The largest thing above the fold — fetched ahead of the rest. */
+        fetchPriority="high"
         className="h-14 w-14 shrink-0"
       />
       {p.teamId && (
@@ -541,6 +550,15 @@ export default async function PlayerPage({
 
   return (
     <div className="mx-auto max-w-[96rem] space-y-3 p-3">
+      <JsonLd
+        data={breadcrumbs([
+          ["Home", "/"],
+          ...(player.teamId && player.team
+            ? [[player.team, teamHref(player.teamId, player.team)] as [string, string]]
+            : []),
+          [player.name, `/player/${player.id}`],
+        ])}
+      />
       <Identity p={player} />
       <PlayerTabs id={playerId} active={section} query={query} />
       {/* The career and game-log tables carry the controls in their own
