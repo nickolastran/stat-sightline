@@ -425,11 +425,13 @@ export default function PlayoffBracket({
   return (
     <div className="space-y-2">
       {/* Scrolled rather than shrunk on a narrow screen: a bracket squeezed
-          to phone width is a diagram of nothing. */}
+          to phone width is a diagram of nothing. On a wide one it is held
+          to the window's height, so the whole tree reads without scrolling;
+          the viewBox centres it in the spare width. */}
       <div className="overflow-x-auto">
         <svg
           viewBox={`0 0 ${W} ${H}`}
-          className="h-auto w-full min-w-[62rem]"
+          className="h-auto max-h-[75vh] w-full min-w-[62rem]"
           role="img"
           aria-label={`${seeded ? "" : "Projected "}postseason bracket`}
         >
