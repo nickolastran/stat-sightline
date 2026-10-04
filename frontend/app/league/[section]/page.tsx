@@ -86,7 +86,9 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { section } = await params;
   const found = findSection(section);
-  return found ? { title: titleCase(found.title) } : {};
+  return found
+    ? { title: titleCase(found.title), description: found.description }
+    : {};
 }
 
 /** A `?season=` the boards can actually serve, else the running season. */
@@ -396,6 +398,7 @@ export default async function LeagueSectionPage({
            that isn't shouted takes the tighter spacing with it — capitals
            need the letter-spacing, mixed case reads as a gap in the word. */
         title={title}
+        heading="h1"
         right={
           dated ? (
             <ScoreboardDate

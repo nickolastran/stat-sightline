@@ -21,7 +21,11 @@ import {
  * held — see components/mlb/DraftBoard.tsx.
  */
 
-export const metadata: Metadata = { title: "MLB Draft" };
+export const metadata: Metadata = {
+  title: "MLB Draft",
+  description:
+    "Every pick of the MLB Draft by year — round, club, position and school, back to the first draft in 1965.",
+};
 
 async function Body({ year }: { year: number }) {
   try {

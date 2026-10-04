@@ -1,25 +1,26 @@
 /*
  * The league reference sections, shared by the bar that links to them and the
  * route that renders them, so a new section is added in exactly one place.
- * `tab` is the short bar label; `title` is the panel heading on the page.
+ * `tab` is the short bar label; `title` is the panel heading on the page;
+ * `description` is what a search result says under it.
  *
  * `inBar: false` keeps a section routable without giving it a bar tab of its
  * own — the wild-card race is reached from the standings page instead, since
  * the two are the same table read two ways.
  */
 export const LEAGUE_SECTIONS = [
-  { id: "gamefeed", tab: "GAME FEED", title: "GAME FEED" },
+  { id: "gamefeed", tab: "GAME FEED", title: "GAME FEED", description: "The best of the day in MLB — the hardest-hit balls, longest homers, fastest pitches, most whiffs and the swings that turned games." },
   /* Set in mixed case, like the probables board: these two are read as a
      heading over a slate of games rather than as a shouted section label. */
-  { id: "scoreboard", tab: "SCOREBOARD", title: "Scoreboard" },
-  { id: "probables", tab: "PROBABLES", title: "PROBABLE PITCHERS — TODAY" },
-  { id: "standings", tab: "STANDINGS", title: "STANDINGS" },
-  { id: "wildcard", tab: "WILD CARD", title: "WILD CARD RACE", inBar: false },
-  { id: "leaders", tab: "STAT LEADERS", title: "STAT LEADERS" },
-  { id: "teamleaders", tab: "TEAM LEADERS", title: "TEAM LEADERS" },
-  { id: "players", tab: "PLAYER STATS", title: "PLAYER STATISTICS" },
-  { id: "teams", tab: "TEAM STATS", title: "TEAM STATISTICS" },
-  { id: "abs", tab: "ABS", title: "ABS CHALLENGES" },
+  { id: "scoreboard", tab: "SCOREBOARD", title: "Scoreboard", description: "Live MLB scores for every game today, with box scores, starting pitchers and final lines." },
+  { id: "probables", tab: "PROBABLES", title: "PROBABLE PITCHERS — TODAY", description: "MLB probable starting pitchers for today and the next few days." },
+  { id: "standings", tab: "STANDINGS", title: "STANDINGS", description: "MLB standings by division — records, games back, run differential, streaks and last ten." },
+  { id: "wildcard", tab: "WILD CARD", title: "WILD CARD RACE", inBar: false, description: "The MLB wild-card race in each league — games back of the last berth and elimination numbers." },
+  { id: "leaders", tab: "STAT LEADERS", title: "STAT LEADERS", description: "MLB stat leaders in batting and pitching — home runs, average, ERA, strikeouts and more." },
+  { id: "teamleaders", tab: "TEAM LEADERS", title: "TEAM LEADERS", description: "Each MLB club's leaders in the main batting and pitching categories." },
+  { id: "players", tab: "PLAYER STATS", title: "PLAYER STATISTICS", description: "Sortable MLB player stats — batting, pitching and fielding, by season." },
+  { id: "teams", tab: "TEAM STATS", title: "TEAM STATISTICS", description: "Sortable MLB team stats — batting, pitching and fielding for all thirty clubs, by season." },
+  { id: "abs", tab: "ABS", title: "ABS CHALLENGES", description: "Automated ball-strike (ABS) challenge leaderboards — who challenges, how often, and how often they win." },
 ] as const;
 
 export type LeagueSection = (typeof LEAGUE_SECTIONS)[number]["id"];
