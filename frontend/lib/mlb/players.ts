@@ -1,6 +1,7 @@
 /* A player's summary line and individual stat tables. */
 import {
   mlb,
+  FRESH,
 } from "./core";
 import {
   inRotation,
@@ -87,7 +88,7 @@ export async function getPlayer(
 ): Promise<PlayerSummary | null> {
   const data = await mlb(
     `/people/${id}?hydrate=currentTeam,stats(group=[hitting,pitching],type=[season],season=${season})`,
-    1800,
+    FRESH,
   ).catch((e: Error) => {
     // Unknown id → null so the route 404s; anything else is an outage and
     // must surface as one, not as "no such player".
@@ -382,7 +383,7 @@ export async function getTeamPlayerStats(
   const data = await mlb(
     `/stats?stats=season&group=${group}&season=${season}&teamId=${id}` +
       `&gameType=${gameType}&sportId=1&playerPool=ALL&limit=200&hydrate=person`,
-    1800,
+    FRESH,
   );
   const columns = playerCols(group);
   const rows = ((data.stats?.[0]?.splits ?? []) as any[]).map(
