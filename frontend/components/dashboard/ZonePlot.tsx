@@ -51,9 +51,10 @@ const HEAT_Z: [number, number] = [0.4, 4.4];
 const fmtBA = (ba: number | null) =>
   ba === null ? "—" : ba.toFixed(3).replace(/^0/, "");
 
-const SURFACE = "#1a1a19";
-const MUTED = "#898781";
-const GRID = "#2c2c2a";
+/* Theme tokens — the site is light-only, so the chrome reads its vars. */
+const SURFACE = "var(--color-surface)";
+const MUTED = "var(--color-ink-3)";
+const GRID = "var(--color-grid)";
 
 /* Series marks — ~9px across, 2px surface ring for overlap legibility. */
 function Mark({
@@ -284,7 +285,7 @@ export default function ZonePlot({
                 width={size}
                 height={size}
                 fill={fill}
-                stroke={active ? "#ffffff" : "none"}
+                stroke={active ? "var(--color-ink)" : "none"}
                 strokeWidth={active ? 1.5 : 0}
                 onPointerEnter={() => {
                   setHoverKey(`cell-${k}`);
@@ -321,7 +322,7 @@ export default function ZonePlot({
                   width={w - 2}
                   height={h - 2}
                   fill={fill ?? SURFACE}
-                  stroke={active ? "#ffffff" : GRID}
+                  stroke={active ? "var(--color-ink)" : GRID}
                   strokeWidth={active ? 1.5 : 1}
                   onPointerEnter={() => {
                     setHoverKey(`z-${c.row}-${c.col}`);
@@ -388,7 +389,7 @@ export default function ZonePlot({
             width={(ZONE.x2 - ZONE.x1) * PX_FT}
             height={(ZONE.z2 - ZONE.z1) * PX_FT}
             fill="none"
-            stroke={mode === "scatter" ? MUTED : "#ffffff"}
+            stroke={mode === "scatter" ? MUTED : "var(--color-ink)"}
             strokeWidth={1.5}
           />
         </g>
@@ -411,7 +412,7 @@ export default function ZonePlot({
                 cy={hovered.cy}
                 r={9}
                 fill="none"
-                stroke="#ffffff"
+                stroke="var(--color-ink)"
                 strokeWidth={1.5}
                 pointerEvents="none"
               />
@@ -420,8 +421,8 @@ export default function ZonePlot({
         )}
 
         {/* Axes: ticks + labels in muted ink. */}
-        <line x1={PAD.l} y1={PAD.t + PLOT_H} x2={PAD.l + PLOT_W} y2={PAD.t + PLOT_H} stroke="#383835" strokeWidth={1} />
-        <line x1={PAD.l} y1={PAD.t} x2={PAD.l} y2={PAD.t + PLOT_H} stroke="#383835" strokeWidth={1} />
+        <line x1={PAD.l} y1={PAD.t + PLOT_H} x2={PAD.l + PLOT_W} y2={PAD.t + PLOT_H} stroke="var(--color-ink-3)" strokeWidth={1} />
+        <line x1={PAD.l} y1={PAD.t} x2={PAD.l} y2={PAD.t + PLOT_H} stroke="var(--color-ink-3)" strokeWidth={1} />
         {[-2, -1, 0, 1, 2].map((x) => (
           <text key={`tx${x}`} x={sx(x)} y={PAD.t + PLOT_H + 14} textAnchor="middle" fontSize={9} fill={MUTED} style={{ fontVariantNumeric: "tabular-nums" }}>
             {x}

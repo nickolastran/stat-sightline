@@ -25,21 +25,27 @@ export const PITCH_SLOTS: Record<string, PitchSlot> = {
 
 export const OTHER_SLOT: PitchSlot = { color: "#898781", shape: "circle" };
 
+/* Variants share their family's slot — a sweeper reads as a slider, not as
+   "other" — so a staff of sweepers and splitters isn't mostly grey. */
+const FAMILY: Record<string, string> = { ST: "SL", SV: "SL", KC: "CU", FS: "CH", FO: "CH" };
+for (const [code, family] of Object.entries(FAMILY))
+  PITCH_SLOTS[code] = PITCH_SLOTS[family];
+
 export const slotFor = (pitchType: string | null): PitchSlot =>
   (pitchType && PITCH_SLOTS[pitchType]) || OTHER_SLOT;
 
 /*
  * Sequential ramp for the density heatmap — one hue (blue), anchored for the
- * dark surface: near-zero recedes toward the surface (darkest step), maximum
- * reads brightest. Steps 650→100 of the reference blue ramp.
+ * light surface: near-zero recedes toward the surface (lightest step),
+ * maximum reads darkest. Steps 100→650 of the reference blue ramp.
  */
 export const HEAT_RAMP = [
-  "#104281",
-  "#1c5cab",
-  "#2a78d6",
-  "#5598e7",
-  "#9ec5f4",
   "#cde2fb",
+  "#9ec5f4",
+  "#5598e7",
+  "#2a78d6",
+  "#1c5cab",
+  "#104281",
 ] as const;
 
 export const heatColor = (value: number, max: number): string | null => {
