@@ -18,7 +18,8 @@ import { MIN_AB, normZ, ZONE, zoneGrid } from "@/lib/metrics";
  *  - scatter: one mark per pitch, colored + SHAPED by pitch type (shape is
  *    the secondary encoding required by the palette's floor-band CVD ΔE),
  *    nearest-point hover within 24px so nobody has to hit a dot dead-center.
- *  - heat: 0.25 ft density grid on a single-hue sequential ramp anchored to
+ *  - heat: a smoothed density (Gaussian kernel per pitch, blurred onto a
+ *    0.1 ft grid) in banded blobs on a single-hue sequential ramp anchored to
  *    the dark surface (near-zero recedes; max reads brightest).
  *  - zones: the rulebook zone's own 3x3, each ninth shaded by the batting
  *    average allowed there on a diverging ramp — the hot/cold read.
@@ -43,7 +44,9 @@ const sz = (z: number) => PAD.t + PLOT_H - (z - ZD[0]) * PX_FT;
 
 const MAX_POINTS = 2000; // scatter cap; most recent pitches win
 const HIT_RADIUS = 24; // nearest-point hover radius, viewBox px
-const CELL_FT = 0.25; // heat bin size
+const CELL_FT = 0.1; // density grid step
+const BANDWIDTH_FT = 0.25; // kernel σ — how far one pitch's weight spreads
+const HEAT_FLOOR = 0.08; // share of the peak below which the surface stays bare
 const HEAT_X: [number, number] = [-2, 2];
 const HEAT_Z: [number, number] = [0.4, 4.4];
 
@@ -168,23 +171,32 @@ export default function ZonePlot({
     return [...counts.entries()].sort((a, b) => b[1] - a[1]);
   }, [pts]);
 
-  /* Heat bins over the fixed grid. */
+  /* Kernel density over the fixed grid: every pitch adds a Gaussian bump,
+     so a thin sample reads as a blob around where it went, not as speckle. */
   const heat = useMemo(() => {
     if (mode !== "heat") return null;
     const cols = Math.round((HEAT_X[1] - HEAT_X[0]) / CELL_FT);
     const rows = Math.round((HEAT_Z[1] - HEAT_Z[0]) / CELL_FT);
-    const cells = new Map<string, number>();
-    let max = 0;
+    const density = new Float64Array(cols * rows);
+    const reach = Math.ceil((3 * BANDWIDTH_FT) / CELL_FT);
+    const twoVar = 2 * BANDWIDTH_FT ** 2;
     for (const { x, z } of located) {
-      const cx = Math.floor((x - HEAT_X[0]) / CELL_FT);
-      const cz = Math.floor((z - HEAT_Z[0]) / CELL_FT);
-      if (cx < 0 || cx >= cols || cz < 0 || cz >= rows) continue;
-      const k = `${cx}:${cz}`;
-      const v = (cells.get(k) ?? 0) + 1;
-      cells.set(k, v);
-      if (v > max) max = v;
+      /* The pitch in cell units, measured from cell centers. */
+      const c0 = (x - HEAT_X[0]) / CELL_FT - 0.5;
+      const r0 = (z - HEAT_Z[0]) / CELL_FT - 0.5;
+      const rLo = Math.max(0, Math.floor(r0) - reach);
+      const rHi = Math.min(rows - 1, Math.ceil(r0) + reach);
+      const cLo = Math.max(0, Math.floor(c0) - reach);
+      const cHi = Math.min(cols - 1, Math.ceil(c0) + reach);
+      for (let r = rLo; r <= rHi; r++)
+        for (let c = cLo; c <= cHi; c++) {
+          const d2 = ((c - c0) ** 2 + (r - r0) ** 2) * CELL_FT ** 2;
+          density[r * cols + c] += Math.exp(-d2 / twoVar);
+        }
     }
-    return { cells, max, cols, rows };
+    let max = 0;
+    for (const v of density) if (v > max) max = v;
+    return { density, max, cols, rows };
   }, [located, mode]);
 
   /* 3x3 hot/cold grid — batting average allowed per ninth of the zone. */
@@ -266,43 +278,33 @@ export default function ZonePlot({
           <line key={`gz${z}`} x1={PAD.l} y1={sz(z)} x2={PAD.l + PLOT_W} y2={sz(z)} stroke={GRID} strokeWidth={1} />
         ))}
 
-        {/* Heat cells under the zone outline. */}
-        {mode === "heat" &&
-          heat &&
-          [...heat.cells.entries()].map(([k, v]) => {
-            const [cx, cz] = k.split(":").map(Number);
-            const fill = heatColor(v, heat.max);
-            if (!fill) return null;
-            const x = sx(HEAT_X[0] + cx * CELL_FT);
-            const z = sz(HEAT_Z[0] + (cz + 1) * CELL_FT);
-            const size = CELL_FT * PX_FT - 2; // 2px surface gap between cells
-            const active = hoverKey === `cell-${k}`;
-            return (
-              <rect
-                key={k}
-                x={x + 1}
-                y={z + 1}
-                width={size}
-                height={size}
-                fill={fill}
-                stroke={active ? "var(--color-ink)" : "none"}
-                strokeWidth={active ? 1.5 : 0}
-                onPointerEnter={() => {
-                  setHoverKey(`cell-${k}`);
-                  setTip({
-                    cx: x + size / 2,
-                    cy: z + size / 2,
-                    title: `${v} PITCH${v === 1 ? "" : "ES"}`,
-                    lines: [
-                      { label: "SHARE", value: `${((v / located.length) * 100).toFixed(1)}%` },
-                      { label: "CELL", value: `${CELL_FT} × ${CELL_FT} FT` },
-                    ],
-                  });
-                }}
-                onPointerLeave={clearHover}
-              />
-            );
-          })}
+        {/* Heat blobs under the zone outline: banded cells, blurred so the
+            grid's steps melt into contours. */}
+        {mode === "heat" && heat && (
+          <g filter="url(#zone-heat-blur)" pointerEvents="none">
+            <defs>
+              <filter id="zone-heat-blur">
+                <feGaussianBlur stdDeviation={5} />
+              </filter>
+            </defs>
+            {Array.from(heat.density, (v, i) => {
+              if (v < heat.max * HEAT_FLOOR) return null;
+              const c = i % heat.cols;
+              const r = Math.floor(i / heat.cols);
+              const size = CELL_FT * PX_FT;
+              return (
+                <rect
+                  key={i}
+                  x={sx(HEAT_X[0] + c * CELL_FT)}
+                  y={sz(HEAT_Z[0] + (r + 1) * CELL_FT)}
+                  width={size + 0.5}
+                  height={size + 0.5}
+                  fill={heatColor(v, heat.max)!}
+                />
+              );
+            })}
+          </g>
+        )}
 
         {/* Hot/cold ninths — fill is BA allowed; the count is the caveat. */}
         {mode === "zones" &&
@@ -505,12 +507,12 @@ export default function ZonePlot({
         </div>
       ) : (
         <div className="flex items-center gap-1.5 border-t border-grid px-1 pt-2 text-[10px] text-ink-3">
-          <span>0</span>
+          <span>NONE</span>
           <span className="inline-block h-3 w-4 border border-grid" style={{ background: SURFACE }} aria-hidden />
           {HEAT_RAMP.map((c) => (
             <span key={c} className="inline-block h-3 w-4" style={{ background: c }} aria-hidden />
           ))}
-          <span className="tabular-nums">{heat?.max ?? 0} MAX / CELL</span>
+          <span>DENSEST</span>
         </div>
       )}
     </div>
