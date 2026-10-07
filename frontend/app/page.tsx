@@ -5,10 +5,13 @@ import PlayerSearch from "@/components/landing/PlayerSearch";
 import AccessCta from "@/components/landing/AccessCta";
 import { Card } from "@/components/mlb/TopPerformers";
 import SprayChart from "@/components/mlb/SprayChart";
+import ZonePlot, { type ZonePlotMode } from "@/components/dashboard/ZonePlot";
+import Panel from "@/components/ui/Panel";
 import { Skeleton, SkeletonPanel } from "@/components/ui/Skeleton";
 import { searchPitchers, type Pitcher } from "@/lib/api";
-import { getTopPerformers, type TopCard } from "@/lib/advanced";
-import { getHomePark, getSprayHits } from "@/lib/spray";
+import { getTopPerformers, type TopCard, type TopLeader } from "@/lib/advanced";
+import { getHomePark, getSprayHits, seasonHitPitches } from "@/lib/spray";
+import { getStrikeouts } from "@/lib/statcast";
 import { seasonOf, todayPT } from "@/lib/mlb";
 
 const FEATURES: {
@@ -94,16 +97,17 @@ const draw = cache(async (): Promise<TopCard[]> => {
   return shuffled;
 });
 
-function RailHeading() {
+function RailHeading({ label }: { label: string }) {
   return (
-    <div className="flex items-baseline justify-between text-[10px] tracking-[0.25em] text-ink-3">
-      <span>{SEASON()} TOP PERFORMERS</span>
-      <Link href="/stats/top" className="hover:text-ink">
-        ALL →
-      </Link>
-    </div>
+    <p className="text-[10px] tracking-[0.25em] text-ink-3">
+      {SEASON()} {label}
+    </p>
   );
 }
+
+/** The first `n` cards of this draw from the given bands. */
+const take = (cards: TopCard[], groups: string[], n: number) =>
+  cards.filter((c) => groups.includes(c.group)).slice(0, n);
 
 function RailSkeleton({ cards }: { cards: number }) {
   return (
@@ -121,24 +125,51 @@ function RailSkeleton({ cards }: { cards: number }) {
   );
 }
 
-/** The first `n` cards of this draw from the given bands. */
-const take = (cards: TopCard[], groups: string[], n: number) =>
-  cards.filter((c) => groups.includes(c.group)).slice(0, n);
+/** A leader off one of this draw's boards, and the board that put them there. */
+type Pick = { card: TopCard; leader: TopLeader };
 
-/* Hitters on the left (and one glove), arms on the right. */
+/** `n` different players off the band's boards, one random leader per board. */
+function picks(cards: TopCard[], group: string, n: number): Pick[] {
+  const out: Pick[] = [];
+  for (const card of cards) {
+    if (card.group !== group || card.leaders.length === 0) continue;
+    const leader =
+      card.leaders[Math.floor(Math.random() * card.leaders.length)];
+    if (out.some((p) => p.leader.id === leader.id)) continue;
+    out.push({ card, leader });
+    if (out.length === n) break;
+  }
+  return out;
+}
+
+/* Hitters on the left (and one glove), arms on the right — leader cards,
+   then two charts each, every chart streamed on its own: Savant's CSV is the
+   slowest call on the page. */
 async function LeftRail() {
   const cards = await draw();
   const shown = [
     ...take(cards, ["BATTING"], 2),
     ...take(cards, ["FIELDING", "CATCHER"], 1),
   ];
-  if (shown.length === 0) return null;
+  const [a, b] = picks(cards, "BATTING", 2);
+  if (shown.length === 0 && !a) return null;
   return (
     <div className="space-y-3">
-      <RailHeading />
+      {shown.length > 0 && <RailHeading label="TOP PERFORMERS" />}
       {shown.map((c) => (
         <Card key={c.key} card={c} />
       ))}
+      {a && <RailHeading label="TRENDING HITTERS" />}
+      {a && (
+        <Suspense fallback={<RailSkeleton cards={1} />}>
+          <SprayTrend pick={a} />
+        </Suspense>
+      )}
+      {b && (
+        <Suspense fallback={<RailSkeleton cards={1} />}>
+          <ZoneTrend pick={b} what="Hits" mode="heat" />
+        </Suspense>
+      )}
     </div>
   );
 }
@@ -146,52 +177,83 @@ async function LeftRail() {
 async function RightRail() {
   const cards = await draw();
   const shown = take(cards, ["PITCHING"], 2);
-  if (shown.length === 0) return null;
+  const [a, b] = picks(cards, "PITCHING", 2);
+  if (shown.length === 0 && !a) return null;
   return (
     <div className="space-y-3">
-      <RailHeading />
+      {shown.length > 0 && <RailHeading label="TOP PERFORMERS" />}
       {shown.map((c) => (
         <Card key={c.key} card={c} />
       ))}
-      <Suspense fallback={<RailSkeleton cards={1} />}>
-        <Trending cards={cards} />
-      </Suspense>
+      {a && <RailHeading label="TRENDING PITCHERS" />}
+      {a && (
+        <Suspense fallback={<RailSkeleton cards={1} />}>
+          <ZoneTrend pick={a} what="Strikeouts" mode="scatter" />
+        </Suspense>
+      )}
+      {b && (
+        <Suspense fallback={<RailSkeleton cards={1} />}>
+          <ZoneTrend pick={b} what="Strikeouts" mode="heat" />
+        </Suspense>
+      )}
     </div>
   );
 }
 
-/*
- * "Trending": a hitter off the left rail's first batting board, and where
- * this season's hits of theirs landed. Streamed on its own — Savant's CSV is
- * the slowest call on the page.
- */
-async function Trending({ cards }: { cards: TopCard[] }) {
-  const batting = cards.find((c) => c.group === "BATTING");
-  if (!batting) return null;
-  const pick =
-    batting.leaders[Math.floor(Math.random() * batting.leaders.length)];
-  const [hits, park] = await Promise.all([
-    getSprayHits(pick.id, [SEASON()]),
-    pick.teamId ? getHomePark(pick.teamId).catch(() => null) : null,
-  ]);
-  if (hits.length === 0) return null;
+/** One trending chart: which board the player trends on, and their page. */
+function Trend({ pick, children }: { pick: Pick; children: React.ReactNode }) {
   return (
     <div className="space-y-1">
       <p className="text-[10px] tracking-[0.25em] text-ink-3">
-        TRENDING // #{pick.rank} {batting.label}
+        #{pick.leader.rank} {pick.card.label}
       </p>
-      <SprayChart
-        hits={hits}
-        park={park}
-        title={`${pick.name} · ${SEASON()} Hits`}
-      />
+      {children}
       <Link
-        href={`/player/${pick.id}`}
+        href={`/player/${pick.leader.id}`}
         className="block text-right text-[10px] tracking-[0.2em] text-ink-3 hover:text-ink"
       >
         PLAYER PAGE →
       </Link>
     </div>
+  );
+}
+
+/** Where a hitter's hits landed this season. */
+async function SprayTrend({ pick }: { pick: Pick }) {
+  const { id, name, teamId } = pick.leader;
+  const [hits, park] = await Promise.all([
+    getSprayHits(id, [SEASON()]),
+    teamId ? getHomePark(teamId).catch(() => null) : null,
+  ]);
+  if (hits.length === 0) return null;
+  return (
+    <Trend pick={pick}>
+      <SprayChart hits={hits} park={park} title={`${name} · ${SEASON()} Hits`} />
+    </Trend>
+  );
+}
+
+/** Where in the zone a hitter's hits, or a pitcher's strikeouts, were thrown. */
+async function ZoneTrend({
+  pick,
+  what,
+  mode,
+}: {
+  pick: Pick;
+  what: "Hits" | "Strikeouts";
+  mode: ZonePlotMode;
+}) {
+  const { id, name } = pick.leader;
+  const pitches = await (
+    what === "Hits" ? seasonHitPitches(id, SEASON()) : getStrikeouts(id, SEASON())
+  ).catch(() => []);
+  if (pitches.length === 0) return null;
+  return (
+    <Trend pick={pick}>
+      <Panel title={`${name} · ${SEASON()} ${what}`}>
+        <ZonePlot pitches={pitches} mode={mode} />
+      </Panel>
+    </Trend>
   );
 }
 

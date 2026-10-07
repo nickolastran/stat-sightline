@@ -143,6 +143,13 @@ export const seasonOf = (isoDate: string) => Number(isoDate.slice(0, 4));
 export const FIRST_SEASON = 1876;
 
 /**
+ * The window for stats that move with every final: none, fetched on each
+ * request. Next hands out an expired entry once before refetching it, so on a
+ * site this quiet any window means a refresh can land on numbers hours old.
+ */
+export const FRESH = 0;
+
+/**
  * One Stats API call. Exported so lib/advanced.ts can reach the same feeds
  * through the same cache rather than opening a second client onto them.
  */

@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { useSetParam } from "@/lib/useSetParam";
 import type { Leaderboard, LeaderRow, PlayerGameType } from "@/lib/mlb";
 import SegmentedControl from "@/components/ui/SegmentedControl";
 import PlayerLink from "@/components/mlb/PlayerLink";
@@ -124,7 +125,10 @@ export default function Leaderboards({
   /** Club cards rather than player ones — the TEAM LEADERS section. */
   teams?: boolean;
 }) {
-  const [group, setGroup] = useState<"hitting" | "pitching">("hitting");
+  /* In the URL rather than in state, so a refresh keeps the group. */
+  const setParam = useSetParam();
+  const group =
+    useSearchParams().get("group") === "pitching" ? "pitching" : "hitting";
   const shown = boards.filter((b) => b.group === group && b.leaders.length > 0);
 
   return (
@@ -133,7 +137,7 @@ export default function Leaderboards({
         <SegmentedControl<"hitting" | "pitching">
           ariaLabel="Stat group"
           value={group}
-          onChange={setGroup}
+          onChange={(g) => setParam("group", g)}
           options={[
             { value: "hitting", label: "HITTING" },
             { value: "pitching", label: "PITCHING" },

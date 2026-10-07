@@ -223,13 +223,66 @@ export async function getPostseason(season: number): Promise<PostSeries[]> {
     `/schedule/postseason/series?sportId=1&season=${season}&hydrate=${SCHEDULE_HYDRATE}`,
     60,
   );
-  return (data.series ?? [])
+  const series: PostSeries[] = (data.series ?? [])
     .map(toSeries)
     .filter((s: PostSeries) => s.home && s.away)
     .sort(
       (a: PostSeries, b: PostSeries) =>
         ORDER.indexOf(a.round) - ORDER.indexOf(b.round) || a.id.localeCompare(b.id),
     );
+  nameCsSides(series);
+  return series;
+}
+
+/** The two division series each LCS draws its sides from. */
+const FEEDS: Record<string, [string, string]> = { L_1: ["D_1", "D_2"], L_2: ["D_3", "D_4"] };
+
+/**
+ * Until its sides are known MLB calls an LCS "AL Lower Seed v AL Higher
+ * Seed" — the better-seeded division-series winner at home, whichever series
+ * it came out of. Spell out who each can still be, "TB/CLE/NYY", off every
+ * pairing of the two division series' live sides. Seeds come off round one,
+ * where all twelve are placed; the World Series ranks by record, not seed, and
+ * keeps MLB's name.
+ */
+export function nameCsSides(series: PostSeries[]): void {
+  const seed = new Map<number, number>();
+  const abbr = new Map<number, string>();
+  for (const s of series)
+    for (const side of [s.home, s.away]) if (isClub(side.id)) abbr.set(side.id, side.abbr);
+  for (const [id, [, home, away]] of Object.entries(SLOTS)) {
+    const s = series.find((x) => x.id === id);
+    if (!s) continue;
+    seed.set(s.home.id, home);
+    if (away !== null) seed.set(s.away.id, away);
+  }
+
+  for (const [cs, feeds] of Object.entries(FEEDS)) {
+    const s = series.find((x) => x.id === cs);
+    const alive = feeds.map((id) => {
+      const d = series.find((x) => x.id === id);
+      return !d ? [] : d.winner ? [d.winner] : [d.home.id, d.away.id];
+    });
+    /* A wild card still undecided leaves a division series with a
+       placeholder side, and no seed to rank it by. */
+    if (!s || alive.some((a) => a.length === 0 || a.some((id) => !seed.has(id)))) continue;
+
+    const high = new Set<number>();
+    const low = new Set<number>();
+    for (const a of alive[0])
+      for (const b of alive[1]) {
+        const [h, l] = seed.get(a)! < seed.get(b)! ? [a, b] : [b, a];
+        high.add(h);
+        low.add(l);
+      }
+    const label = (ids: Set<number>) =>
+      [...ids].sort((a, b) => seed.get(a)! - seed.get(b)!).map((id) => abbr.get(id)).join("/");
+
+    for (const g of s.games)
+      for (const side of [g.home, g.away])
+        if (!isClub(side.id) && /higher|lower/i.test(side.name))
+          side.abbr = label(/higher/i.test(side.name) ? high : low);
+  }
 }
 
 /** MLB has named all twelve clubs — the postseason is set, if not begun. */

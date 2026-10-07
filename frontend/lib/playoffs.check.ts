@@ -17,6 +17,7 @@ import {
   fieldSet,
   seriesLine,
   clubLine,
+  nameCsSides,
 } from "./playoffs";
 import type { Division, StandingRow } from "./mlb";
 
@@ -134,5 +135,35 @@ const bye = toSeries({ series: { id: "D_1" }, games: [game([139, "TB"], [5529, "
 assert.equal(bye.label, "ALDS");
 assert.equal(clubLine([bye], 139), "BYE");
 assert.equal(fieldSet([live, bye]), false);
+
+/* The ALCS before its sides are known: TB (1) and CLE (2) host NYY (4) and
+   CWS (6). Whoever is the better seed of the two winners is at home, so either
+   placeholder can come out of either division series. */
+const TB: [number, string] = [139, "TB"];
+const CLE: [number, string] = [114, "CLE"];
+const CWS: [number, string] = [145, "CWS"];
+const HOU: [number, string] = [117, "HOU"];
+const csGame = () => ({
+  ...game([5513, "AL High"], [5521, "AL Low"], null),
+  teams: {
+    home: { team: { id: 5513, name: "AL Higher Seed", abbreviation: "AL High" } },
+    away: { team: { id: 5521, name: "AL Lower Seed", abbreviation: "AL Low" } },
+  },
+});
+const alcs = (ds1: ReturnType<typeof game>[]) => {
+  const all = [
+    toSeries({ series: { id: "F_1" }, games: [game(HOU, CWS, false)] }),
+    toSeries({ series: { id: "F_2" }, games: [game(NYY, BOS, true)] }),
+    toSeries({ series: { id: "D_1" }, games: ds1 }),
+    toSeries({ series: { id: "D_2" }, games: [game(CLE, CWS, null)] }),
+    toSeries({ series: { id: "L_1" }, games: [csGame()] }),
+  ];
+  nameCsSides(all);
+  const g = all[4].games[0];
+  return [g.home.abbr, g.away.abbr];
+};
+assert.deepEqual(alcs([game(TB, NYY, null)]), ["TB/CLE/NYY", "CLE/NYY/CWS"]);
+/* TB through: the 1 seed is home whoever joins it. */
+assert.deepEqual(alcs([game(TB, NYY, true), game(TB, NYY, true), game(TB, NYY, true)]), ["TB", "CLE/CWS"]);
 
 console.log("playoffs.check.ts OK");

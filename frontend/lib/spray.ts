@@ -9,8 +9,8 @@
  * The park is the batter's current club's, off MLB's venue record, which
  * gives the wall's distance down each line, to each gap and to center.
  */
-import { parseCsv } from "./advanced";
-import { FETCH_TIMEOUT_MS, mlb, mlbTeams, seasonOf, todayPT } from "./mlb";
+import { mlb, mlbTeams } from "./mlb";
+import { statcastSearch, toPitch } from "./statcast";
 
 export type HitKind = "single" | "double" | "triple" | "home_run";
 
@@ -43,33 +43,27 @@ const toFeet = (hcX: number, hcY: number) => ({
   y: Math.round((198.27 - hcY) * 2.5),
 });
 
+/** One season of a batter's regular-season hits, as Savant's rows. */
+const hitRows = (id: number, season: number) =>
+  statcastSearch(
+    {
+      hfAB: "single|double|triple|home_run|",
+      player_type: "batter",
+      "batters_lookup[]": String(id),
+    },
+    season,
+  );
+
+/** The pitches those hits came off — where in the zone a batter does damage. */
+export const seasonHitPitches = async (id: number, season: number) =>
+  (await hitRows(id, season)).map(toPitch);
+
 /** One season's regular-season hits that Gameday placed on the field. */
 export async function seasonHits(
   id: number,
   season: number,
 ): Promise<SprayHit[]> {
-  const query = new URLSearchParams({
-    all: "true",
-    hfAB: "single|double|triple|home_run|",
-    hfSea: `${season}|`,
-    hfGT: "R|",
-    player_type: "batter",
-    "batters_lookup[]": String(id),
-    type: "details",
-  });
-  const res = await fetch(
-    `https://baseballsavant.mlb.com/statcast_search/csv?${query}`,
-    {
-      /* A finished season never changes; the running one moves daily. */
-      next: { revalidate: season < seasonOf(todayPT()) ? 604800 : 3600 },
-      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS * 3),
-    },
-  );
-  if (!res.ok) throw new Error(`Savant ${res.status}: spray ${id} ${season}`);
-  const text = await res.text();
-  if (text.trimStart().startsWith("<"))
-    throw new Error(`Savant: page, not CSV`);
-  return parseCsv(text).flatMap((r): SprayHit[] => {
+  return (await hitRows(id, season)).flatMap((r): SprayHit[] => {
     const hcX = Number.parseFloat(r.hc_x);
     const hcY = Number.parseFloat(r.hc_y);
     if (!KINDS.has(r.events) || !Number.isFinite(hcX) || !Number.isFinite(hcY))

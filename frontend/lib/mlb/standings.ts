@@ -4,6 +4,7 @@ import {
   DIVISIONS,
   LEAGUES,
   mlb,
+  FRESH,
 } from "./core";
 
 
@@ -157,7 +158,7 @@ export async function getStandings(
 ): Promise<Division[]> {
   const data = await mlb(
     standingsUrl(season, gameType === "S" ? "springTraining" : "regularSeason"),
-    1800,
+    FRESH,
   );
   const records = (data.records ?? []) as any[];
   return records
@@ -217,7 +218,7 @@ export interface WildCardGroup {
 export const WC_BERTHS = 3;
 
 export async function getWildCard(season: number): Promise<WildCardGroup[]> {
-  const data = await mlb(standingsUrl(season, "wildCard"), 1800);
+  const data = await mlb(standingsUrl(season, "wildCard"), FRESH);
   return ((data.records ?? []) as any[])
     .map((r): WildCardGroup => {
       const leagueId = r.league?.id;

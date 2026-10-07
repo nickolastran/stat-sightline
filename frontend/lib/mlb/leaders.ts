@@ -1,6 +1,7 @@
 /* Leaderboards, club and player. */
 import {
   mlb,
+  FRESH,
 } from "./core";
 import {
   inRotation,
@@ -128,7 +129,7 @@ async function oneBoard(
      latter and answers with the regular season whatever it is asked. */
   const data = await mlb(
     `/stats/leaders?leaderCategories=${spec.cat}&statGroup=${spec.group}&season=${season}&sportId=1&limit=${limit}&leaderGameTypes=${gameType}`,
-    1800,
+    FRESH,
   );
   const leaders = (data.leagueLeaders?.[0]?.leaders ?? []) as any[];
   return {
@@ -164,12 +165,12 @@ async function postseasonRateBoard(
   const [clubs, pool] = await Promise.all([
     mlb(
       `/teams/stats?season=${season}&sportId=1&stats=season&group=hitting&gameType=P`,
-      1800,
+      FRESH,
     ),
     mlb(
       `/stats?stats=season&group=${spec.group}&season=${season}&sportId=1` +
         `&gameType=P&playerPool=all&limit=1000&hydrate=team`,
-      1800,
+      FRESH,
     ),
   ]);
   const games = Math.max(
@@ -222,7 +223,7 @@ async function warBoard(
 ): Promise<Leaderboard> {
   const data = await mlb(
     `/stats?stats=sabermetrics&group=${group}&season=${season}&sportId=1&limit=${limit}`,
-    1800,
+    FRESH,
   ).catch(() => null);
   const splits = (data?.stats?.[0]?.splits ?? []) as any[];
   return {
@@ -555,7 +556,7 @@ async function tradedTeams(
   const data = await mlb(
     `/people/${id}/stats?stats=season&group=${group}&season=${season}` +
       `&sportId=1&gameType=${gameType}&hydrate=team`,
-    1800,
+    FRESH,
   );
   /* The payload leads with the combined line, which has no club of its own —
      the per-club rows are the ones that name a team. */
@@ -640,7 +641,7 @@ export async function getStatLeaders({
         (order && !ranked ? `&order=${order}` : "") +
         (league === "all" ? "" : `&leagueId=${league}`) +
         (position === "all" || byRole ? "" : `&position=${position}`),
-      1800,
+      FRESH,
     ),
     gameType === "R"
       ? seasonWar(season, group, gameType)
@@ -803,7 +804,7 @@ async function seasonEras(
   const data = await mlb(
     `/stats?stats=season&group=pitching&season=${season}&sportId=1&gameType=${gameType}` +
       `&playerPool=all&limit=2000&fields=stats,splits,player,id,stat,era`,
-    1800,
+    FRESH,
   );
   const out = new Map<number, string>();
   for (const sp of (data.stats?.[0]?.splits ?? []) as any[])

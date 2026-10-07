@@ -7,6 +7,7 @@ import {
   MONTHS,
   seasonOf,
   todayPT,
+  FRESH,
 } from "./core";
 import {
   inRotation,
@@ -221,7 +222,7 @@ async function teamStatTable(
   const [data, war] = await Promise.all([
     mlb(
       `/teams/stats?season=${season}&sportIds=${sportId}&group=${group}&stats=season&gameType=${gameType}`,
-      1800,
+      FRESH,
     ),
     /* The sabermetrics feed is a major-league one: asking it for a minor
        league answers with major-league clubs, whose ids would land WAR on
@@ -774,7 +775,7 @@ export async function buildSplits(
   columns: TeamStatCol[],
   sections: { label: string; codes: string[] }[],
 ): Promise<SplitSection[]> {
-  const data = await mlb(url(sections.flatMap((s) => s.codes).join(",")), 1800);
+  const data = await mlb(url(sections.flatMap((s) => s.codes).join(",")), FRESH);
   const values = (stat: any) =>
     Object.fromEntries(columns.map((c) => [c.key, stat?.[c.key] ?? null]));
   const typed = (name: string) =>
@@ -1028,7 +1029,7 @@ async function teamGameLog(
 ): Promise<TeamLogGame[]> {
   const data = await mlb(
     `/teams/${id}/stats?season=${season}&group=${group}&stats=gameLog`,
-    1800,
+    FRESH,
   );
   return ((data.stats?.[0]?.splits ?? []) as any[]).map((s) => ({
     pk: s.game?.gamePk ?? 0,

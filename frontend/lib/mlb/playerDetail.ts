@@ -4,6 +4,7 @@ import {
   MONTHS,
   seasonOf,
   todayPT,
+  FRESH,
 } from "./core";
 import {
   teamStatNum,
@@ -174,7 +175,7 @@ export async function getVsTeamSplit(
   const data = await mlb(
     `/people/${id}/stats?stats=vsTeamTotal&group=${group}&season=${season}` +
       `&opposingTeamId=${opponent.id}`,
-    1800,
+    FRESH,
   ).catch(() => null);
   const split = (data?.stats?.[0]?.splits ?? [])[0];
   if (!split?.stat) return null;
@@ -313,7 +314,7 @@ export async function getPlayerGameLog(
   const data = await mlb(
     `/people/${id}/stats?stats=gameLog&group=${group}&seasons=${seasons.join(",")}` +
       `&gameType=${gameType}&sportId=1`,
-    900,
+    FRESH,
   );
   const splits = ((data.stats?.[0]?.splits ?? []) as any[]).filter(
     (s) => s.game?.gamePk,
