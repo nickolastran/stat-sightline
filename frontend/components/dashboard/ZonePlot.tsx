@@ -60,7 +60,7 @@ const MUTED = "var(--color-ink-3)";
 const GRID = "var(--color-grid)";
 
 /* Series marks — ~9px across, 2px surface ring for overlap legibility. */
-function Mark({
+export function Mark({
   shape,
   cx,
   cy,

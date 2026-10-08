@@ -14,6 +14,7 @@ import MetricCard from "@/components/ui/MetricCard";
 import SegmentedControl from "@/components/ui/SegmentedControl";
 import PlayerSearch from "@/components/landing/PlayerSearch";
 import FilterPanel, { type PitchTypeOption } from "./FilterPanel";
+import MovementPlot from "./MovementPlot";
 import Sidebar from "./Sidebar";
 import ZonePlot, { type ZonePlotMode } from "./ZonePlot";
 
@@ -116,6 +117,8 @@ export default function DashboardClient({ data }: { data: PitcherPitches }) {
     { key: "usage", label: "USE%", align: "right", sortValue: (r) => r.usage, render: (r) => fmt.pct(r.usage) },
     { key: "avgVelo", label: "VELO", align: "right", sortValue: (r) => r.avgVelo, render: (r) => fmt.num(r.avgVelo) },
     { key: "avgSpin", label: "SPIN", align: "right", sortValue: (r) => r.avgSpin, render: (r) => fmt.int(r.avgSpin) },
+    { key: "avgHBreak", label: "H-BRK", align: "right", sortValue: (r) => r.avgHBreak, render: (r) => fmt.num(r.avgHBreak) },
+    { key: "avgVBreak", label: "IVB", align: "right", sortValue: (r) => r.avgVBreak, render: (r) => fmt.num(r.avgVBreak) },
     { key: "whiffRate", label: "WHIFF%", align: "right", sortValue: (r) => r.whiffRate, render: (r) => fmt.pct(r.whiffRate) },
     { key: "zoneRate", label: "ZONE%", align: "right", sortValue: (r) => r.zoneRate, render: (r) => fmt.pct(r.zoneRate) },
     { key: "chaseRate", label: "CHASE%", align: "right", sortValue: (r) => r.chaseRate, render: (r) => fmt.pct(r.chaseRate) },
@@ -206,7 +209,7 @@ export default function DashboardClient({ data }: { data: PitcherPitches }) {
           <MetricCard label="AVG LAUNCH ANG" value={fmt.num(summary.avgLaunchAngle)} unit="°" sub="VS. BATTED BALLS" />
         </div>
 
-        <div className="grid gap-3 xl:grid-cols-[minmax(400px,480px)_1fr]">
+        <div className="grid gap-3 lg:grid-cols-2">
           <Card
             title="PITCH LOCATION"
             controls={
@@ -225,16 +228,20 @@ export default function DashboardClient({ data }: { data: PitcherPitches }) {
             <ZonePlot pitches={filtered} mode={mode} />
           </Card>
 
-          <Card title="ARSENAL — BY PITCH TYPE">
-            <DataTable
-              columns={arsenalColumns}
-              rows={arsenal}
-              rowKey={(r) => r.code}
-              defaultSort={{ key: "n", dir: "desc" }}
-              maxHeight="34rem"
-            />
+          <Card title="PITCH MOVEMENT">
+            <MovementPlot pitches={filtered} arsenal={arsenal} />
           </Card>
         </div>
+
+        <Card title="ARSENAL — BY PITCH TYPE">
+          <DataTable
+            columns={arsenalColumns}
+            rows={arsenal}
+            rowKey={(r) => r.code}
+            defaultSort={{ key: "n", dir: "desc" }}
+            maxHeight="34rem"
+          />
+        </Card>
 
         <Card title="PITCH LOG — TABLE VIEW OF THE SLICE">
           <DataTable

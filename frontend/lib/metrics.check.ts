@@ -8,7 +8,7 @@
  */
 import assert from "node:assert/strict";
 import type { Pitch } from "./api";
-import { MIN_AB, normZ, ZONE, zoneGrid } from "./metrics";
+import { arsenalRows, MIN_AB, normZ, ZONE, zoneGrid } from "./metrics";
 
 const pitch = (o: Partial<Pitch>): Pitch =>
   ({
@@ -85,5 +85,22 @@ assert.equal(zoneGrid([mid("single"), ...Array.from({ length: MIN_AB - 1 }, () =
 // An empty slice is nine empty cells, not a crash.
 assert.equal(zoneGrid([]).length, 9);
 assert.equal(zoneGrid([]).every((c) => c.n === 0 && c.ba === null), true);
+
+/* ── arsenalRows: movement is averaged per type, in inches ───────────── */
+
+const moves = arsenalRows(
+  [
+    pitch({ pfx_x: -0.5, pfx_z: 1.25 }),
+    pitch({ pfx_x: -1.0, pfx_z: 1.5 }),
+    pitch({ pfx_x: null, pfx_z: null }), // untracked: skipped, not a zero
+    pitch({ pitch_type: "SL", pitch_name: "Slider", pfx_x: 0.25, pfx_z: 0 }),
+  ],
+  new Set(["FF", "SL"])
+);
+const ff = moves.find((r) => r.code === "FF")!;
+assert.equal(ff.avgHBreak, -9);
+assert.equal(ff.avgVBreak, 16.5);
+assert.equal(moves.find((r) => r.code === "SL")!.avgHBreak, 3);
+assert.equal(arsenalRows([pitch({})], new Set(["FF"]))[0].avgVBreak, null);
 
 console.log("metrics.check.ts OK");
