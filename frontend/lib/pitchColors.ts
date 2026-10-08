@@ -80,6 +80,20 @@ export const BA_RAMP = [
 export const baColor = (ba: number | null): string | null =>
   ba === null ? null : BA_RAMP[BA_BREAKS.filter((b) => ba >= b).length];
 
-/** A percentile on the same diverging ramp: poor reads blue, elite red. */
-export const pctColor = (pct: number): string =>
-  BA_RAMP[Math.min(BA_RAMP.length - 1, Math.floor((pct / 100) * BA_RAMP.length))];
+/*
+ * Percentile color, Savant's card: poor blue through a pale average to
+ * great red, continuous so 48 and 52 read nearly alike.
+ */
+const PCT_STOPS = [
+  [54, 97, 173], // 0   — poor
+  [180, 196, 201], // 50 — average
+  [216, 33, 41], // 100 — great
+] as const;
+
+export const pctColor = (pct: number): string => {
+  const t = Math.min(Math.max(pct, 0), 100) / 50;
+  const [a, b] = t <= 1 ? [PCT_STOPS[0], PCT_STOPS[1]] : [PCT_STOPS[1], PCT_STOPS[2]];
+  const f = t <= 1 ? t : t - 1;
+  const c = a.map((v, i) => Math.round(v + (b[i] - v) * f));
+  return `rgb(${c.join(", ")})`;
+};

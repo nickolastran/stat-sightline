@@ -8,7 +8,7 @@
  */
 import assert from "node:assert/strict";
 import type { Pitch } from "./api";
-import { BA_RAMP, pctColor } from "./pitchColors";
+import { pctColor } from "./pitchColors";
 import { arsenalRows, MIN_AB, normZ, ZONE, zoneGrid } from "./metrics";
 
 const pitch = (o: Partial<Pitch>): Pitch =>
@@ -104,11 +104,11 @@ assert.equal(ff.avgVBreak, 16.5);
 assert.equal(moves.find((r) => r.code === "SL")!.avgHBreak, 3);
 assert.equal(arsenalRows([pitch({})], new Set(["FF"]))[0].avgVBreak, null);
 
-/* ── pctColor: percentiles land on the ends of the diverging ramp ────── */
+/* ── pctColor: Savant's blue → pale → red, clamped at the ends ──────── */
 
-assert.equal(pctColor(0), BA_RAMP[0]);
-assert.equal(pctColor(100), BA_RAMP[BA_RAMP.length - 1], "100th must not index past the ramp");
-assert.equal(pctColor(49), BA_RAMP[2]);
-assert.equal(pctColor(51), BA_RAMP[3]);
+assert.equal(pctColor(0), "rgb(54, 97, 173)");
+assert.equal(pctColor(50), "rgb(180, 196, 201)");
+assert.equal(pctColor(100), "rgb(216, 33, 41)");
+assert.equal(pctColor(140), pctColor(100), "out-of-range clamps, never extrapolates");
 
 console.log("metrics.check.ts OK");

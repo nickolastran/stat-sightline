@@ -182,51 +182,172 @@ async function savantCsv(
   return parseCsv(text);
 }
 
-/* Savant's percentile card, in its own order. Every figure is already turned
-   so that higher is better — a pitcher's 90th in xwOBA allowed a low one. */
-const PERCENTILE_COLS = {
+/*
+ * Savant's percentile card. `pct` keys its percentile-rankings CSV, which
+ * ranks qualified players only and is already turned so higher is better;
+ * `raw` keys the figure itself on the custom board (or `arm` on the arm
+ * board). A player short of the minimum is still placed, as Savant does —
+ * their figure ranked against the qualified field and drawn hatched.
+ */
+interface CardMetric {
+  label: string;
+  /** Percentile CSV key; absent where Savant ranks it on the card only. */
+  pct?: string;
+  raw: string;
+  /** Decimal places, or "rate" for a leading-zero-less .396. */
+  fmt: number | "rate";
+  /** A low figure is the good one. */
+  low?: true;
+  /** Read off the arm-strength board rather than the custom one. */
+  arm?: true;
+}
+
+const CARD: Record<"batter" | "pitcher", { title: string; metrics: CardMetric[] }[]> = {
   batter: [
-    ["xwoba", "xwOBA"], ["xba", "xBA"], ["xslg", "xSLG"],
-    ["exit_velocity", "Avg Exit Velo"], ["brl_percent", "Barrel %"],
-    ["hard_hit_percent", "Hard-Hit %"], ["bat_speed", "Bat Speed"],
-    ["squared_up_rate", "Squared-Up %"], ["chase_percent", "Chase %"],
-    ["whiff_percent", "Whiff %"], ["k_percent", "K %"], ["bb_percent", "BB %"],
-    ["sprint_speed", "Sprint Speed"], ["oaa", "Outs Above Avg"],
-    ["arm_strength", "Arm Strength"],
+    {
+      title: "Batting",
+      metrics: [
+        { label: "xwOBA", pct: "xwoba", raw: "xwoba", fmt: "rate" },
+        { label: "xBA", pct: "xba", raw: "xba", fmt: "rate" },
+        { label: "xSLG", pct: "xslg", raw: "xslg", fmt: "rate" },
+        { label: "Avg Exit Velo", pct: "exit_velocity", raw: "exit_velocity_avg", fmt: 1 },
+        { label: "Barrel %", pct: "brl_percent", raw: "barrel_batted_rate", fmt: 1 },
+        { label: "Hard-Hit %", pct: "hard_hit_percent", raw: "hard_hit_percent", fmt: 1 },
+        { label: "LA Sweet-Spot %", raw: "sweet_spot_percent", fmt: 1 },
+        { label: "Bat Speed", pct: "bat_speed", raw: "avg_swing_speed", fmt: 1 },
+        { label: "Squared-Up %", pct: "squared_up_rate", raw: "squared_up_swing", fmt: 1 },
+        { label: "Chase %", pct: "chase_percent", raw: "oz_swing_percent", fmt: 1, low: true },
+        { label: "Whiff %", pct: "whiff_percent", raw: "whiff_percent", fmt: 1, low: true },
+        { label: "K %", pct: "k_percent", raw: "k_percent", fmt: 1, low: true },
+        { label: "BB %", pct: "bb_percent", raw: "bb_percent", fmt: 1 },
+      ],
+    },
+    {
+      title: "Fielding",
+      metrics: [
+        { label: "Range (OAA)", pct: "oaa", raw: "n_outs_above_average", fmt: 0 },
+        { label: "Arm Strength", pct: "arm_strength", raw: "arm_overall", fmt: 1, arm: true },
+      ],
+    },
+    {
+      title: "Running",
+      metrics: [{ label: "Sprint Speed", pct: "sprint_speed", raw: "sprint_speed", fmt: 1 }],
+    },
   ],
   pitcher: [
-    ["xera", "xERA"], ["xwoba", "xwOBA"], ["xba", "xBA"],
-    ["fb_velocity", "Fastball Velo"], ["fb_spin", "Fastball Spin"],
-    ["curve_spin", "Curve Spin"], ["exit_velocity", "Avg Exit Velo"],
-    ["brl_percent", "Barrel %"], ["hard_hit_percent", "Hard-Hit %"],
-    ["chase_percent", "Chase %"], ["whiff_percent", "Whiff %"],
-    ["k_percent", "K %"], ["bb_percent", "BB %"],
+    {
+      title: "Pitching",
+      metrics: [
+        { label: "xERA", pct: "xera", raw: "xera", fmt: 2, low: true },
+        { label: "xwOBA", pct: "xwoba", raw: "xwoba", fmt: "rate", low: true },
+        { label: "xBA", pct: "xba", raw: "xba", fmt: "rate", low: true },
+        { label: "Fastball Velo", pct: "fb_velocity", raw: "fastball_avg_speed", fmt: 1 },
+        { label: "Fastball Spin", pct: "fb_spin", raw: "fastball_avg_spin", fmt: 0 },
+        { label: "Curve Spin", pct: "curve_spin", raw: "cu_avg_spin", fmt: 0 },
+        { label: "Avg Exit Velo", pct: "exit_velocity", raw: "exit_velocity_avg", fmt: 1, low: true },
+        { label: "Chase %", pct: "chase_percent", raw: "oz_swing_percent", fmt: 1 },
+        { label: "Whiff %", pct: "whiff_percent", raw: "whiff_percent", fmt: 1 },
+        { label: "K %", pct: "k_percent", raw: "k_percent", fmt: 1 },
+        { label: "BB %", pct: "bb_percent", raw: "bb_percent", fmt: 1, low: true },
+        { label: "Barrel %", pct: "brl_percent", raw: "barrel_batted_rate", fmt: 1, low: true },
+        { label: "Hard-Hit %", pct: "hard_hit_percent", raw: "hard_hit_percent", fmt: 1, low: true },
+      ],
+    },
   ],
-} as const;
+};
 
 export interface Percentile {
   label: string;
-  /** 0-100 against the league, higher always better. */
-  pct: number;
+  /** 0-100, higher always better; null when there is no figure to place. */
+  pct: number | null;
+  /** The figure itself, as printed — "94.0", ".396". */
+  value: string | null;
+  /** Ranked by Savant; false where it was placed against the qualified field. */
+  qualified: boolean;
 }
 
-/** One player's percentile ranks for a season — empty when Savant has none,
- *  which is everyone short of its playing-time minimum. */
+export interface PercentileSection {
+  title: string;
+  rows: Percentile[];
+}
+
+/**
+ * Where `v` falls among `field`, 0-100 with ties counted half — the share of
+ * the field it beats. `low` turns it so the smallest figure ranks highest.
+ */
+export function rankAgainst(v: number, field: number[], low = false): number | null {
+  if (field.length === 0) return null;
+  let beat = 0;
+  for (const f of field) {
+    if (f === v) beat += 0.5;
+    else if (low ? v < f : v > f) beat += 1;
+  }
+  // ponytail: share-of-field, not Savant's exact rounding — within a point.
+  return Math.round((100 * beat) / field.length);
+}
+
+const fmtFigure = (n: number, f: CardMetric["fmt"]) =>
+  f === "rate" ? n.toFixed(3).replace(/^(-?)0\./, "$1.") : n.toFixed(f);
+
+/** One player's percentile card for a season, every figure on it. */
 export async function getPercentiles(
   id: number,
   season: number,
   role: "batter" | "pitcher",
-): Promise<Percentile[]> {
-  const rows = await savantCsv("percentile-rankings", {
-    type: role,
-    year: String(season),
-  });
-  const row = rows.find((r) => Number(r.player_id) === id);
-  if (!row) return [];
-  return PERCENTILE_COLS[role].flatMap(([key, label]) => {
-    const pct = Number.parseFloat(row[key]);
-    return Number.isFinite(pct) ? [{ label, pct }] : [];
-  });
+): Promise<PercentileSection[]> {
+  const sections = CARD[role];
+  const metrics = sections.flatMap((s) => s.metrics);
+  const [ranks, custom, arm] = await Promise.all([
+    savantCsv("percentile-rankings", { type: role, year: String(season) }),
+    orNone(
+      savantCsv("custom", {
+        year: String(season),
+        type: role,
+        min: "1",
+        selections: metrics.filter((m) => !m.arm).map((m) => m.raw).join(","),
+      }),
+    ),
+    role === "batter"
+      ? orNone(
+          savantCsv("arm-strength", {
+            type: "player",
+            year: String(season),
+            minThrows: "1",
+            pos: "",
+            team: "",
+          }),
+        )
+      : Promise.resolve([]),
+  ]);
+  const rankBy = byId(ranks, "player_id");
+  const customBy = byId(custom, "player_id");
+  const armBy = byId(arm, "player_id");
+  const figure = (pid: number, m: CardMetric) => {
+    const n = Number.parseFloat((m.arm ? armBy : customBy).get(pid)?.[m.raw] ?? "");
+    return Number.isFinite(n) ? n : null;
+  };
+  const ranked = (pid: number, key: string) => {
+    const n = Number.parseFloat(rankBy.get(pid)?.[key] ?? "");
+    return Number.isFinite(n) ? n : null;
+  };
+
+  const row = (m: CardMetric): Percentile => {
+    const v = figure(id, m);
+    const value = v === null ? null : fmtFigure(v, m.fmt);
+    const own = m.pct ? ranked(id, m.pct) : null;
+    if (own !== null) return { label: m.label, pct: own, value, qualified: true };
+    if (v === null) return { label: m.label, pct: null, value, qualified: false };
+    /* The qualified field: everyone Savant ranked on this figure — or, for
+       one it doesn't publish, everyone it ranked on xwOBA. */
+    const key = m.pct ?? "xwoba";
+    const field = [...rankBy.keys()].flatMap((pid) => {
+      const f = pid !== id && ranked(pid, key) !== null ? figure(pid, m) : null;
+      return f === null ? [] : [f];
+    });
+    return { label: m.label, pct: rankAgainst(v, field, m.low), value, qualified: false };
+  };
+
+  return sections.map((s) => ({ title: s.title, rows: s.metrics.map(row) }));
 }
 
 /** A source whose absence costs its columns and nothing else. */
