@@ -6,6 +6,9 @@ import JsonLd, { breadcrumbs } from "@/components/JsonLd";
 import { Skeleton, SkeletonPanel, SkeletonTiles } from "@/components/ui/Skeleton";
 import SeasonSelect from "@/components/mlb/SeasonSelect";
 import SprayChart from "@/components/mlb/SprayChart";
+import StatcastPanels from "@/components/mlb/StatcastPanels";
+import { getPercentiles } from "@/lib/advanced";
+import { getSeasonPitches, STATCAST_FIRST_SEASON } from "@/lib/statcast";
 import { getHomePark, getSprayHits } from "@/lib/spray";
 import ParamTabs from "@/components/mlb/ParamTabs";
 import ParamSelect from "@/components/mlb/ParamSelect";
@@ -375,6 +378,30 @@ async function TabBody({
           />
         );
       }
+      case "statcast": {
+        if (season < STATCAST_FIRST_SEASON)
+          return (
+            <Panel title="Advanced Analytics">
+              <p className="text-xs text-ink-3">
+                STATCAST TRACKING BEGINS IN {STATCAST_FIRST_SEASON}
+              </p>
+            </Panel>
+          );
+        /* A two-way player is read as whichever line the group strip names. */
+        const role = group === "pitching" ? "pitcher" : "batter";
+        const [pitches, percentiles] = await Promise.all([
+          getSeasonPitches(id, season, role),
+          getPercentiles(id, season, role).catch(() => []),
+        ]);
+        return (
+          <StatcastPanels
+            pitches={pitches}
+            percentiles={percentiles}
+            role={role}
+            season={season}
+          />
+        );
+      }
       case "gamelog": {
         const { game, running } = gameLogCols(group);
         /* October is not a season's log but a career's, so it is not banded
@@ -497,8 +524,9 @@ export default async function PlayerPage({
   /* Neither October's log nor a career of splits has a year to pick — both
      are the whole of it at once. */
   const seasonal = !(section === "gamelog" && gameType === "P") && !career;
-  /* There is no fielding split, so that tab offers one fewer choice than the
-     rest and lands on batting when fielding was the standing pick. */
+  /* There is no fielding split or fielding Statcast here, so those tabs offer
+     one fewer choice than the rest and land on batting when fielding was the
+     standing pick. */
   const splitGroups = groups.filter((g) => g !== "fielding");
   /* Three tabs have nothing to control: the bio is fixed, the career table
      stacks every line of every season rather than showing one at a time, and
@@ -512,14 +540,15 @@ export default async function PlayerPage({
      this is a server component, and a fragment's children reach the client as
      a bare array, which React then wants keys on. */
   const splits = section === "splits";
+  const noFielding = splits || section === "statcast";
   const controls = hasControls ? (
     <div className="flex w-full flex-wrap items-center gap-3">
-      {(!splits || splitGroups.length > 1) && (
+      {(!noFielding || splitGroups.length > 1) && (
         <ParamTabs
           param="group"
           ariaLabel="Stat group"
-          value={splits && group === "fielding" ? "hitting" : group}
-          options={groupOptions(splits ? splitGroups : groups)}
+          value={noFielding && group === "fielding" ? "hitting" : group}
+          options={groupOptions(noFielding ? splitGroups : groups)}
         />
       )}
       {splits && (

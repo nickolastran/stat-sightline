@@ -39,7 +39,15 @@ export interface MetricSummary {
   avgExitVelo: number | null; // vs. batted balls allowed
   avgLaunchAngle: number | null;
   hardHitRate: number | null; // EV >= 95 among batted balls
+  avgHBreak: number | null; // pfx_x in inches, catcher's view
+  avgVBreak: number | null; // pfx_z in inches — induced, gravity removed
 }
+
+/** Mean of a pitch field that may be missing, scaled (ft → in for breaks). */
+const avgOf = (pitches: Pitch[], f: (p: Pitch) => number | null, scale = 1) => {
+  const m = mean(pitches.map(f).filter((v): v is number => v !== null));
+  return m === null ? null : m * scale;
+};
 
 export function summarize(pitches: Pitch[]): MetricSummary {
   const swings = pitches.filter(isSwing);
@@ -54,25 +62,17 @@ export function summarize(pitches: Pitch[]): MetricSummary {
 
   return {
     pitches: pitches.length,
-    avgVelo: mean(
-      pitches.map((p) => p.release_speed).filter((v): v is number => v !== null)
-    ),
-    avgSpin: mean(
-      pitches
-        .map((p) => p.release_spin_rate)
-        .filter((v): v is number => v !== null)
-    ),
+    avgVelo: avgOf(pitches, (p) => p.release_speed),
+    avgSpin: avgOf(pitches, (p) => p.release_spin_rate),
     whiffRate: rate(whiffs.length, swings.length),
     cswRate: rate(called.length + whiffs.length, pitches.length),
     zoneRate: rate(located.filter(inZone).length, located.length),
     chaseRate: rate(outOfZone.filter(isSwing).length, outOfZone.length),
     avgExitVelo: mean(evs),
-    avgLaunchAngle: mean(
-      batted
-        .map((p) => p.launch_angle)
-        .filter((v): v is number => v !== null)
-    ),
+    avgLaunchAngle: avgOf(batted, (p) => p.launch_angle),
     hardHitRate: rate(evs.filter((v) => v >= 95).length, evs.length),
+    avgHBreak: avgOf(pitches, (p) => p.pfx_x, 12),
+    avgVBreak: avgOf(pitches, (p) => p.pfx_z, 12),
   };
 }
 
@@ -88,6 +88,8 @@ export interface ArsenalRow {
   chaseRate: number | null;
   avgExitVelo: number | null;
   hardHitRate: number | null;
+  avgHBreak: number | null;
+  avgVBreak: number | null;
 }
 
 export function arsenalRows(
@@ -121,6 +123,8 @@ export function arsenalRows(
         chaseRate: s.chaseRate,
         avgExitVelo: s.avgExitVelo,
         hardHitRate: s.hardHitRate,
+        avgHBreak: s.avgHBreak,
+        avgVBreak: s.avgVBreak,
       };
     })
     .sort((a, b) => b.n - a.n);

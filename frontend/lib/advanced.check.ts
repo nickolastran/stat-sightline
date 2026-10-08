@@ -25,6 +25,7 @@ import {
   parseCsv,
   pickAdvSeason,
   pickCustomQuery,
+  rankAgainst,
   type AdvRow,
 } from "./advanced";
 
@@ -242,3 +243,19 @@ for (const m of CUSTOM_MINS)
 }
 
 console.log("advanced.check.ts custom OK");
+
+/* ── rankAgainst: an unqualified figure placed in the qualified field ── */
+
+{
+  const field = [10, 20, 30, 40];
+  assert.equal(rankAgainst(50, field), 100, "beats the whole field");
+  assert.equal(rankAgainst(5, field), 0);
+  assert.equal(rankAgainst(25, field), 50);
+  assert.equal(rankAgainst(20, field), 38, "a tie counts half");
+  // A low-is-good figure (K%, xERA) turns around.
+  assert.equal(rankAgainst(5, field, true), 100);
+  assert.equal(rankAgainst(50, field, true), 0);
+  assert.equal(rankAgainst(1, []), null, "no field, no rank");
+}
+
+console.log("advanced.check.ts rank OK");
