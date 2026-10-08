@@ -182,6 +182,53 @@ async function savantCsv(
   return parseCsv(text);
 }
 
+/* Savant's percentile card, in its own order. Every figure is already turned
+   so that higher is better — a pitcher's 90th in xwOBA allowed a low one. */
+const PERCENTILE_COLS = {
+  batter: [
+    ["xwoba", "xwOBA"], ["xba", "xBA"], ["xslg", "xSLG"],
+    ["exit_velocity", "Avg Exit Velo"], ["brl_percent", "Barrel %"],
+    ["hard_hit_percent", "Hard-Hit %"], ["bat_speed", "Bat Speed"],
+    ["squared_up_rate", "Squared-Up %"], ["chase_percent", "Chase %"],
+    ["whiff_percent", "Whiff %"], ["k_percent", "K %"], ["bb_percent", "BB %"],
+    ["sprint_speed", "Sprint Speed"], ["oaa", "Outs Above Avg"],
+    ["arm_strength", "Arm Strength"],
+  ],
+  pitcher: [
+    ["xera", "xERA"], ["xwoba", "xwOBA"], ["xba", "xBA"],
+    ["fb_velocity", "Fastball Velo"], ["fb_spin", "Fastball Spin"],
+    ["curve_spin", "Curve Spin"], ["exit_velocity", "Avg Exit Velo"],
+    ["brl_percent", "Barrel %"], ["hard_hit_percent", "Hard-Hit %"],
+    ["chase_percent", "Chase %"], ["whiff_percent", "Whiff %"],
+    ["k_percent", "K %"], ["bb_percent", "BB %"],
+  ],
+} as const;
+
+export interface Percentile {
+  label: string;
+  /** 0-100 against the league, higher always better. */
+  pct: number;
+}
+
+/** One player's percentile ranks for a season — empty when Savant has none,
+ *  which is everyone short of its playing-time minimum. */
+export async function getPercentiles(
+  id: number,
+  season: number,
+  role: "batter" | "pitcher",
+): Promise<Percentile[]> {
+  const rows = await savantCsv("percentile-rankings", {
+    type: role,
+    year: String(season),
+  });
+  const row = rows.find((r) => Number(r.player_id) === id);
+  if (!row) return [];
+  return PERCENTILE_COLS[role].flatMap(([key, label]) => {
+    const pct = Number.parseFloat(row[key]);
+    return Number.isFinite(pct) ? [{ label, pct }] : [];
+  });
+}
+
 /** A source whose absence costs its columns and nothing else. */
 const orNone = <T>(p: Promise<T[]>): Promise<T[]> => p.catch(() => []);
 

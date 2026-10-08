@@ -16,6 +16,7 @@ export const PLAYER_TABS = [
   { id: "stats", label: "STATS" },
   { id: "bio", label: "BIO" },
   { id: "splits", label: "SPLITS" },
+  { id: "statcast", label: "ADVANCED ANALYTICS" },
   { id: "gamelog", label: "GAME LOG" },
 ] as const;
 

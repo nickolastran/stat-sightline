@@ -79,3 +79,7 @@ export const BA_RAMP = [
 /** null (too few at-bats to average) stays uncolored — bare surface. */
 export const baColor = (ba: number | null): string | null =>
   ba === null ? null : BA_RAMP[BA_BREAKS.filter((b) => ba >= b).length];
+
+/** A percentile on the same diverging ramp: poor reads blue, elite red. */
+export const pctColor = (pct: number): string =>
+  BA_RAMP[Math.min(BA_RAMP.length - 1, Math.floor((pct / 100) * BA_RAMP.length))];

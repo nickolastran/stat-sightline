@@ -78,3 +78,21 @@ export const getStrikeouts = async (id: number, season: number) =>
       season,
     )
   ).map(toPitch);
+
+/** Pitch tracking good enough to plot begins with Statcast itself. */
+export const STATCAST_FIRST_SEASON = 2015;
+
+/** Every regular-season pitch a player threw — or saw, as a batter. */
+export const getSeasonPitches = async (
+  id: number,
+  season: number,
+  role: "pitcher" | "batter",
+) =>
+  (
+    // ponytail: a full season is ~2MB of CSV, at Next's fetch-cache ceiling;
+    // a heavier workload just goes uncached. Trim columns server-side if it bites.
+    await statcastSearch(
+      { player_type: role, [`${role}s_lookup[]`]: String(id) },
+      season,
+    )
+  ).map(toPitch);
