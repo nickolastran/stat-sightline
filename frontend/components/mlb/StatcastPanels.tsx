@@ -11,6 +11,7 @@ import SegmentedControl from "@/components/ui/SegmentedControl";
 import ArsenalTable from "@/components/dashboard/ArsenalTable";
 import MovementPlot from "@/components/dashboard/MovementPlot";
 import ZonePlot, { type ZonePlotMode } from "@/components/dashboard/ZonePlot";
+import RollingChart from "@/components/mlb/RollingChart";
 
 /*
  * A player's season through Statcast: Savant's percentile card, then the
@@ -141,6 +142,7 @@ export default function StatcastPanels({
         </Panel>
       ) : (
         <>
+          <RollingChart pitches={pitches} role={role} season={season} />
           <div className="grid gap-3 lg:grid-cols-2">
             <Panel
               title={role === "pitcher" ? "Pitch Location" : "Pitches Seen"}
