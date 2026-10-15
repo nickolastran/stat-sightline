@@ -3,6 +3,7 @@ import { Suspense } from "react";
 import { notFound } from "next/navigation";
 import { Skeleton, SkeletonPanel } from "@/components/ui/Skeleton";
 import JsonLd, { breadcrumbs } from "@/components/JsonLd";
+import FavoriteStar from "@/components/mlb/FavoriteStar";
 import TeamTabs, { isTeamTab, type TeamTab } from "@/components/mlb/TeamTabs";
 import TeamHome from "@/components/mlb/TeamHome";
 import PlayerStatTables from "@/components/mlb/PlayerStatTables";
@@ -120,9 +121,12 @@ function Identity({
         className="h-9 w-9 shrink-0"
       />
       <div className="min-w-0">
-        <h1 className="truncate text-base font-bold tracking-wider text-ink">
-          {t.name.toUpperCase()}
-        </h1>
+        <div className="flex items-center gap-2">
+          <h1 className="truncate text-base font-bold tracking-wider text-ink">
+            {t.name.toUpperCase()}
+          </h1>
+          <FavoriteStar id={t.id} name={t.name} />
+        </div>
         <p className="mt-1 truncate text-[10px] tracking-[0.2em] text-ink-3">
           {[`${season} SEASON`, ...facts].join(" · ")}
         </p>
