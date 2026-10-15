@@ -142,7 +142,8 @@ export default function StatcastPanels({
         </Panel>
       ) : (
         <>
-          <RollingChart pitches={pitches} role={role} season={season} />
+          {/* Keyed on role: a two-way player's strip swaps the window unit. */}
+          <RollingChart key={role} pitches={pitches} role={role} season={season} />
           <div className="grid gap-3 lg:grid-cols-2">
             <Panel
               title={role === "pitcher" ? "Pitch Location" : "Pitches Seen"}

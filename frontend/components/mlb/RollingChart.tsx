@@ -15,7 +15,8 @@ import SegmentedControl from "@/components/ui/SegmentedControl";
 
 /*
  * How a season went, not just where it ended: the player's xwOBA or K% over
- * his last 15, 30 or 50 games at every point of the year, read against his
+ * a trailing window — his last 15/30/50 games, or for a pitcher his last
+ * 50/100/250 batters faced — at every point of the year, read against his
  * own season figure (the dashed line). Pointer over the chart names the
  * window under it.
  *
@@ -35,10 +36,11 @@ export default function RollingChart({
   season: number;
 }) {
   const [metric, setMetric] = useState<RollMetric>("xwoba");
-  const [n, setN] = useState<number>(30);
+  const win = WINDOWS[role];
+  const [n, setN] = useState<number>(win.initial);
   const [at, setAt] = useState<number | null>(null);
 
-  const games = useMemo(() => gameLines(pitches), [pitches]);
+  const games = useMemo(() => gameLines(pitches, role), [pitches, role]);
   const points = useMemo(() => rolling(games, n, metric), [games, n, metric]);
   const avg = seasonRate(games, metric);
 
@@ -61,7 +63,7 @@ export default function RollingChart({
           setN(v);
           setAt(null);
         }}
-        options={WINDOWS.map((w) => ({ value: w, label: `${w} G` }))}
+        options={win.sizes.map((w) => ({ value: w, label: `${w} ${win.unit}` }))}
       />
     </div>
   );
@@ -70,7 +72,7 @@ export default function RollingChart({
     return (
       <Panel title="Rolling Form" right={controls}>
         <p className="text-xs text-ink-3">
-          FEWER THAN {n} GAMES {role === "pitcher" ? "PITCHED" : "PLAYED"} IN {season}
+          FEWER THAN {n} {role === "pitcher" ? "BATTERS FACED" : "GAMES PLAYED"} IN {season}
         </p>
       </Panel>
     );
@@ -96,7 +98,8 @@ export default function RollingChart({
     <Panel title="Rolling Form" right={controls}>
       <div className="space-y-2">
         <p className="text-[10px] tracking-wider text-ink-3">
-          LAST {n} G THRU {shown.date} · {shown.pa} PA ·{" "}
+          LAST {n} {win.unit} THRU {shown.date} ·{" "}
+          {role === "batter" && <>{shown.pa} PA · </>}
           <span className="text-xs tabular-nums text-ink">
             {label} {rollText(metric, shown.value)}
           </span>
@@ -114,7 +117,7 @@ export default function RollingChart({
             onMouseMove={track}
             onMouseLeave={() => setAt(null)}
             role="img"
-            aria-label={`Rolling ${n}-game ${label}, now ${rollText(metric, points[last].value)}${
+            aria-label={`Rolling ${n}-${role === "pitcher" ? "batter" : "game"} ${label}, now ${rollText(metric, points[last].value)}${
               avg !== null ? `, season ${rollText(metric, avg)}` : ""
             }`}
           >

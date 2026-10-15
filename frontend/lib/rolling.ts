@@ -1,18 +1,27 @@
 /*
- * Rolling form: a player's xwOBA or K% over his last N games, game by game
- * through a season, off the same Statcast pitches the Statcast tab already
- * loads. Works the same for a batter (what he produced) and a pitcher (what
- * he allowed) — both are just the plate appearances in his pitches.
+ * Rolling form: a player's xwOBA or K% over a trailing window, through a
+ * season, off the same Statcast pitches the Statcast tab already loads.
+ *
+ * A batter's window is games. A pitcher's is batters faced: a starter makes
+ * ~32 starts, so a 30- or 50-game window is his whole season or more, and a
+ * count of starts would leave relievers out entirely. Both are the same
+ * arithmetic over a different unit — a game, or one plate appearance.
  *
  * Sums, not averages of averages: a window's rate is its totals divided, so a
  * two-PA pinch-hit game weighs two PAs, not a full game.
  */
 import type { Pitch } from "./api";
 
-export const WINDOWS = [15, 30, 50] as const;
 export type RollMetric = "xwoba" | "k";
+export type RollRole = "pitcher" | "batter";
 
-/** One game's totals. */
+/** Each role's window sizes, its default, and the unit they count. */
+export const WINDOWS: Record<RollRole, { sizes: number[]; initial: number; unit: string }> = {
+  batter: { sizes: [15, 30, 50], initial: 30, unit: "G" },
+  pitcher: { sizes: [50, 100, 250], initial: 100, unit: "BF" },
+};
+
+/** One unit's totals — a game, or a single plate appearance. */
 interface GameLine {
   date: string;
   pa: number;
@@ -22,10 +31,10 @@ interface GameLine {
 }
 
 export interface RollPoint {
-  /** Last game in the window. */
+  /** Date of the last unit in the window. */
   date: string;
-  /** Games 1-based, the last in the window — the x position. */
-  game: number;
+  /** 1-based index of the last unit in the window. */
+  unit: number;
   value: number;
   pa: number;
 }
@@ -35,16 +44,25 @@ export interface RollPoint {
 const NOT_A_PA = /^(caught_stealing|pickoff|stolen_base|other_advance|wild_pitch|passed_ball)/;
 const STRIKEOUT = /^strikeout/;
 
-/** The season's games in order, each reduced to the counts a rate needs. */
-export function gameLines(pitches: Pitch[]): GameLine[] {
-  const games = new Map<string, GameLine & { pk: number }>();
+/**
+ * The season in order, one line per game (a batter) or per plate appearance
+ * (a pitcher), each reduced to the counts a rate needs.
+ */
+export function gameLines(pitches: Pitch[], role: RollRole = "batter"): GameLine[] {
+  const games = new Map<string, GameLine & { pk: number; ab: number }>();
   for (const p of pitches) {
     if (!p.events || NOT_A_PA.test(p.events) || !p.game_date) continue;
-    const key = String(p.game_pk ?? p.game_date);
+    const game = String(p.game_pk ?? p.game_date);
+    const key = role === "pitcher" ? `${game}-${p.at_bat_number}` : game;
     const g =
       games.get(key) ??
       games
-        .set(key, { date: p.game_date, pk: p.game_pk ?? 0, pa: 0, k: 0, xNum: 0, xDen: 0 })
+        .set(key, {
+          date: p.game_date,
+          pk: p.game_pk ?? 0,
+          ab: role === "pitcher" ? (p.at_bat_number ?? 0) : 0,
+          pa: 0, k: 0, xNum: 0, xDen: 0,
+        })
         .get(key)!;
     g.pa += 1;
     if (STRIKEOUT.test(p.events)) g.k += 1;
@@ -56,7 +74,7 @@ export function gameLines(pitches: Pitch[]): GameLine[] {
     }
   }
   return [...games.values()].sort(
-    (a, b) => a.date.localeCompare(b.date) || a.pk - b.pk,
+    (a, b) => a.date.localeCompare(b.date) || a.pk - b.pk || a.ab - b.ab,
   );
 }
 
@@ -73,7 +91,7 @@ export const seasonRate = (games: GameLine[], m: RollMetric): number | null =>
     ),
   );
 
-/** One point per game from the Nth on, each over the N games ending there. */
+/** One point per unit from the Nth on, each over the N units ending there. */
 export function rolling(games: GameLine[], n: number, m: RollMetric): RollPoint[] {
   const out: RollPoint[] = [];
   const s = { pa: 0, k: 0, xNum: 0, xDen: 0 };
@@ -84,7 +102,7 @@ export function rolling(games: GameLine[], n: number, m: RollMetric): RollPoint[
       s.pa -= old.pa; s.k -= old.k; s.xNum -= old.xNum; s.xDen -= old.xDen;
     }
     const v = i >= n - 1 ? rate(m, s) : null;
-    if (v !== null) out.push({ date: g.date, game: i + 1, value: v, pa: s.pa });
+    if (v !== null) out.push({ date: g.date, unit: i + 1, value: v, pa: s.pa });
   });
   return out;
 }

@@ -55,6 +55,7 @@ export interface Pitch {
   events: string | null;
   /* Savant's search carries these; the warehouse route doesn't send them. */
   game_pk?: number | null;
+  at_bat_number?: number | null;
   xwoba?: number | null; // Statcast's expected wOBA on contact
   woba_value?: number | null;
   woba_denom?: number | null;

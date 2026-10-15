@@ -36,11 +36,29 @@ assert.equal(games[0].k, 1);
 assert.ok(Math.abs(games[0].xNum - 1.5) < 1e-9, "estimate on contact, actual on the walk");
 
 const k2 = rolling(games, 2, "k");
-assert.deepEqual(k2.map((p) => p.game), [2, 3], "points start once a window is full");
+assert.deepEqual(k2.map((p) => p.unit), [2, 3], "points start once a window is full");
 assert.equal(k2[0].value, 2 / 4, "games 1-2: 2 K in 4 PA, not the mean of 1/3 and 1/1");
 assert.equal(k2[1].value, 1 / 2, "game 1 has rolled out of the window");
 
 assert.equal(seasonRate(games, "k"), 2 / 5);
 assert.equal(rolling(games, 50, "k").length, 0, "fewer games than the window: no line");
+
+/* A pitcher's unit is the batter faced, in at-bat order within a game. */
+const bf = gameLines(
+  [
+    pa(1, "single", { at_bat_number: 7, woba_value: 0.9 }),
+    pa(1, "strikeout", { at_bat_number: 2, woba_value: 0 }),
+    pa(1, "caught_stealing_2b", { at_bat_number: 5, woba_denom: null }),
+    pa(2, "walk", { at_bat_number: 1, woba_value: 0.7 }),
+  ],
+  "pitcher",
+);
+assert.deepEqual(bf.map((u) => u.pa), [1, 1, 1], "one unit per batter faced");
+assert.deepEqual(bf.map((u) => u.k), [1, 0, 0], "at-bat 2 comes before at-bat 7");
+assert.deepEqual(
+  rolling(bf, 2, "k").map((p) => p.value),
+  [1 / 2, 0],
+  "a window can end mid-game",
+);
 
 console.log("rolling: ok");
