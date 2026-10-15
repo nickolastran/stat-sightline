@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import type { Pitch } from "@/lib/api";
+import type { LeagueRates } from "@/lib/advanced";
 import {
   WINDOWS,
   gameLines,
@@ -17,8 +18,8 @@ import SegmentedControl from "@/components/ui/SegmentedControl";
  * How a season went, not just where it ended: the player's xwOBA or K% over
  * a trailing window — his last 15/30/50 games, or for a pitcher his last
  * 50/100/250 batters faced — at every point of the year, read against his
- * own season figure (the dashed line). Pointer over the chart names the
- * window under it.
+ * own season figure (dashed) and the league's (dotted). Pointer over the
+ * chart names the window under it.
  *
  * For a pitcher both are what he allowed — down is good for xwOBA, up for K%.
  */
@@ -26,12 +27,25 @@ import SegmentedControl from "@/components/ui/SegmentedControl";
 const W = 600;
 const H = 150;
 
+/* The two reference lines are told apart by dash, not colour, and the
+   read-out above draws each one's dash beside its name — the legend. */
+const SEASON_DASH = "6 4";
+const LEAGUE_DASH = "1 4";
+
+const Swatch = ({ dash }: { dash: string }) => (
+  <svg aria-hidden viewBox="0 0 16 2" className="mr-1 inline h-0.5 w-4 align-middle">
+    <line x1={0} y1={1} x2={16} y2={1} className="stroke-ink-2" strokeWidth={2} strokeDasharray={dash} />
+  </svg>
+);
+
 export default function RollingChart({
   pitches,
+  league,
   role,
   season,
 }: {
   pitches: Pitch[];
+  league: LeagueRates | null;
   role: "pitcher" | "batter";
   season: number;
 }) {
@@ -43,6 +57,7 @@ export default function RollingChart({
   const games = useMemo(() => gameLines(pitches, role), [pitches, role]);
   const points = useMemo(() => rolling(games, n, metric), [games, n, metric]);
   const avg = seasonRate(games, metric);
+  const lg = league?.[metric] ?? null;
 
   const label = metric === "k" ? "K%" : "xwOBA";
   const controls = (
@@ -77,9 +92,9 @@ export default function RollingChart({
       </Panel>
     );
 
-  /* The y range is the line and the season mark, padded so neither rides the
-     panel's edge. */
-  const vals = points.map((p) => p.value).concat(avg ?? []);
+  /* The y range is the line and both reference marks, padded so none rides
+     the panel's edge. */
+  const vals = points.map((p) => p.value).concat(avg ?? [], lg ?? []);
   const lo = Math.min(...vals);
   const hi = Math.max(...vals);
   const pad = (hi - lo || hi || 1) * 0.12;
@@ -103,7 +118,20 @@ export default function RollingChart({
           <span className="text-xs tabular-nums text-ink">
             {label} {rollText(metric, shown.value)}
           </span>
-          {avg !== null && <> · SEASON {rollText(metric, avg)}</>}
+          {avg !== null && (
+            <>
+              {" · "}
+              <Swatch dash={SEASON_DASH} />
+              SEASON {rollText(metric, avg)}
+            </>
+          )}
+          {lg !== null && (
+            <>
+              {" · "}
+              <Swatch dash={LEAGUE_DASH} />
+              LEAGUE {rollText(metric, lg)}
+            </>
+          )}
         </p>
         <div className="flex gap-2">
           <div className="flex w-10 shrink-0 flex-col justify-between text-right text-[10px] tabular-nums text-ink-3">
@@ -119,7 +147,7 @@ export default function RollingChart({
             role="img"
             aria-label={`Rolling ${n}-${role === "pitcher" ? "batter" : "game"} ${label}, now ${rollText(metric, points[last].value)}${
               avg !== null ? `, season ${rollText(metric, avg)}` : ""
-            }`}
+            }${lg !== null ? `, league ${rollText(metric, lg)}` : ""}`}
           >
             {avg !== null && (
               <line
@@ -127,9 +155,22 @@ export default function RollingChart({
                 y1={y(avg)}
                 x2={W}
                 y2={y(avg)}
-                className="stroke-ink-3"
+                className="stroke-ink-2"
                 strokeWidth={1}
-                strokeDasharray="4 4"
+                strokeDasharray={SEASON_DASH}
+                vectorEffect="non-scaling-stroke"
+              />
+            )}
+            {lg !== null && (
+              <line
+                x1={0}
+                y1={y(lg)}
+                x2={W}
+                y2={y(lg)}
+                className="stroke-ink-2"
+                strokeWidth={1.5}
+                strokeDasharray={LEAGUE_DASH}
+                strokeLinecap="round"
                 vectorEffect="non-scaling-stroke"
               />
             )}
