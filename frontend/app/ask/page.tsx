@@ -11,10 +11,18 @@ import { ask } from "@/lib/api";
  * the same way the league pages survive an unreachable source.
  */
 
-export const metadata: Metadata = {
-  title: "Ask",
-  description: "Ask the Statcast pitch warehouse a question in plain English.",
-};
+/* A shared answer unfurls as its question rather than as the bare page. */
+export async function generateMetadata({
+  searchParams,
+}: {
+  searchParams: Promise<{ q?: string }>;
+}): Promise<Metadata> {
+  const q = (await searchParams).q?.trim();
+  return {
+    title: q ? `Ask: ${q}` : "Ask",
+    description: "Ask the Statcast pitch warehouse a question in plain English.",
+  };
+}
 
 const EXAMPLES = [
   "how many home runs did aaron judge hit this year",
@@ -49,7 +57,9 @@ export default async function AskPage({
         <p className="mb-4 text-xs tracking-[0.3em] text-ink-3">
           ASK // PITCH WAREHOUSE
         </p>
-        <AskBox initial={question} autoFocus={!question} />
+        {/* Keyed on the question so back/forward resets the box to the
+            answer on screen instead of keeping the last thing typed. */}
+        <AskBox key={question} initial={question} autoFocus={!question} />
 
         {data?.data_through && (
           <p className="mt-2 text-[10px] tracking-wider text-ink-3">
