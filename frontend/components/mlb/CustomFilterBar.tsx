@@ -164,7 +164,9 @@ export default function CustomFilterBar({
       min: draft.min === "q" ? null : draft.min,
       league: draft.league === "all" ? null : draft.league,
       div: draft.division === "all" ? null : draft.division,
-      team: draft.team === "all" ? null : draft.team,
+      /* Always written, "all" included: an absent `team` opens on the
+         reader's favourite club, so choosing every club has to be said. */
+      team: draft.team,
       pos: draft.position === "all" ? null : draft.position,
       rookies: draft.rookies ? "1" : null,
       /* Always written, even empty: an absent `cols` is a first visit and

@@ -155,6 +155,10 @@ assert.ok(!picked.cols.includes("bat.avg_bat_speed"));
 // Filters that name nothing real fall back to unfiltered.
 assert.equal(pickCustomQuery({ team: "999" }, clubs).team, "all");
 assert.equal(pickCustomQuery({ team: "147" }, clubs).team, "147");
+assert.equal(pickCustomQuery({}, clubs, "147").team, "147", "no ?team= opens on the favourite");
+assert.equal(pickCustomQuery({ team: "all" }, clubs, "147").team, "all", "an explicit all wins");
+assert.equal(pickCustomQuery({ team: "999" }, clubs, "147").team, "all", "a bad ?team= isn't the favourite");
+assert.equal(pickCustomQuery({}, clubs, "999").team, "all", "a stale favourite is ignored");
 assert.equal(pickCustomQuery({ div: "AL EAST" }, clubs).division, "AL EAST");
 assert.equal(pickCustomQuery({ div: "AL MIDDLE" }, clubs).division, "all");
 assert.equal(pickCustomQuery({ league: "105" }, clubs).league, "all");

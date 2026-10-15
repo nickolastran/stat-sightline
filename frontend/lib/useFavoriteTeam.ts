@@ -1,11 +1,13 @@
 "use client";
 
 import { useSyncExternalStore } from "react";
+import { FAVORITE_COOKIE } from "@/lib/site";
 
 /*
  * The reader's favourite club, kept in localStorage — no account needed. It
  * pins that club's game to the front of the scoreboard and puts a MY TEAM tab
- * in the league bar.
+ * in the league bar. Its id is mirrored into a cookie, the one copy a server
+ * render can read, so the custom stat board opens filtered to it.
  *
  * useSyncExternalStore rather than state, so every component reading it moves
  * together when the star is pressed, and another tab's change (the `storage`
@@ -61,7 +63,17 @@ export function setFavoriteTeam(team: FavoriteTeam | null) {
   } catch {
     /* storage blocked — nothing to keep it in */
   }
+  document.cookie = team
+    ? `${FAVORITE_COOKIE}=${team.id}; path=/; max-age=31536000; samesite=lax`
+    : `${FAVORITE_COOKIE}=; path=/; max-age=0`;
   window.dispatchEvent(new Event(EVENT));
+}
+
+/* A favourite starred before the cookie existed lives in storage alone; the
+   league bar loads this module on every page, so it is copied across once. */
+if (typeof window !== "undefined") {
+  const fav = getSnapshot();
+  if (fav && !document.cookie.includes(`${FAVORITE_COOKIE}=`)) setFavoriteTeam(fav);
 }
 
 export const useFavoriteTeam = (): FavoriteTeam | null =>

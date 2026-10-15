@@ -1578,6 +1578,8 @@ export function pickCustomQuery(
     sort?: string;
   },
   clubIds: Set<string>,
+  /** The reader's favourite club, for a board whose URL names none. */
+  favorite?: string,
 ): CustomQuery {
   const group: StatGroup =
     sp.group === "pitching" || sp.group === "fielding" ? sp.group : "hitting";
@@ -1597,7 +1599,12 @@ export function pickCustomQuery(
     cols: picked,
     league: oneOf(sp.league, CUSTOM_LEAGUES, "all"),
     division: oneOf(sp.div, CUSTOM_DIVISIONS, "all"),
-    team: sp.team && clubIds.has(sp.team) ? sp.team : "all",
+    /* No `?team=` at all opens on the reader's favourite club; `?team=all`
+       is a reader who chose every club, and keeps them all. */
+    team:
+      sp.team === undefined
+        ? favorite && clubIds.has(favorite) ? favorite : "all"
+        : clubIds.has(sp.team) ? sp.team : "all",
     position: oneOf(sp.pos, LEADER_POSITIONS, "all"),
     min: oneOf(sp.min, CUSTOM_MINS, "q"),
     rookies: sp.rookies === "1",
