@@ -1,3 +1,5 @@
+import type { LineupLine, TeamStatCol } from "@/lib/mlb";
+
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
 /* Same ceiling as the Stats API client, and for the same reason: a backend
@@ -51,6 +53,12 @@ export interface Pitch {
   launch_speed: number | null; // exit velocity, mph
   launch_angle: number | null; // degrees
   events: string | null;
+  /* Savant's search carries these; the warehouse route doesn't send them. */
+  game_pk?: number | null;
+  at_bat_number?: number | null;
+  xwoba?: number | null; // Statcast's expected wOBA on contact
+  woba_value?: number | null;
+  woba_denom?: number | null;
 }
 
 export interface PitcherPitches {
@@ -295,5 +303,62 @@ export async function ask(q: string): Promise<AskResponse> {
     `/api/ask?q=${encodeURIComponent(q)}`,
     { next: { revalidate: 3600 } },
     false
+  );
+}
+
+/* ── Batter vs. pitcher, pitch by pitch ─────────────────────────────── */
+
+interface Matchup {
+  batter: number;
+  pitches: number;
+  pa: number;
+  whiff_pct: number | null;
+  avg_ev: number | null;
+  hard_hit_pct: number | null;
+  xwoba: number | null;
+  mix: { pitch_type: string; pct: number | null }[];
+}
+
+/** The lineup card's columns for the warehouse's matchup line. */
+export const MATCHUP_COLS: TeamStatCol[] = [
+  { key: "pa", label: "PA", title: "Plate appearances against him (pitch-tracked)" },
+  { key: "pitches", label: "PIT", title: "Pitches seen from him" },
+  { key: "whiff", label: "WHIFF%", title: "Whiffs per swing" },
+  { key: "ev", label: "EV", title: "Average exit velocity on balls in play, mph" },
+  { key: "hh", label: "HH%", title: "Hard-hit rate — batted balls at 95+ mph" },
+  { key: "xwoba", label: "xwOBA", title: "Expected wOBA from contact quality, walks and strikeouts" },
+  { key: "mix", label: "MIX", title: "What he threw this hitter most" },
+];
+
+const pctText = (v: number | null) => (v === null ? null : `${v.toFixed(1)}%`);
+
+/**
+ * Each listed hitter's pitch-level line against one pitcher, as lineup rows
+ * keyed by player id. A hitter who never faced him has no row.
+ *
+ * Only the local warehouse can answer this, and production has no backend:
+ * there the request fails fast and the caller hides the view.
+ */
+export async function getMatchups(
+  pitcher: number,
+  batters: number[],
+): Promise<Record<number, LineupLine>> {
+  const rows = await api<Matchup[]>(
+    `/api/matchups?pitcher=${pitcher}&batters=${batters.join(",")}`,
+    { next: { revalidate: 3600 } },
+  );
+  return Object.fromEntries(
+    rows.map((m) => [
+      m.batter,
+      {
+        pa: m.pa,
+        pitches: m.pitches,
+        whiff: pctText(m.whiff_pct),
+        ev: m.avg_ev?.toFixed(1) ?? null,
+        hh: pctText(m.hard_hit_pct),
+        xwoba: m.xwoba === null ? null : m.xwoba.toFixed(3).replace(/^0/, ""),
+        mix: m.mix.map((p) => `${p.pitch_type} ${Math.round(p.pct ?? 0)}%`).join(" · ") || null,
+      },
+    ]),
   );
 }

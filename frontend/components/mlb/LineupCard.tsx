@@ -9,11 +9,15 @@ import {
   type LineupLine,
   type LineupSpot,
 } from "@/lib/mlb";
+import { MATCHUP_COLS } from "@/lib/api";
 
 /*
  * Tonight's posted lineups, each hitter read two ways: his season line, and
- * what he has done against the arm he is facing today. Both are fetched with
- * the page, so the toggle is instant and neither mode waits on a request.
+ * what he has done against the arm he is facing today. All are fetched with
+ * the page, so the toggle is instant and no mode waits on a request.
+ *
+ * A third read, pitch by pitch against the starter, comes off the local
+ * warehouse; where that isn't reachable (production) the option isn't shown.
  */
 
 export interface LineupSide {
@@ -22,6 +26,8 @@ export interface LineupSide {
   season: Record<number, LineupLine>;
   /** Career against today's opposing starter, by player id. */
   vs: Record<number, LineupLine>;
+  /** Pitch-level line against today's starter, or null when unavailable. */
+  pitch: Record<number, LineupLine> | null;
   /** Whose line the career column is against — "F. Peralta". */
   facing: string;
 }
@@ -40,9 +46,15 @@ export default function LineupCard({
   home: LineupSide;
 }) {
   const [which, setWhich] = useState<"away" | "home">("away");
-  const [mode, setMode] = useState<"season" | "vs">("season");
+  const [picked, setPicked] = useState<"season" | "vs" | "pitch">("season");
   const side = which === "away" ? away : home;
-  const lines = mode === "season" ? side.season : side.vs;
+  /* The pitch view can be picked on one side and missing on the other; that
+     side falls back to the season line rather than an empty table. */
+  const mode = picked === "pitch" && !side.pitch ? "season" : picked;
+  const lines =
+    mode === "pitch" ? side.pitch! : mode === "vs" ? side.vs : side.season;
+  const cols = mode === "pitch" ? MATCHUP_COLS : LINEUP_COLS;
+  const vsWho = side.facing ? shortName(side.facing).toUpperCase() : "STARTER";
 
   return (
     <div className="space-y-2">
@@ -59,15 +71,13 @@ export default function LineupCard({
         <SegmentedControl
           ariaLabel="Split"
           value={mode}
-          onChange={setMode}
+          onChange={setPicked}
           options={[
             { value: "season" as const, label: "SEASON" },
-            {
-              value: "vs" as const,
-              label: side.facing
-                ? `CAREER VS ${shortName(side.facing).toUpperCase()}`
-                : "CAREER VS STARTER",
-            },
+            { value: "vs" as const, label: `CAREER VS ${vsWho}` },
+            ...(side.pitch
+              ? [{ value: "pitch" as const, label: `PITCH LEVEL VS ${vsWho}` }]
+              : []),
           ]}
         />
       </div>
@@ -92,7 +102,7 @@ export default function LineupCard({
                     {h}
                   </th>
                 ))}
-                {LINEUP_COLS.map((c) => (
+                {cols.map((c) => (
                   <th
                     key={c.key}
                     scope="col"
@@ -121,10 +131,10 @@ export default function LineupCard({
                     <td className="px-2 py-1.5 text-right text-[10px] tracking-wider text-ink-3">
                       {s.pos}
                     </td>
-                    {LINEUP_COLS.map((c) => (
+                    {cols.map((c) => (
                       <td
                         key={c.key}
-                        className="px-2 py-1.5 text-right tabular-nums text-ink-2"
+                        className="px-2 py-1.5 text-right whitespace-nowrap tabular-nums text-ink-2"
                       >
                         {/* Never faced him is a fact about the matchup, not a
                             missing number — it reads as a dash, not 0-0. */}

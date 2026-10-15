@@ -1,5 +1,6 @@
 import Link from "next/link";
 import StatsMenu from "@/components/mlb/StatsMenu";
+import MyTeamLink from "@/components/mlb/MyTeamLink";
 import { LEAGUE_SECTIONS } from "@/lib/leagueSections";
 import { seasonOf, todayPT } from "@/lib/mlb";
 
@@ -115,6 +116,7 @@ export default function LeagueBar() {
           PLAYOFFS
         </Link>
         <StatsMenu current={seasonOf(todayPT())} />
+        <MyTeamLink className={TAB} />
         <MoreMenu />
       </div>
     </div>

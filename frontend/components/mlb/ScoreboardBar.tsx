@@ -7,6 +7,7 @@ import { sortGames, todayPT, type Game } from "@/lib/mlb";
 import GameCard from "@/components/mlb/GameCard";
 import DatePicker from "@/components/ui/DatePicker";
 import { SkeletonGameCard } from "@/components/ui/Skeleton";
+import { useFavoriteTeam } from "@/lib/useFavoriteTeam";
 
 /*
  * Global scoreboard strip under the header. One horizontal rail of the
@@ -47,6 +48,7 @@ export default function ScoreboardBar() {
   const [games, setGames] = useState<Game[] | null>(null); // null = loading
   const [error, setError] = useState(false);
   const [arrows, setArrows] = useState({ prev: false, next: false });
+  const fav = useFavoriteTeam()?.id;
 
   const stripRef = useRef<HTMLDivElement>(null);
 
@@ -112,7 +114,12 @@ export default function ScoreboardBar() {
   };
 
   const loading = games === null;
-  const sorted = sortGames(games ?? []);
+  /* The favourite club's game leads the rail; the rest keep their order
+     (the sort is stable). Two games on a doubleheader day both move up. */
+  const isFav = (g: Game) => g.away.id === fav || g.home.id === fav;
+  const sorted = sortGames(games ?? []).sort(
+    (a, b) => Number(isFav(b)) - Number(isFav(a)),
+  );
 
   return (
     <div className="border-b border-line bg-bg">

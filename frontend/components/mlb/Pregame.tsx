@@ -31,6 +31,7 @@ import {
   type Pregame as PregameData,
 } from "@/lib/mlb";
 import { getClubInjuries } from "@/lib/injuries";
+import { getMatchups } from "@/lib/api";
 
 /*
  * Everything a game is worth reading before it starts, since there is no box
@@ -155,6 +156,8 @@ export default async function Pregame({ game }: { game: Game }) {
     homeOctober,
     awayHurt,
     homeHurt,
+    awayPitch,
+    homePitch,
   ] = await Promise.all([
     game.away.probable ? getPlayer(game.away.probable.id, season).catch(() => null) : null,
     game.home.probable ? getPlayer(game.home.probable.id, season).catch(() => null) : null,
@@ -179,6 +182,14 @@ export default async function Pregame({ game }: { game: Game }) {
     game.series ? getTeamLeaders(game.home.id, season, "P", true).catch(() => null) : null,
     game.series ? getClubInjuries(game.away).catch(() => null) : null,
     game.series ? getClubInjuries(game.home).catch(() => null) : null,
+    /* The same matchups pitch by pitch, off the local warehouse. Null —
+       no backend, as in production — hides that view of the card. */
+    pre && game.home.probable
+      ? getMatchups(game.home.probable.id, pre.away.map((s) => s.id)).catch(() => null)
+      : null,
+    pre && game.away.probable
+      ? getMatchups(game.away.probable.id, pre.home.map((s) => s.id)).catch(() => null)
+      : null,
   ]);
 
   /* In October a side's record is its series one, which says nothing about
@@ -306,6 +317,7 @@ export default async function Pregame({ game }: { game: Game }) {
                 spots: pre.away,
                 season: lineupSeason(awayBats),
                 vs: awayVs,
+                pitch: awayPitch,
                 facing: game.home.probable?.name ?? "",
               }}
               home={{
@@ -313,6 +325,7 @@ export default async function Pregame({ game }: { game: Game }) {
                 spots: pre.home,
                 season: lineupSeason(homeBats),
                 vs: homeVs,
+                pitch: homePitch,
                 facing: game.away.probable?.name ?? "",
               }}
             />

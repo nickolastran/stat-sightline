@@ -184,3 +184,21 @@ class AskResponse(BaseModel):
     notes: list[str] = []
     suggestions: list[str] = []
     data_through: date | None = None
+
+
+class PitchShare(BaseModel):
+    pitch_type: str
+    pct: float | None = None
+
+
+class Matchup(BaseModel):
+    """One batter's pitch-level line against one pitcher. Rates with no
+    denominator (never swung, never put it in play) are None, not 0."""
+    batter: int
+    pitches: int
+    pa: int
+    whiff_pct: float | None = None     # whiffs / swings
+    avg_ev: float | None = None        # mph, batted balls
+    hard_hit_pct: float | None = None  # 95+ mph / batted balls
+    xwoba: float | None = None
+    mix: list[PitchShare] = []         # most-seen pitch types, top first

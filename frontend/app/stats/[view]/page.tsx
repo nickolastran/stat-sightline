@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import { cookies } from "next/headers";
+import { FAVORITE_COOKIE } from "@/lib/site";
 import Link from "next/link";
 import { Suspense } from "react";
 import { notFound } from "next/navigation";
@@ -177,7 +179,11 @@ export default async function AdvancedPage({
      rather than leaving the table under a heading it isn't ordered by. */
   const custom = found.id === "custom";
   const clubs: Club[] = custom ? await getClubs().catch(() => []) : [];
-  const query = pickCustomQuery(sp, new Set(clubs.map((c) => String(c.id))));
+  const query = pickCustomQuery(
+    sp,
+    new Set(clubs.map((c) => String(c.id))),
+    custom ? (await cookies()).get(FAVORITE_COOKIE)?.value : undefined,
+  );
   const sort =
     found.id === "top" || custom
       ? undefined

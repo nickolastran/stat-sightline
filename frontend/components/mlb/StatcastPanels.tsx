@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import type { Pitch } from "@/lib/api";
-import type { PercentileSection } from "@/lib/advanced";
+import type { LeagueRates, PercentileSection } from "@/lib/advanced";
 import { arsenalRows } from "@/lib/metrics";
 import { ordinal } from "@/lib/mlb";
 import { PITCH_SLOTS, pctColor } from "@/lib/pitchColors";
@@ -11,6 +11,7 @@ import SegmentedControl from "@/components/ui/SegmentedControl";
 import ArsenalTable from "@/components/dashboard/ArsenalTable";
 import MovementPlot from "@/components/dashboard/MovementPlot";
 import ZonePlot, { type ZonePlotMode } from "@/components/dashboard/ZonePlot";
+import RollingChart from "@/components/mlb/RollingChart";
 
 /*
  * A player's season through Statcast: Savant's percentile card, then the
@@ -121,11 +122,13 @@ function Percentiles({ sections, season }: { sections: PercentileSection[]; seas
 export default function StatcastPanels({
   pitches,
   percentiles,
+  league,
   role,
   season,
 }: {
   pitches: Pitch[];
   percentiles: PercentileSection[];
+  league: LeagueRates | null;
   role: "pitcher" | "batter";
   season: number;
 }) {
@@ -141,6 +144,14 @@ export default function StatcastPanels({
         </Panel>
       ) : (
         <>
+          {/* Keyed on role: a two-way player's strip swaps the window unit. */}
+          <RollingChart
+            key={role}
+            pitches={pitches}
+            league={league}
+            role={role}
+            season={season}
+          />
           <div className="grid gap-3 lg:grid-cols-2">
             <Panel
               title={role === "pitcher" ? "Pitch Location" : "Pitches Seen"}

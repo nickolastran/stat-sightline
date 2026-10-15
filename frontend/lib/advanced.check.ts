@@ -25,6 +25,7 @@ import {
   parseCsv,
   pickAdvSeason,
   pickCustomQuery,
+  leagueRates,
   rankAgainst,
   type AdvRow,
 } from "./advanced";
@@ -154,6 +155,10 @@ assert.ok(!picked.cols.includes("bat.avg_bat_speed"));
 // Filters that name nothing real fall back to unfiltered.
 assert.equal(pickCustomQuery({ team: "999" }, clubs).team, "all");
 assert.equal(pickCustomQuery({ team: "147" }, clubs).team, "147");
+assert.equal(pickCustomQuery({}, clubs, "147").team, "147", "no ?team= opens on the favourite");
+assert.equal(pickCustomQuery({ team: "all" }, clubs, "147").team, "all", "an explicit all wins");
+assert.equal(pickCustomQuery({ team: "999" }, clubs, "147").team, "all", "a bad ?team= isn't the favourite");
+assert.equal(pickCustomQuery({}, clubs, "999").team, "all", "a stale favourite is ignored");
 assert.equal(pickCustomQuery({ div: "AL EAST" }, clubs).division, "AL EAST");
 assert.equal(pickCustomQuery({ div: "AL MIDDLE" }, clubs).division, "all");
 assert.equal(pickCustomQuery({ league: "105" }, clubs).league, "all");
@@ -259,3 +264,15 @@ console.log("advanced.check.ts custom OK");
 }
 
 console.log("advanced.check.ts rank OK");
+
+/* ── leagueRates: weighted by plate appearances, blanks skipped ──────── */
+{
+  const r = leagueRates([
+    { pa: "600", xwoba: ".400", k_percent: "20.0" },
+    { pa: "200", xwoba: ".200", k_percent: "40.0" },
+    { pa: "50", xwoba: "", k_percent: "" }, // no tracked figure: left out
+  ]);
+  assert.ok(Math.abs(r.xwoba! - 0.35) < 1e-9, "the regular outweighs the bench bat");
+  assert.ok(Math.abs(r.k! - 0.25) < 1e-9, "K% comes back a fraction");
+  assert.deepEqual(leagueRates([]), { xwoba: null, k: null });
+}

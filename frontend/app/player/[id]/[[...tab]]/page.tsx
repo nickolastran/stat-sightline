@@ -391,12 +391,13 @@ async function TabBody({
         const role = group === "pitching" ? "pitcher" : "batter";
         const [pitches, percentiles] = await Promise.all([
           getSeasonPitches(id, season, role),
-          getPercentiles(id, season, role).catch(() => []),
+          getPercentiles(id, season, role).catch(() => ({ sections: [], league: null })),
         ]);
         return (
           <StatcastPanels
             pitches={pitches}
-            percentiles={percentiles}
+            percentiles={percentiles.sections}
+            league={percentiles.league}
             role={role}
             season={season}
           />

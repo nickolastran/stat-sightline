@@ -27,13 +27,10 @@ pybaseball ──► ETL (pandas) ──► PostgreSQL ──► FastAPI ──�
 | `src/stat_sightline/standings/` | Standings projection: MLB results ingest, rolling-form features, model training, season projection |
 | `src/stat_sightline/db/` | Cached SQLAlchemy engine |
 | `sql/` | `01_schema.sql` (tables + indexes), `02_feature_views.sql` (barrel, attack-zone, swing-take views) |
-| `api/` | FastAPI app + `/api/ask`, `/api/pitchers` and `/api/standings` routers |
+| `api/` | FastAPI app + `/api/ask`, `/api/matchups`, `/api/pitchers` and `/api/standings` routers |
 | `frontend/` | Next.js 16 app (App Router, Tailwind v4, Recharts, Framer Motion); `lib/mlb/` is the MLB Stats API client every league / team / player / game page reads through |
 | `scripts/` | `init_db.py`, `run_etl.py`, `train_standings.py` |
 | `tests/` | pytest for cleaning, feature math, question parsing, and projection leakage |
-
-`src/app/` is a leftover `create-next-app` scaffold; the live frontend is
-`frontend/`.
 
 Packages carry no `__init__.py`: every import (`api.*`, `src.stat_sightline.*`,
 `config.*`) resolves as a PEP 420 namespace package off the repo root, which

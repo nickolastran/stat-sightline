@@ -289,12 +289,45 @@ export function rankAgainst(v: number, field: number[], low = false): number | n
 const fmtFigure = (n: number, f: CardMetric["fmt"]) =>
   f === "rate" ? n.toFixed(3).replace(/^(-?)0\./, "$1.") : n.toFixed(f);
 
-/** One player's percentile card for a season, every figure on it. */
+/** The league's xwOBA and K% for a season, as fractions (.315, .222). */
+export interface LeagueRates {
+  xwoba: number | null;
+  k: number | null;
+}
+
+/**
+ * League rates off the custom board's every-player rows, each player weighted
+ * by his plate appearances.
+ */
+// ponytail: xwOBA weighted by PA, not its own denominator (no IBB/sac bunts) —
+// within a point or so of Savant's league figure.
+export function leagueRates(rows: Record<string, string>[]): LeagueRates {
+  const mean = (key: string) => {
+    let num = 0;
+    let den = 0;
+    for (const r of rows) {
+      const pa = Number.parseFloat(r.pa);
+      const v = Number.parseFloat(r[key]);
+      if (pa > 0 && Number.isFinite(v)) {
+        num += v * pa;
+        den += pa;
+      }
+    }
+    return den ? num / den : null;
+  };
+  const k = mean("k_percent");
+  return { xwoba: mean("xwoba"), k: k === null ? null : k / 100 };
+}
+
+/**
+ * One player's percentile card for a season, every figure on it — and the
+ * league's rates, which come off the same every-player board for free.
+ */
 export async function getPercentiles(
   id: number,
   season: number,
   role: "batter" | "pitcher",
-): Promise<PercentileSection[]> {
+): Promise<{ sections: PercentileSection[]; league: LeagueRates }> {
   const sections = CARD[role];
   const metrics = sections.flatMap((s) => s.metrics);
   const [ranks, custom, arm] = await Promise.all([
@@ -304,7 +337,7 @@ export async function getPercentiles(
         year: String(season),
         type: role,
         min: "1",
-        selections: metrics.filter((m) => !m.arm).map((m) => m.raw).join(","),
+        selections: ["pa", ...metrics.filter((m) => !m.arm).map((m) => m.raw)].join(","),
       }),
     ),
     role === "batter"
@@ -347,7 +380,10 @@ export async function getPercentiles(
     return { label: m.label, pct: rankAgainst(v, field, m.low), value, qualified: false };
   };
 
-  return sections.map((s) => ({ title: s.title, rows: s.metrics.map(row) }));
+  return {
+    sections: sections.map((s) => ({ title: s.title, rows: s.metrics.map(row) })),
+    league: leagueRates(custom),
+  };
 }
 
 /** A source whose absence costs its columns and nothing else. */
@@ -1542,6 +1578,8 @@ export function pickCustomQuery(
     sort?: string;
   },
   clubIds: Set<string>,
+  /** The reader's favourite club, for a board whose URL names none. */
+  favorite?: string,
 ): CustomQuery {
   const group: StatGroup =
     sp.group === "pitching" || sp.group === "fielding" ? sp.group : "hitting";
@@ -1561,7 +1599,12 @@ export function pickCustomQuery(
     cols: picked,
     league: oneOf(sp.league, CUSTOM_LEAGUES, "all"),
     division: oneOf(sp.div, CUSTOM_DIVISIONS, "all"),
-    team: sp.team && clubIds.has(sp.team) ? sp.team : "all",
+    /* No `?team=` at all opens on the reader's favourite club; `?team=all`
+       is a reader who chose every club, and keeps them all. */
+    team:
+      sp.team === undefined
+        ? favorite && clubIds.has(favorite) ? favorite : "all"
+        : clubIds.has(sp.team) ? sp.team : "all",
     position: oneOf(sp.pos, LEADER_POSITIONS, "all"),
     min: oneOf(sp.min, CUSTOM_MINS, "q"),
     rookies: sp.rookies === "1",
