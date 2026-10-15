@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import AskBox from "@/components/ask/AskBox";
 import AskResult from "@/components/ask/AskResult";
+import CopyLink from "@/components/ask/CopyLink";
 import { ask } from "@/lib/api";
 
 /*
@@ -61,10 +62,13 @@ export default async function AskPage({
             answer on screen instead of keeping the last thing typed. */}
         <AskBox key={question} initial={question} autoFocus={!question} />
 
-        {data?.data_through && (
-          <p className="mt-2 text-[10px] tracking-wider text-ink-3">
-            DATA THROUGH {data.data_through}
-          </p>
+        {data && (
+          <div className="mt-2 flex items-center justify-between gap-2">
+            <p className="text-[10px] tracking-wider text-ink-3">
+              {data.data_through && `DATA THROUGH ${data.data_through}`}
+            </p>
+            <CopyLink />
+          </div>
         )}
 
         <div className="mt-6">
