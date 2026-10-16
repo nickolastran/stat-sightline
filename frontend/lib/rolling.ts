@@ -22,7 +22,7 @@ export const WINDOWS: Record<RollRole, { sizes: number[]; initial: number; unit:
 };
 
 /** One unit's totals — a game, or a single plate appearance. */
-interface GameLine {
+export interface GameLine {
   date: string;
   pa: number;
   k: number;

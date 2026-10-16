@@ -12,6 +12,7 @@ import ArsenalTable from "@/components/dashboard/ArsenalTable";
 import MovementPlot from "@/components/dashboard/MovementPlot";
 import ZonePlot, { type ZonePlotMode } from "@/components/dashboard/ZonePlot";
 import RollingChart from "@/components/mlb/RollingChart";
+import { gameLines } from "@/lib/rolling";
 
 /*
  * A player's season through Statcast: Savant's percentile card, then the
@@ -134,6 +135,10 @@ export default function StatcastPanels({
 }) {
   const [mode, setMode] = useState<ZonePlotMode>(role === "batter" ? "zones" : "scatter");
   const arsenal = useMemo(() => arsenalRows(pitches, NAMED_TYPES), [pitches]);
+  const rollSeries = useMemo(
+    () => [{ name: "", games: gameLines(pitches, role) }],
+    [pitches, role],
+  );
 
   return (
     <div className="space-y-3">
@@ -147,7 +152,7 @@ export default function StatcastPanels({
           {/* Keyed on role: a two-way player's strip swaps the window unit. */}
           <RollingChart
             key={role}
-            pitches={pitches}
+            series={rollSeries}
             league={league}
             role={role}
             season={season}
