@@ -336,8 +336,10 @@ const pctText = (v: number | null) => (v === null ? null : `${v.toFixed(1)}%`);
  * Each listed hitter's pitch-level line against one pitcher, as lineup rows
  * keyed by player id. A hitter who never faced him has no row.
  *
- * Only the local warehouse can answer this, and production has no backend:
- * there the request fails fast and the caller hides the view.
+ * Production has no backend, so there it falls back to the daily snapshot of
+ * today's and tomorrow's starters against the opposing rosters
+ * (scripts/snapshot_matchups.py). A starter it doesn't hold still throws, and
+ * the caller hides the view.
  */
 export async function getMatchups(
   pitcher: number,
@@ -346,7 +348,12 @@ export async function getMatchups(
   const rows = await api<Matchup[]>(
     `/api/matchups?pitcher=${pitcher}&batters=${batters.join(",")}`,
     { next: { revalidate: 3600 } },
-  );
+  ).catch(async (err) => {
+    const { default: all } = await import("@/data/matchups.json");
+    const snap = (all as Record<string, Matchup[]>)[pitcher];
+    if (!snap) throw err;
+    return snap.filter((m) => batters.includes(m.batter));
+  });
   return Object.fromEntries(
     rows.map((m) => [
       m.batter,

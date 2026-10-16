@@ -182,8 +182,9 @@ export default async function Pregame({ game }: { game: Game }) {
     game.series ? getTeamLeaders(game.home.id, season, "P", true).catch(() => null) : null,
     game.series ? getClubInjuries(game.away).catch(() => null) : null,
     game.series ? getClubInjuries(game.home).catch(() => null) : null,
-    /* The same matchups pitch by pitch, off the local warehouse. Null —
-       no backend, as in production — hides that view of the card. */
+    /* The same matchups pitch by pitch, off the local warehouse or, in
+       production, the daily snapshot. Null — a starter neither holds —
+       hides that view of the card. */
     pre && game.home.probable
       ? getMatchups(game.home.probable.id, pre.away.map((s) => s.id)).catch(() => null)
       : null,

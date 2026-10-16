@@ -1,0 +1,33 @@
+# Refreshes frontend/data/matchups.json — the deployed site has no API, so the
+# pregame lineup card's PITCH view reads today's and tomorrow's starters
+# against the opposing rosters from that snapshot. Straight off Baseball
+# Savant, no warehouse or secrets; commits only if a line moved, which
+# triggers the Vercel redeploy.
+name: Matchups
+
+on:
+  schedule:
+    - cron: "15 12 * * *" # 8:15am ET, after the playoff odds and with the day's probables set
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install fastapi pydantic sqlalchemy pandas numpy requests python-dotenv
+      - run: python scripts/snapshot_matchups.py
+      - name: Commit if changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898729+github-actions[bot]@users.noreply.github.com"
+          git add frontend/data/matchups.json
+          # Rebased before the push: the odds job may have landed a commit
+          # since checkout. Different files, so it never conflicts.
+          git diff --cached --quiet || { git commit -m "chore: refresh matchups" && git pull --rebase && git push; }
