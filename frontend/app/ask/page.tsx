@@ -22,6 +22,9 @@ export async function generateMetadata({
   return {
     title: q ? `Ask: ${q}` : "Ask",
     description: "Ask the Statcast pitch warehouse a question in plain English.",
+    ...(q && {
+      openGraph: { images: `/ask/card?q=${encodeURIComponent(q)}` },
+    }),
   };
 }
 

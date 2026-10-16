@@ -23,6 +23,9 @@ export const metadata: Metadata = {
   },
   description:
     "Live MLB scores, box scores, standings, player and team stats, Statcast analytics, playoff odds and the postseason bracket.",
+  /* Player, game and Ask pages carry a generated card; ask X to show it
+     full-width rather than as a thumbnail. */
+  twitter: { card: "summary_large_image" },
 };
 
 export default function RootLayout({
