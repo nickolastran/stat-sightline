@@ -110,3 +110,34 @@ export function rolling(games: GameLine[], n: number, m: RollMetric): RollPoint[
 /** xwOBA reads as Savant prints it, ".342"; K% as a percentage. */
 export const rollText = (m: RollMetric, v: number) =>
   m === "k" ? `${(v * 100).toFixed(1)}%` : v.toFixed(3).replace(/^0/, "");
+
+/* How far his shortest window must sit off his season xwOBA to call it a
+   streak — about the gap between an average bat and a good one. Tuning knob. */
+const STREAK_GAP = 0.05;
+/* A streak is now: a window that ended over a week ago (injured list, off
+   season) is a memory, not a streak. */
+const STREAK_STALE_DAYS = 7;
+
+export interface Streak {
+  hot: boolean;
+  /** "last 15 G" — the window the call is made over. */
+  label: string;
+  value: number;
+  season: number;
+}
+
+/**
+ * HOT or COLD when his xwOBA over the shortest window — 15 games, or 50
+ * batters faced, about the same number of PAs — sits well off his season
+ * figure. A pitcher's is what he allowed, so down is hot. Null otherwise.
+ */
+export function streak(games: GameLine[], role: RollRole, today: string): Streak | null {
+  const { sizes, unit } = WINDOWS[role];
+  const last = rolling(games, sizes[0], "xwoba").at(-1);
+  const season = seasonRate(games, "xwoba");
+  if (!last || season === null || last.unit !== games.length) return null;
+  if (Date.parse(today) - Date.parse(last.date) > STREAK_STALE_DAYS * 864e5) return null;
+  const gap = (last.value - season) * (role === "pitcher" ? -1 : 1);
+  if (Math.abs(gap) < STREAK_GAP) return null;
+  return { hot: gap > 0, label: `last ${sizes[0]} ${unit}`, value: last.value, season };
+}

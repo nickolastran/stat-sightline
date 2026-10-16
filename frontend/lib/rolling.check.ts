@@ -7,7 +7,7 @@
  */
 import assert from "node:assert/strict";
 import type { Pitch } from "./api";
-import { gameLines, rolling, seasonRate } from "./rolling";
+import { gameLines, rolling, seasonRate, streak } from "./rolling";
 
 const pa = (game: number, events: string, o: Partial<Pitch> = {}): Pitch =>
   ({
@@ -60,5 +60,24 @@ assert.deepEqual(
   [1 / 2, 0],
   "a window can end mid-game",
 );
+
+/* Streaks: 50 units of a .300 xwOBA, then 50 of .500, against a season of
+   .400 — hot for a batter, cold for a pitcher (it's what he allowed). */
+const units = Array.from({ length: 100 }, (_, i) =>
+  ({
+    game_pk: i + 1,
+    game_date: new Date(Date.UTC(2025, 3, 1 + i)).toISOString().slice(0, 10),
+    events: "single",
+    woba_denom: 1,
+    xwoba: i < 50 ? 0.3 : 0.5,
+  }) as Pitch,
+);
+const season = gameLines(units);
+const end = season.at(-1)!.date;
+assert.equal(streak(season, "batter", end)?.hot, true);
+assert.equal(streak(season, "batter", end)?.label, "last 15 G");
+assert.equal(streak(gameLines(units, "pitcher"), "pitcher", end)?.hot, false, "a pitcher's hot is xwOBA down");
+assert.equal(streak(season, "batter", "2025-08-01"), null, "over a week stale: no streak");
+assert.equal(streak(season.slice(0, 50), "batter", season[49].date), null, "level form: no streak");
 
 console.log("rolling: ok");

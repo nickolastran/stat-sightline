@@ -101,3 +101,26 @@ export const getSeasonPitches = async (
       season,
     )
   ).map(toPitch);
+
+/* Every event that ends a plate appearance. Rolling form reads nothing else,
+   so asking Savant for these rows alone is under a third of the season's CSV
+   — small enough for the fetch cache. Checked against a full pull: the same PAs. */
+const PA_EVENTS =
+  "single|double|triple|home_run|field_out|strikeout|strikeout_double_play|" +
+  "walk|intent_walk|hit_by_pitch|force_out|grounded_into_double_play|" +
+  "double_play|triple_play|field_error|fielders_choice|fielders_choice_out|" +
+  "sac_fly|sac_fly_double_play|sac_bunt|sac_bunt_double_play|catcher_interf|" +
+  "truncated_pa|";
+
+/** Only the pitches that ended a plate appearance — what `gameLines` reads. */
+export const getSeasonPAs = async (
+  id: number,
+  season: number,
+  role: "pitcher" | "batter",
+) =>
+  (
+    await statcastSearch(
+      { hfAB: PA_EVENTS, player_type: role, [`${role}s_lookup[]`]: String(id) },
+      season,
+    )
+  ).map(toPitch);
