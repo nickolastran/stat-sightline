@@ -15,6 +15,7 @@ import RollingChart from "@/components/mlb/RollingChart";
 import SequencingGrid from "@/components/mlb/SequencingGrid";
 import SwingTakePanel from "@/components/mlb/SwingTakePanel";
 import BatTrackingPanel from "@/components/mlb/BatTrackingPanel";
+import TimesThroughPanel from "@/components/mlb/TimesThroughPanel";
 import { BAT_TRACKING_FIRST_SEASON, type BatLine } from "@/lib/batTracking";
 import { gameLines } from "@/lib/rolling";
 
@@ -209,6 +210,11 @@ export default function StatcastPanels({
           {role === "batter" && (
             <Panel title="Swing / Take">
               <SwingTakePanel pitches={pitches} />
+            </Panel>
+          )}
+          {role === "pitcher" && (
+            <Panel title="Times Through the Order">
+              <TimesThroughPanel pitches={pitches} />
             </Panel>
           )}
           {role === "pitcher" && (

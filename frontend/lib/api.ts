@@ -67,6 +67,7 @@ export interface Pitch {
   run_value?: number | null; // change in run expectancy, batter's side
   bat_speed?: number | null; // mph, swings only, 2024 on
   swing_length?: number | null; // ft, swings only, 2024 on
+  tto?: number | null; // the pitcher's time through the order, 1 = first
   xwoba?: number | null; // Statcast's expected wOBA on contact
   woba_value?: number | null;
   woba_denom?: number | null;
