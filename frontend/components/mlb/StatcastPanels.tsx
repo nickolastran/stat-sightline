@@ -12,6 +12,12 @@ import ArsenalTable from "@/components/dashboard/ArsenalTable";
 import MovementPlot from "@/components/dashboard/MovementPlot";
 import ZonePlot, { type ZonePlotMode } from "@/components/dashboard/ZonePlot";
 import RollingChart from "@/components/mlb/RollingChart";
+import SequencingGrid from "@/components/mlb/SequencingGrid";
+import SwingTakePanel from "@/components/mlb/SwingTakePanel";
+import BatTrackingPanel from "@/components/mlb/BatTrackingPanel";
+import TimesThroughPanel from "@/components/mlb/TimesThroughPanel";
+import { BAT_TRACKING_FIRST_SEASON, type BatLine } from "@/lib/batTracking";
+import { gameLines } from "@/lib/rolling";
 
 /*
  * A player's season through Statcast: Savant's percentile card, then the
@@ -125,15 +131,22 @@ export default function StatcastPanels({
   league,
   role,
   season,
+  bat = null,
 }: {
   pitches: Pitch[];
   percentiles: PercentileSection[];
   league: LeagueRates | null;
   role: "pitcher" | "batter";
   season: number;
+  /** The hitter's bat-tracking line and the league's; null before 2024 or off the board. */
+  bat?: { player: BatLine; league: BatLine } | null;
 }) {
   const [mode, setMode] = useState<ZonePlotMode>(role === "batter" ? "zones" : "scatter");
   const arsenal = useMemo(() => arsenalRows(pitches, NAMED_TYPES), [pitches]);
+  const rollSeries = useMemo(
+    () => [{ name: "", games: gameLines(pitches, role) }],
+    [pitches, role],
+  );
 
   return (
     <div className="space-y-3">
@@ -147,7 +160,7 @@ export default function StatcastPanels({
           {/* Keyed on role: a two-way player's strip swaps the window unit. */}
           <RollingChart
             key={role}
-            pitches={pitches}
+            series={rollSeries}
             league={league}
             role={role}
             season={season}
@@ -179,6 +192,34 @@ export default function StatcastPanels({
           {role === "pitcher" && (
             <Panel title="Arsenal">
               <ArsenalTable rows={arsenal} />
+            </Panel>
+          )}
+          {role === "batter" && (
+            <Panel title="Bat Tracking">
+              {bat ? (
+                <BatTrackingPanel pitches={pitches} line={bat} />
+              ) : (
+                <p className="text-xs text-ink-3">
+                  {season < BAT_TRACKING_FIRST_SEASON
+                    ? `BAT TRACKING BEGINS IN ${BAT_TRACKING_FIRST_SEASON}`
+                    : `NO BAT TRACKING FOR ${season}`}
+                </p>
+              )}
+            </Panel>
+          )}
+          {role === "batter" && (
+            <Panel title="Swing / Take">
+              <SwingTakePanel pitches={pitches} />
+            </Panel>
+          )}
+          {role === "pitcher" && (
+            <Panel title="Times Through the Order">
+              <TimesThroughPanel pitches={pitches} />
+            </Panel>
+          )}
+          {role === "pitcher" && (
+            <Panel title="Pitch Sequencing">
+              <SequencingGrid pitches={pitches} codes={arsenal.map((r) => r.code)} />
             </Panel>
           )}
         </>

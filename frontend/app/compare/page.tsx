@@ -1,7 +1,15 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import ParamTabs from "@/components/mlb/ParamTabs";
 import SeasonSelect from "@/components/mlb/SeasonSelect";
 import ComparePicker from "@/components/mlb/ComparePicker";
+import RollingChart from "@/components/mlb/RollingChart";
+import SprayChart from "@/components/mlb/SprayChart";
+import { Skeleton, SkeletonPanel } from "@/components/ui/Skeleton";
+import { getPercentiles } from "@/lib/advanced";
+import { gameLines, type RollRole } from "@/lib/rolling";
+import { getHomePark, getSprayHits } from "@/lib/spray";
+import { getSeasonPAs, STATCAST_FIRST_SEASON } from "@/lib/statcast";
 import {
   CompareHeadline,
   CompareSection,
@@ -202,6 +210,78 @@ function derive(group: StatGroup, v: Record<string, TeamStatValue>): Record<stri
   };
 }
 
+/* ── Pitch-tracked panels — Savant is slow, so each streams in on its own ── */
+
+/** Everyone's rolling form on one chart, over the season the page is on. */
+async function Rolling({
+  players,
+  season,
+  role,
+}: {
+  players: PlayerSummary[];
+  season: number;
+  role: RollRole;
+}) {
+  const [games, league] = await Promise.all([
+    Promise.all(
+      players.map((p) =>
+        getSeasonPAs(p.id, season, role)
+          .then((pas) => gameLines(pas, role))
+          .catch(() => []),
+      ),
+    ),
+    /* The league line is the same whoever's card it comes off. */
+    getPercentiles(players[0].id, season, role)
+      .then((r) => r.league)
+      .catch(() => null),
+  ]);
+  return (
+    <RollingChart
+      series={players.map((p, i) => ({ name: p.name, games: games[i] }))}
+      league={league}
+      role={role}
+      season={season}
+    />
+  );
+}
+
+/** Each hitter's spray chart, side by side, each on his own club's park. */
+async function Sprays({
+  hitters,
+  career,
+}: {
+  hitters: { p: PlayerSummary; seasons: number[] }[];
+  career: boolean;
+}) {
+  const charts = await Promise.all(
+    hitters.map(({ p, seasons }) =>
+      Promise.all([
+        getSprayHits(p.id, seasons),
+        p.teamId ? getHomePark(p.teamId).catch(() => null) : null,
+      ]),
+    ),
+  );
+  return (
+    <div className="grid gap-3 md:grid-cols-2">
+      {charts.map(([hits, park], i) => (
+        <SprayChart
+          key={hitters[i].p.id}
+          hits={hits}
+          park={park}
+          title={`${hitters[i].p.name} — Spray Chart`}
+          initial={career ? "career" : undefined}
+        />
+      ))}
+    </div>
+  );
+}
+
+const PanelSkeleton = ({ height }: { height: string }) => (
+  <SkeletonPanel right>
+    <Skeleton className={`${height} w-full`} />
+  </SkeletonPanel>
+);
+
 function parseIds(raw: string | undefined): number[] {
   const ids = (raw ?? "")
     .split(",")
@@ -319,6 +399,27 @@ export default async function ComparePage({
     ...(shown.includes("awards") ? won : []),
   ].map((st, i) => (i || st.band ? st : { ...st, band: "Stats" }));
 
+  /* The pitch-tracked panels read only the players who have the main line —
+     no pitcher's batting in a hitters' comparison. The spray charts follow
+     the page's scope: the picked season, or every one of the career. */
+  const tracked = players.filter((_, i) => groupsByPlayer[i].includes(group));
+  const hitters =
+    group === "hitting"
+      ? players.flatMap((p, i) =>
+          groupsByPlayer[i].includes("hitting")
+            ? [
+                {
+                  p,
+                  seasons:
+                    scope === "career"
+                      ? careersOf("hitting")[i].rows.map((r) => Number(r.season)).filter(Boolean)
+                      : [season],
+                },
+              ]
+            : [],
+        )
+      : [];
+
   const entities: CompareEntity[] = players.map((p) => ({
     id: p.id,
     name: p.name,
@@ -383,6 +484,20 @@ export default async function ComparePage({
                 entities={entities}
                 values={values}
               />
+              {tracked.length > 0 && season >= STATCAST_FIRST_SEASON && (
+                <Suspense fallback={<PanelSkeleton height="h-36" />}>
+                  <Rolling
+                    players={tracked}
+                    season={season}
+                    role={group === "pitching" ? "pitcher" : "batter"}
+                  />
+                </Suspense>
+              )}
+              {hitters.length > 0 && (
+                <Suspense fallback={<PanelSkeleton height="h-96" />}>
+                  <Sprays hitters={hitters} career={scope === "career"} />
+                </Suspense>
+              )}
             </>
           )}
         </>

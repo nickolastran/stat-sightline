@@ -1,15 +1,15 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import type { Pitch } from "@/lib/api";
 import type { LeagueRates } from "@/lib/advanced";
 import {
   WINDOWS,
-  gameLines,
   rollText,
   rolling,
   seasonRate,
+  type GameLine,
   type RollMetric,
+  type RollPoint,
 } from "@/lib/rolling";
 import Panel from "@/components/ui/Panel";
 import SegmentedControl from "@/components/ui/SegmentedControl";
@@ -20,6 +20,11 @@ import SegmentedControl from "@/components/ui/SegmentedControl";
  * 50/100/250 batters faced — at every point of the year, read against his
  * own season figure (dashed) and the league's (dotted). Pointer over the
  * chart names the window under it.
+ *
+ * Handed several players (the compare page), it draws one line each on a
+ * shared scale, lined up by game — or batter faced — rather than by date:
+ * "through his 80th game" is the comparison, and a pitcher's batters faced
+ * pile up on one date. Each one's season figure moves into the read-out.
  *
  * For a pitcher both are what he allowed — down is good for xwOBA, up for K%.
  */
@@ -32,19 +37,38 @@ const H = 150;
 const SEASON_DASH = "6 4";
 const LEAGUE_DASH = "1 4";
 
-const Swatch = ({ dash }: { dash: string }) => (
+/* One per compared player, in the order they were picked: the first four
+   categorical slots, validated as lines (adjacent pairs) on the white chart
+   surface. Slot 1 is the accent, so a lone player reads as he always has. */
+const COLORS = ["var(--color-accent)", "#eb6834", "#1baf7a", "#eda100"];
+
+const Swatch = ({ dash, color }: { dash?: string; color?: string }) => (
   <svg aria-hidden viewBox="0 0 16 2" className="mr-1 inline h-0.5 w-4 align-middle">
-    <line x1={0} y1={1} x2={16} y2={1} className="stroke-ink-2" strokeWidth={2} strokeDasharray={dash} />
+    <line
+      x1={0}
+      y1={1}
+      x2={16}
+      y2={1}
+      className={color ? undefined : "stroke-ink-2"}
+      style={color ? { stroke: color } : undefined}
+      strokeWidth={2}
+      strokeDasharray={dash}
+    />
   </svg>
 );
 
+export interface RollSeries {
+  name: string;
+  games: GameLine[];
+}
+
 export default function RollingChart({
-  pitches,
+  series,
   league,
   role,
   season,
 }: {
-  pitches: Pitch[];
+  series: RollSeries[];
   league: LeagueRates | null;
   role: "pitcher" | "batter";
   season: number;
@@ -54,12 +78,21 @@ export default function RollingChart({
   const [n, setN] = useState<number>(win.initial);
   const [at, setAt] = useState<number | null>(null);
 
-  const games = useMemo(() => gameLines(pitches, role), [pitches, role]);
-  const points = useMemo(() => rolling(games, n, metric), [games, n, metric]);
-  const avg = seasonRate(games, metric);
+  const lines = useMemo(
+    () =>
+      series.map((s, i) => ({
+        name: s.name,
+        color: COLORS[i],
+        points: rolling(s.games, n, metric),
+        avg: seasonRate(s.games, metric),
+      })),
+    [series, n, metric],
+  );
+  const solo = lines.length === 1;
   const lg = league?.[metric] ?? null;
 
   const label = metric === "k" ? "K%" : "xwOBA";
+  const title = solo ? "Rolling Form" : `Rolling Form — ${season}`;
   const controls = (
     <div className="flex flex-wrap gap-2">
       <SegmentedControl<RollMetric>
@@ -83,56 +116,98 @@ export default function RollingChart({
     </div>
   );
 
-  if (points.length === 0)
+  const drawn = lines.filter((l) => l.points.length);
+  if (drawn.length === 0)
     return (
-      <Panel title="Rolling Form" right={controls}>
+      <Panel title={title} right={controls}>
         <p className="text-xs text-ink-3">
           FEWER THAN {n} {role === "pitcher" ? "BATTERS FACED" : "GAMES PLAYED"} IN {season}
         </p>
       </Panel>
     );
 
-  /* The y range is the line and both reference marks, padded so none rides
+  /* The y range is every line and the reference marks, padded so none rides
      the panel's edge. */
-  const vals = points.map((p) => p.value).concat(avg ?? [], lg ?? []);
+  const vals = lines
+    .flatMap((l) => l.points.map((p) => p.value))
+    .concat(solo && lines[0].avg !== null ? [lines[0].avg] : [], lg ?? []);
   const lo = Math.min(...vals);
   const hi = Math.max(...vals);
   const pad = (hi - lo || hi || 1) * 0.12;
   const y = (v: number) => H - ((v - (lo - pad)) / (hi - lo + 2 * pad)) * H;
-  const last = points.length - 1;
-  const x = (i: number) => (last ? (i / last) * W : W / 2);
+  /* x is the unit a window ends on — the first full window at the left, the
+     furthest anyone got at the right. */
+  const end = Math.max(...drawn.map((l) => l.points.at(-1)!.unit));
+  const span = end - n;
+  const x = (u: number) => (span ? ((u - n) / span) * W : W / 2);
 
-  const shown = points[at ?? last];
+  const unit = at ?? end;
+  /** The window ending on the unit under the pointer — or a line's last one,
+   *  for a player whose season stopped short of it. */
+  const under = (pts: RollPoint[]) => pts.findLast((p) => p.unit <= unit) ?? null;
   const track = (e: React.MouseEvent<SVGSVGElement>) => {
     const box = e.currentTarget.getBoundingClientRect();
-    const i = Math.round(((e.clientX - box.left) / box.width) * last);
-    setAt(Math.min(last, Math.max(0, i)));
+    const u = n + Math.round(((e.clientX - box.left) / box.width) * span);
+    setAt(Math.min(end, Math.max(n, u)));
   };
 
+  const avg = solo ? lines[0].avg : null;
+  const shown = under(lines[0].points);
+  const now = (l: (typeof lines)[number]) =>
+    l.points.length ? rollText(metric, l.points.at(-1)!.value) : "none";
+
   return (
-    <Panel title="Rolling Form" right={controls}>
+    <Panel title={title} right={controls}>
       <div className="space-y-2">
-        <p className="text-[10px] tracking-wider text-ink-3">
-          LAST {n} {win.unit} THRU {shown.date} ·{" "}
-          {role === "batter" && <>{shown.pa} PA · </>}
-          <span className="text-xs tabular-nums text-ink">
-            {label} {rollText(metric, shown.value)}
-          </span>
-          {avg !== null && (
-            <>
-              {" · "}
-              <Swatch dash={SEASON_DASH} />
-              SEASON {rollText(metric, avg)}
-            </>
-          )}
-          {lg !== null && (
-            <>
-              {" · "}
-              <Swatch dash={LEAGUE_DASH} />
-              LEAGUE {rollText(metric, lg)}
-            </>
-          )}
-        </p>
+        {solo && shown ? (
+          <p className="text-[10px] tracking-wider text-ink-3">
+            LAST {n} {win.unit} THRU {shown.date} ·{" "}
+            {role === "batter" && <>{shown.pa} PA · </>}
+            <span className="text-xs tabular-nums text-ink">
+              {label} {rollText(metric, shown.value)}
+            </span>
+            {avg !== null && (
+              <>
+                {" · "}
+                <Swatch dash={SEASON_DASH} />
+                SEASON {rollText(metric, avg)}
+              </>
+            )}
+            {lg !== null && (
+              <>
+                {" · "}
+                <Swatch dash={LEAGUE_DASH} />
+                LEAGUE {rollText(metric, lg)}
+              </>
+            )}
+          </p>
+        ) : (
+          /* The legend: each player's swatch, name, window and season. */
+          <p className="flex flex-wrap gap-x-3 gap-y-1 text-[10px] tracking-wider text-ink-3">
+            <span>
+              LAST {n} {win.unit} THRU {win.unit} {unit}
+            </span>
+            {lines.map((l, i) => {
+              const p = under(l.points);
+              return (
+                <span key={i}>
+                  <Swatch color={l.color} />
+                  {l.name.toUpperCase()}{" "}
+                  <span className="text-xs tabular-nums text-ink">
+                    {p ? `${label} ${rollText(metric, p.value)}` : "—"}
+                  </span>
+                  {l.avg !== null && <> · SEASON {rollText(metric, l.avg)}</>}
+                </span>
+              );
+            })}
+            {lg !== null && (
+              <span>
+                <Swatch dash={LEAGUE_DASH} />
+                LEAGUE {rollText(metric, lg)}
+              </span>
+            )}
+          </p>
+        )}
         <div className="flex gap-2">
           <div className="flex w-10 shrink-0 flex-col justify-between text-right text-[10px] tabular-nums text-ink-3">
             <span>{rollText(metric, hi + pad)}</span>
@@ -145,9 +220,15 @@ export default function RollingChart({
             onMouseMove={track}
             onMouseLeave={() => setAt(null)}
             role="img"
-            aria-label={`Rolling ${n}-${role === "pitcher" ? "batter" : "game"} ${label}, now ${rollText(metric, points[last].value)}${
-              avg !== null ? `, season ${rollText(metric, avg)}` : ""
-            }${lg !== null ? `, league ${rollText(metric, lg)}` : ""}`}
+            aria-label={
+              solo
+                ? `Rolling ${n}-${role === "pitcher" ? "batter" : "game"} ${label}, now ${now(lines[0])}${
+                    avg !== null ? `, season ${rollText(metric, avg)}` : ""
+                  }${lg !== null ? `, league ${rollText(metric, lg)}` : ""}`
+                : `Rolling ${n}-${role === "pitcher" ? "batter" : "game"} ${label}: ${lines
+                    .map((l) => `${l.name} ${now(l)}`)
+                    .join(", ")}${lg !== null ? `; league ${rollText(metric, lg)}` : ""}`
+            }
           >
             {avg !== null && (
               <line
@@ -174,14 +255,17 @@ export default function RollingChart({
                 vectorEffect="non-scaling-stroke"
               />
             )}
-            <polyline
-              points={points.map((p, i) => `${x(i)},${y(p.value)}`).join(" ")}
-              fill="none"
-              className="stroke-accent"
-              strokeWidth={2}
-              strokeLinejoin="round"
-              vectorEffect="non-scaling-stroke"
-            />
+            {lines.map((l, i) => (
+              <polyline
+                key={i}
+                points={l.points.map((p) => `${x(p.unit)},${y(p.value)}`).join(" ")}
+                fill="none"
+                style={{ stroke: l.color }}
+                strokeWidth={2}
+                strokeLinejoin="round"
+                vectorEffect="non-scaling-stroke"
+              />
+            ))}
             {at !== null && (
               /* A rule rather than a dot: the chart stretches to its box, so
                  anything round comes out an ellipse. */
@@ -198,8 +282,21 @@ export default function RollingChart({
           </svg>
         </div>
         <div className="flex justify-between pl-12 text-[10px] tabular-nums text-ink-3">
-          <span>{points[0].date}</span>
-          <span>{points[last].date}</span>
+          {solo ? (
+            <>
+              <span>{lines[0].points[0].date}</span>
+              <span>{lines[0].points.at(-1)!.date}</span>
+            </>
+          ) : (
+            <>
+              <span>
+                {win.unit} {n}
+              </span>
+              <span>
+                {win.unit} {end}
+              </span>
+            </>
+          )}
         </div>
       </div>
     </Panel>

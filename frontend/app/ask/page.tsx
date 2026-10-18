@@ -22,6 +22,9 @@ export async function generateMetadata({
   return {
     title: q ? `Ask: ${q}` : "Ask",
     description: "Ask the Statcast pitch warehouse a question in plain English.",
+    ...(q && {
+      openGraph: { images: `/ask/card?q=${encodeURIComponent(q)}` },
+    }),
   };
 }
 
@@ -48,7 +51,7 @@ export default async function AskPage({
     try {
       data = await ask(question);
     } catch {
-      failure = "THE WAREHOUSE API DIDN'T ANSWER. IS uvicorn RUNNING ON :8000?";
+      failure = "THE PITCH WAREHOUSE DIDN'T ANSWER. TRY AGAIN IN A MOMENT.";
     }
   }
 

@@ -1,6 +1,12 @@
 import type { LineupLine, TeamStatCol } from "@/lib/mlb";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+/* localhost only in dev. A deployed build with no API configured must not
+   aim at localhost: on the server that is a dead socket per call, and in a
+   visitor's browser it is *their* machine. Unset, every call fails at once
+   and the callers' snapshot fallbacks and notices take over. */
+const API_URL =
+  process.env.NEXT_PUBLIC_API_URL ??
+  (process.env.NODE_ENV === "development" ? "http://localhost:8000" : null);
 
 /* Same ceiling as the Stats API client, and for the same reason: a backend
    that is cold, unreachable or simply slow must not be able to hold a
@@ -15,6 +21,7 @@ async function api<T>(
   init: RequestInit,
   timeout = true
 ): Promise<T> {
+  if (!API_URL) throw new Error(`API not configured: ${path}`);
   const res = await fetch(`${API_URL}${path}`, {
     ...init,
     ...(timeout && { signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) }),
@@ -56,6 +63,11 @@ export interface Pitch {
   /* Savant's search carries these; the warehouse route doesn't send them. */
   game_pk?: number | null;
   at_bat_number?: number | null;
+  pitch_number?: number | null; // 1 for the first pitch of the PA
+  run_value?: number | null; // change in run expectancy, batter's side
+  bat_speed?: number | null; // mph, swings only, 2024 on
+  swing_length?: number | null; // ft, swings only, 2024 on
+  tto?: number | null; // the pitcher's time through the order, 1 = first
   xwoba?: number | null; // Statcast's expected wOBA on contact
   woba_value?: number | null;
   woba_denom?: number | null;
@@ -336,8 +348,10 @@ const pctText = (v: number | null) => (v === null ? null : `${v.toFixed(1)}%`);
  * Each listed hitter's pitch-level line against one pitcher, as lineup rows
  * keyed by player id. A hitter who never faced him has no row.
  *
- * Only the local warehouse can answer this, and production has no backend:
- * there the request fails fast and the caller hides the view.
+ * Production has no backend, so there it falls back to the daily snapshot of
+ * today's and tomorrow's starters against the opposing rosters
+ * (scripts/snapshot_matchups.py). A starter it doesn't hold still throws, and
+ * the caller hides the view.
  */
 export async function getMatchups(
   pitcher: number,
@@ -346,7 +360,12 @@ export async function getMatchups(
   const rows = await api<Matchup[]>(
     `/api/matchups?pitcher=${pitcher}&batters=${batters.join(",")}`,
     { next: { revalidate: 3600 } },
-  );
+  ).catch(async (err) => {
+    const { default: all } = await import("@/data/matchups.json");
+    const snap = (all as Record<string, Matchup[]>)[pitcher];
+    if (!snap) throw err;
+    return snap.filter((m) => batters.includes(m.batter));
+  });
   return Object.fromEntries(
     rows.map((m) => [
       m.batter,

@@ -21,10 +21,12 @@ import {
   getVsPitcher,
   headToHead,
   lineupSeason,
+  log5,
   seasonOf,
   seriesGames,
   teamLogo,
   winProbability,
+  withSeasonRecords,
   type Game,
   type GameSide,
   type PlayerSummary,
@@ -32,6 +34,8 @@ import {
 } from "@/lib/mlb";
 import { getClubInjuries } from "@/lib/injuries";
 import { getMatchups } from "@/lib/api";
+import { roundOdds } from "@/lib/cwpa";
+import { edgeLines, getArsenalBoards } from "@/lib/matchupEdge";
 
 /*
  * Everything a game is worth reading before it starts, since there is no box
@@ -158,6 +162,7 @@ export default async function Pregame({ game }: { game: Game }) {
     homeHurt,
     awayPitch,
     homePitch,
+    boards,
   ] = await Promise.all([
     game.away.probable ? getPlayer(game.away.probable.id, season).catch(() => null) : null,
     game.home.probable ? getPlayer(game.home.probable.id, season).catch(() => null) : null,
@@ -182,28 +187,32 @@ export default async function Pregame({ game }: { game: Game }) {
     game.series ? getTeamLeaders(game.home.id, season, "P", true).catch(() => null) : null,
     game.series ? getClubInjuries(game.away).catch(() => null) : null,
     game.series ? getClubInjuries(game.home).catch(() => null) : null,
-    /* The same matchups pitch by pitch, off the local warehouse. Null —
-       no backend, as in production — hides that view of the card. */
+    /* The same matchups pitch by pitch, off the local warehouse or, in
+       production, the daily snapshot. Null — a starter neither holds —
+       hides that view of the card. */
     pre && game.home.probable
       ? getMatchups(game.home.probable.id, pre.away.map((s) => s.id)).catch(() => null)
       : null,
     pre && game.away.probable
       ? getMatchups(game.away.probable.id, pre.home.map((s) => s.id)).catch(() => null)
       : null,
+    /* Every hitter and pitcher by pitch type, for the mix projection. */
+    pre ? getArsenalBoards(season).catch(() => null) : null,
   ]);
+  /* Null — no board, or a starter it doesn't carry — hides that view. */
+  const edgeVs = (probable: GameSide["probable"], spots: { id: number }[]) =>
+    boards && probable ? edgeLines(boards, probable.id, spots.map((s) => s.id)) : null;
 
-  /* In October a side's record is its series one, which says nothing about
-     who is better; the predictor reads the 162 off the standings instead.
-     No standings, no season record, no call. */
-  const season162 = (s: GameSide): GameSide => {
-    const r = standings?.flatMap((d) => d.teams).find((t) => t.id === s.id);
-    return { ...s, wins: r?.wins ?? null, losses: r?.losses ?? null };
-  };
-  const odds = winProbability(
-    game.series
-      ? { ...game, away: season162(game.away), home: season162(game.home) }
-      : game,
-  );
+  /* In October a side's record is its series one; the predictor reads the
+     162 off the standings instead. No standings, no season record, no call. */
+  const on162 = game.series ? withSeasonRecords(game, standings) : game;
+  const odds = winProbability(on162);
+  /* The round is worked off the original game, whose records are the series
+     score; the games after this one off the 162. */
+  const round =
+    odds && game.series
+      ? roundOdds(game, odds.home * 100, log5(on162) ?? 0.5)
+      : null;
   const matchups = awaySchedule ? headToHead(awaySchedule, game.home.id) : [];
   const series = seriesGames(matchups, game.pk);
 
@@ -224,7 +233,15 @@ export default async function Pregame({ game }: { game: Game }) {
         {(odds || !game.series) && (
           <Panel title="Matchup Predictor" tight>
             {odds ? (
-              <Donut game={game} odds={odds} />
+              <>
+                <Donut game={game} odds={odds} />
+                {round !== null && (
+                  <p className="mt-1 text-center text-[10px] tracking-wider text-ink-3 tabular-nums">
+                    TO TAKE THE {game.series!.split(" G")[0]} · {game.away.abbr}{" "}
+                    {(100 - round).toFixed(0)}% · {game.home.abbr} {round.toFixed(0)}%
+                  </p>
+                )}
+              </>
             ) : (
               <Notice what="NO RECORDS TO CALL IT ON YET" />
             )}
@@ -318,6 +335,7 @@ export default async function Pregame({ game }: { game: Game }) {
                 season: lineupSeason(awayBats),
                 vs: awayVs,
                 pitch: awayPitch,
+                edge: edgeVs(game.home.probable, pre.away),
                 facing: game.home.probable?.name ?? "",
               }}
               home={{
@@ -326,6 +344,7 @@ export default async function Pregame({ game }: { game: Game }) {
                 season: lineupSeason(homeBats),
                 vs: homeVs,
                 pitch: homePitch,
+                edge: edgeVs(game.away.probable, pre.home),
                 facing: game.away.probable?.name ?? "",
               }}
             />

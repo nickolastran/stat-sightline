@@ -8,7 +8,9 @@ import SeasonSelect from "@/components/mlb/SeasonSelect";
 import SprayChart from "@/components/mlb/SprayChart";
 import StatcastPanels from "@/components/mlb/StatcastPanels";
 import { getPercentiles } from "@/lib/advanced";
-import { getSeasonPitches, STATCAST_FIRST_SEASON } from "@/lib/statcast";
+import { getSeasonPAs, getSeasonPitches, STATCAST_FIRST_SEASON } from "@/lib/statcast";
+import { BAT_TRACKING_FIRST_SEASON, getBatTracking } from "@/lib/batTracking";
+import { gameLines, rollText, streak, type RollRole } from "@/lib/rolling";
 import { getHomePark, getSprayHits } from "@/lib/spray";
 import ParamTabs from "@/components/mlb/ParamTabs";
 import ParamSelect from "@/components/mlb/ParamSelect";
@@ -108,6 +110,22 @@ function Unavailable({ what }: { what: string }) {
   );
 }
 
+/** HOT or COLD off his rolling xwOBA, this season and only while it is going. */
+async function StreakBadge({ id, role }: { id: number; role: RollRole }) {
+  const today = todayPT();
+  const pas = await getSeasonPAs(id, seasonOf(today), role).catch(() => []);
+  const s = streak(gameLines(pas, role), role, today);
+  if (!s) return null;
+  return (
+    <span
+      title={`xwOBA${role === "pitcher" ? " allowed" : ""} ${rollText("xwoba", s.value)} over his ${s.label} vs ${rollText("xwoba", s.season)} on the season`}
+      className={`shrink-0 border px-1.5 py-px text-[10px] font-bold tracking-wider ${s.hot ? "border-crit text-crit" : "border-accent text-accent"}`}
+    >
+      {s.hot ? "HOT" : "COLD"} · {s.label.toUpperCase()}
+    </span>
+  );
+}
+
 function Identity({ p }: { p: PlayerSummary }) {
   const facts = [
     p.pos,
@@ -140,9 +158,16 @@ function Identity({ p }: { p: PlayerSummary }) {
         />
       )}
       <div className="min-w-0">
-        <h1 className="truncate text-base font-bold tracking-wider text-ink">
-          {p.name.toUpperCase()}
-        </h1>
+        <div className="flex items-center gap-2">
+          <h1 className="truncate text-base font-bold tracking-wider text-ink">
+            {p.name.toUpperCase()}
+          </h1>
+          {/* Its own Savant read — never holds the bar up, and a dead feed
+              just means no badge. */}
+          <Suspense fallback={null}>
+            <StreakBadge id={p.id} role={p.pos === "P" ? "pitcher" : "batter"} />
+          </Suspense>
+        </div>
         <p className="mt-1 truncate text-[10px] tracking-[0.2em] text-ink-3">
           {[p.team.toUpperCase(), ...facts].join(" · ")}
         </p>
@@ -389,9 +414,12 @@ async function TabBody({
           );
         /* A two-way player is read as whichever line the group strip names. */
         const role = group === "pitching" ? "pitcher" : "batter";
-        const [pitches, percentiles] = await Promise.all([
+        const [pitches, percentiles, bat] = await Promise.all([
           getSeasonPitches(id, season, role),
           getPercentiles(id, season, role).catch(() => ({ sections: [], league: null })),
+          role === "batter" && season >= BAT_TRACKING_FIRST_SEASON
+            ? getBatTracking(id, season).catch(() => null)
+            : null,
         ]);
         return (
           <StatcastPanels
@@ -400,6 +428,7 @@ async function TabBody({
             league={percentiles.league}
             role={role}
             season={season}
+            bat={bat}
           />
         );
       }

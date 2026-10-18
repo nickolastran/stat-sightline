@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useId, useState } from "react";
 import Panel from "@/components/ui/Panel";
 import type { HitKind, Park, SprayHit } from "@/lib/spray";
 
@@ -43,6 +43,9 @@ const pt = (d: number, deg: number): [number, number] => [
 ];
 
 function Field({ park }: { park: Park }) {
+  /* Its own id per chart: the compare page draws several parks at once, and a
+     shared one would clip every infield to the first park's wall. */
+  const clip = useId();
   const wall = Array.from({ length: 91 }, (_, i) =>
     pt(wallAt(park.walls, i - 45), i - 45),
   );
@@ -60,7 +63,7 @@ function Field({ park }: { park: Park }) {
   return (
     <g>
       <defs>
-        <clipPath id="spray-fair">
+        <clipPath id={clip}>
           <polygon points={fair} />
         </clipPath>
       </defs>
@@ -76,7 +79,7 @@ function Field({ park }: { park: Park }) {
         cy={-60.5}
         r={95}
         fill="#ece4d4"
-        clipPath="url(#spray-fair)"
+        clipPath={`url(#${clip})`}
       />
       <polygon points="0,-10 54,-63.6 0,-117 -54,-63.6" fill="#dfe8e1" />
       <circle cx={0} cy={0} r={13} fill="#ece4d4" />
@@ -129,14 +132,17 @@ export default function SprayChart({
   hits,
   park,
   title,
+  initial,
 }: {
   hits: SprayHit[];
   park: Park | null;
   /** Overrides the season-named heading — the landing rail names the batter. */
   title?: string;
+  /** "career" to open on every season — the latest one otherwise. */
+  initial?: "career";
 }) {
   const seasons = [...new Set(hits.map((h) => h.season))].sort((a, b) => b - a);
-  const [pick, setPick] = useState<string>(String(seasons[0] ?? "career"));
+  const [pick, setPick] = useState<string>(initial ?? String(seasons[0] ?? "career"));
   const shown =
     pick === "career" ? hits : hits.filter((h) => String(h.season) === pick);
   const field = park ?? GENERIC;

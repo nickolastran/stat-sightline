@@ -51,6 +51,11 @@ export interface Game {
   /** Wild card through World Series — set off the game type alone, so it
    *  holds on reads too lean to carry the series status. */
   postseason?: boolean;
+  /** MLB's game type ("R", "F", "D", "L", "W") and the series' length — with
+   *  the sides' records, which in October are the series score, they are
+   *  what a game's odds of taking the round are worked from. */
+  gameType?: string;
+  gamesInSeries?: number | null;
 }
 
 function side(raw: any, line: any): GameSide {
@@ -89,6 +94,8 @@ export const toGame = (g: any): Game => ({
   attendance: g.gameInfo?.attendance ?? null,
   series: /^[FDLW]$/.test(g.gameType) && g.seriesStatus ? seriesLine(g) : null,
   postseason: /^[FDLW]$/.test(g.gameType),
+  gameType: g.gameType,
+  gamesInSeries: g.gamesInSeries ?? null,
 });
 
 /**

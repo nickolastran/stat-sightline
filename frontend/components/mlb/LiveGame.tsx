@@ -6,6 +6,7 @@ import WinProbChart from "@/components/mlb/WinProbChart";
 import PlayerLink from "@/components/mlb/PlayerLink";
 import TeamTotals from "@/components/mlb/TeamTotals";
 import SeasonSeries from "@/components/mlb/SeasonSeries";
+import { roundOdds } from "@/lib/cwpa";
 import {
   getHotZones,
   getLive,
@@ -16,8 +17,10 @@ import {
   headToHead,
   playLine,
   inProgress,
+  log5,
   scoringPlays,
   seasonOf,
+  withSeasonRecords,
   type AtBat,
   type BoxScore,
   type Game,
@@ -669,6 +672,8 @@ export default async function LiveGame({
   ]);
   const divisionOf = (id: number) =>
     standings?.find((d) => d.teams.some((t) => t.id === id)) ?? null;
+  /* The games left in the series, off the two 162s; a coin flip without them. */
+  const strength = log5(withSeasonRecords(game, standings)) ?? 0.5;
 
   return (
     /* Both rails hold what a standings table wants — seven columns — and the
@@ -685,7 +690,19 @@ export default async function LiveGame({
           {live.plays.length === 0 ? (
             <Notice what="NO PLAYS YET" />
           ) : (
-            <WinProbChart game={game} plays={live.plays} />
+            <WinProbChart
+              game={game}
+              plays={live.plays}
+              round={
+                /* "ALDS", "NLWC", "WS" — the series line before its game number. */
+                game.series && roundOdds(game, 50, strength) !== null
+                  ? {
+                      label: game.series.split(" G")[0],
+                      homePcts: live.plays.map((p) => roundOdds(game, p.homeProb, strength)!),
+                    }
+                  : undefined
+              }
+            />
           )}
         </Panel>
       </div>

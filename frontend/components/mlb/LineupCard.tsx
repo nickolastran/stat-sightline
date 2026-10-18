@@ -10,6 +10,7 @@ import {
   type LineupSpot,
 } from "@/lib/mlb";
 import { MATCHUP_COLS } from "@/lib/api";
+import { EDGE_COLS } from "@/lib/matchupEdge";
 
 /*
  * Tonight's posted lineups, each hitter read two ways: his season line, and
@@ -18,6 +19,7 @@ import { MATCHUP_COLS } from "@/lib/api";
  *
  * A third read, pitch by pitch against the starter, comes off the local
  * warehouse; where that isn't reachable (production) the option isn't shown.
+ * A fourth projects each hitter against the starter's pitch mix, met or not.
  */
 
 export interface LineupSide {
@@ -28,6 +30,8 @@ export interface LineupSide {
   vs: Record<number, LineupLine>;
   /** Pitch-level line against today's starter, or null when unavailable. */
   pitch: Record<number, LineupLine> | null;
+  /** Projection against today's starter's pitch mix, or null when unavailable. */
+  edge: Record<number, LineupLine> | null;
   /** Whose line the career column is against — "F. Peralta". */
   facing: string;
 }
@@ -46,14 +50,24 @@ export default function LineupCard({
   home: LineupSide;
 }) {
   const [which, setWhich] = useState<"away" | "home">("away");
-  const [picked, setPicked] = useState<"season" | "vs" | "pitch">("season");
+  const [picked, setPicked] = useState<"season" | "vs" | "pitch" | "edge">("season");
   const side = which === "away" ? away : home;
-  /* The pitch view can be picked on one side and missing on the other; that
-     side falls back to the season line rather than an empty table. */
-  const mode = picked === "pitch" && !side.pitch ? "season" : picked;
+  /* The pitch and mix views can be picked on one side and missing on the
+     other; that side falls back to the season line rather than an empty table. */
+  const mode =
+    (picked === "pitch" && !side.pitch) || (picked === "edge" && !side.edge)
+      ? "season"
+      : picked;
   const lines =
-    mode === "pitch" ? side.pitch! : mode === "vs" ? side.vs : side.season;
-  const cols = mode === "pitch" ? MATCHUP_COLS : LINEUP_COLS;
+    mode === "pitch"
+      ? side.pitch!
+      : mode === "edge"
+        ? side.edge!
+        : mode === "vs"
+          ? side.vs
+          : side.season;
+  const cols =
+    mode === "pitch" ? MATCHUP_COLS : mode === "edge" ? EDGE_COLS : LINEUP_COLS;
   const vsWho = side.facing ? shortName(side.facing).toUpperCase() : "STARTER";
 
   return (
@@ -77,6 +91,9 @@ export default function LineupCard({
             { value: "vs" as const, label: `CAREER VS ${vsWho}` },
             ...(side.pitch
               ? [{ value: "pitch" as const, label: `PITCH LEVEL VS ${vsWho}` }]
+              : []),
+            ...(side.edge
+              ? [{ value: "edge" as const, label: `PROJECTED VS ${vsWho}` }]
               : []),
           ]}
         />

@@ -18,6 +18,7 @@
  * than once a day.
  */
 import {
+  FETCH_TIMEOUT_MS,
   getClubs,
   LEADER_POSITIONS,
   mlb,
@@ -167,13 +168,15 @@ const SAVANT = "https://baseballsavant.mlb.com/leaderboard";
  * rather than a status, so an HTML body is treated as the failure it is —
  * otherwise the CSV parser would happily turn markup into one nonsense row.
  */
-async function savantCsv(
+export async function savantCsv(
   board: string,
   params: Record<string, string>,
 ): Promise<Record<string, string>[]> {
   const query = new URLSearchParams({ ...params, csv: "true" });
   const res = await fetch(`${SAVANT}/${board}?${query}`, {
     next: { revalidate: 3600 },
+    /* League-wide boards run to the better part of a megabyte. */
+    signal: AbortSignal.timeout(FETCH_TIMEOUT_MS * 3),
   });
   if (!res.ok) throw new Error(`Savant ${board} ${res.status}`);
   const text = await res.text();

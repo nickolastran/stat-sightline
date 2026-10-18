@@ -25,6 +25,8 @@ export default async function PitcherPage({
     const data = await getPitcherPitches(pitcherId, { limit: 10000 });
     return <DashboardClient data={data} />;
   } catch (e) {
+    // The cause goes to the server log; the page only says it's momentary.
+    console.error(e);
     return (
       <div className="mx-auto max-w-xl px-4 py-24">
         <div className="border border-crit bg-surface p-6">
@@ -32,11 +34,8 @@ export default async function PitcherPage({
             [ERR] DATA SOURCE UNAVAILABLE
           </h1>
           <p className="mt-3 text-xs leading-5 text-ink-2">
-            {(e as Error).message}
-          </p>
-          <p className="mt-3 text-xs leading-5 text-ink-3">
-            Check that the API is up (uvicorn api.main:app --port 8000) and the
-            warehouse is seeded (scripts/run_etl.py).
+            The pitch warehouse didn&apos;t answer. It&apos;s usually
+            momentary; try again.
           </p>
           <Link
             href="/dashboard"

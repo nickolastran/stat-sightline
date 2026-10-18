@@ -9,11 +9,17 @@ import { SITE_URL } from "@/lib/site";
  */
 export default function robots(): MetadataRoute.Robots {
   return {
-    rules: {
-      userAgent: "*",
-      allow: "/",
-      disallow: ["/*?", "/game/", "/api/", "/stats/*/csv"],
-    },
+    rules: [
+      {
+        userAgent: "*",
+        allow: "/",
+        disallow: ["/*?", "/game/", "/api/", "/stats/*/csv"],
+      },
+      /* X's unfurler obeys robots.txt and would skip game pages and every
+         ?q= Ask link. It only fetches what someone posts, so it crawls
+         nothing — let it see everything. */
+      { userAgent: "Twitterbot", allow: "/" },
+    ],
     sitemap: `${SITE_URL}/sitemap.xml`,
   };
 }

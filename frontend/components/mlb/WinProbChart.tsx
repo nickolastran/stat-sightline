@@ -32,12 +32,24 @@ const edge = (game: Game, p: PlayProb) =>
     ? { side: game.home.abbr, pct: p.homeProb }
     : { side: game.away.abbr, pct: 100 - p.homeProb };
 
+/** Round odds as a play left them, for the same club `edge` names — a club
+ *  can lead tonight and still trail the series. */
+type Round = { label: string; homePcts: number[] };
+const roundPart = (game: Game, p: PlayProb, round: Round | undefined, i: number) => {
+  if (!round) return "";
+  const home = round.homePcts[i];
+  return ` · ${round.label} ${(p.homeProb >= 50 ? home : 100 - home).toFixed(0)}%`;
+};
+
 export default function WinProbChart({
   game,
   plays,
+  round,
 }: {
   game: Game;
   plays: PlayProb[];
+  /** Postseason only: the home club's odds of taking the round, play by play. */
+  round?: Round;
 }) {
   const [at, setAt] = useState<number | null>(null);
   const last = plays.length - 1;
@@ -50,10 +62,9 @@ export default function WinProbChart({
 
   /* The at-bat under way is in the log already with nothing to say about
      itself yet, so the resting read-out is the last play that finished. */
-  const shown =
-    at !== null
-      ? plays[at]
-      : ([...plays].reverse().find((p) => p.description) ?? plays[last]);
+  const lastDone = plays.findLastIndex((p) => p.description);
+  const shownAt = at ?? (lastDone >= 0 ? lastDone : last);
+  const shown = plays[shownAt];
 
   /* One tick where each inning starts — the x axis is plays, but a reader
      counts in innings. */
@@ -71,6 +82,7 @@ export default function WinProbChart({
     <div className="space-y-2">
       <p className="text-right text-xs tabular-nums text-ink">
         {edge(game, shown).side} {edge(game, shown).pct.toFixed(1)}%
+        {roundPart(game, shown, round, shownAt)}
       </p>
       <div className="flex gap-2">
         <div className="flex w-10 shrink-0 flex-col justify-between text-[10px] tracking-wider text-ink-3">
@@ -149,6 +161,7 @@ export default function WinProbChart({
           {game.away.abbr} {shown.awayScore}-{shown.homeScore} {game.home.abbr} ·{" "}
           <span className="text-ink-2">
             {edge(game, shown).side} {edge(game, shown).pct.toFixed(1)}%
+            {roundPart(game, shown, round, shownAt)}
           </span>
         </span>
         {shown.description || "AT BAT"}

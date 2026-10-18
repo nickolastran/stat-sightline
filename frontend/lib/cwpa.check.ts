@@ -9,7 +9,8 @@
  * Run with:  npx tsx lib/cwpa.check.ts
  */
 import assert from "node:assert/strict";
-import { cwpaTotals, gameStake, seriesOdds } from "./cwpa";
+import { cwpaTotals, gameStake, roundOdds, seriesOdds } from "./cwpa";
+import type { Game } from "./mlb";
 
 const near = (a: number, b: number, what: string) =>
   assert.ok(Math.abs(a - b) < 1e-9, `${what}: ${a} ≠ ${b}`);
@@ -57,5 +58,20 @@ near(bat.get(3)!.value, -0.1, "an away batter owns the opposite of a home gain")
 assert.equal(bat.get(1)!.team, "Home");
 assert.equal(bat.get(3)!.team, "Away");
 assert.equal(arm.get(4)!.team, "Home", "the top-half pitcher pitches for home");
+
+/* Round odds off a game's live chance: the home side up 3-2 in a
+   best-of-seven, even tonight, takes the series 75% of the time. */
+const g6 = (state: string, w: number, l: number, isWinner?: boolean) =>
+  ({ state, gameType: "L", gamesInSeries: 7,
+     home: { wins: w, losses: l, isWinner } }) as unknown as Game;
+near(roundOdds(g6("Live", 3, 2), 50)!, 75, "3-2 up, coin flip tonight");
+near(roundOdds(g6("Live", 3, 2), 100)!, 100, "winning Game 6 wins it");
+near(roundOdds(g6("Live", 3, 2), 0)!, 50, "losing it means a Game 7");
+/* The same game once final reads 4-2, and has to come back to 3-2. */
+near(roundOdds(g6("Final", 4, 2, true), 100)!, 100, "a final reads off the score before it");
+assert.equal(roundOdds({ ...g6("Live", 3, 2), gameType: "R" }, 50), null, "no round in the regular season");
+/* The stronger club, .6 a game: losing tonight still leaves it a .6 Game 7. */
+near(roundOdds(g6("Live", 3, 2), 50, 0.6)!, 80, "a stronger club's Game 7 isn't a coin flip");
+near(seriesOdds(4, 4, 0.6), 0.710208, "a .6 club over seven");
 
 console.log("cwpa ok");
