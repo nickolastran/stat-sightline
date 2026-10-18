@@ -35,6 +35,7 @@ import {
 import { getClubInjuries } from "@/lib/injuries";
 import { getMatchups } from "@/lib/api";
 import { roundOdds } from "@/lib/cwpa";
+import { edgeLines, getArsenalBoards } from "@/lib/matchupEdge";
 
 /*
  * Everything a game is worth reading before it starts, since there is no box
@@ -161,6 +162,7 @@ export default async function Pregame({ game }: { game: Game }) {
     homeHurt,
     awayPitch,
     homePitch,
+    boards,
   ] = await Promise.all([
     game.away.probable ? getPlayer(game.away.probable.id, season).catch(() => null) : null,
     game.home.probable ? getPlayer(game.home.probable.id, season).catch(() => null) : null,
@@ -194,7 +196,12 @@ export default async function Pregame({ game }: { game: Game }) {
     pre && game.away.probable
       ? getMatchups(game.away.probable.id, pre.home.map((s) => s.id)).catch(() => null)
       : null,
+    /* Every hitter and pitcher by pitch type, for the mix projection. */
+    pre ? getArsenalBoards(season).catch(() => null) : null,
   ]);
+  /* Null — no board, or a starter it doesn't carry — hides that view. */
+  const edgeVs = (probable: GameSide["probable"], spots: { id: number }[]) =>
+    boards && probable ? edgeLines(boards, probable.id, spots.map((s) => s.id)) : null;
 
   /* In October a side's record is its series one; the predictor reads the
      162 off the standings instead. No standings, no season record, no call. */
@@ -328,6 +335,7 @@ export default async function Pregame({ game }: { game: Game }) {
                 season: lineupSeason(awayBats),
                 vs: awayVs,
                 pitch: awayPitch,
+                edge: edgeVs(game.home.probable, pre.away),
                 facing: game.home.probable?.name ?? "",
               }}
               home={{
@@ -336,6 +344,7 @@ export default async function Pregame({ game }: { game: Game }) {
                 season: lineupSeason(homeBats),
                 vs: homeVs,
                 pitch: homePitch,
+                edge: edgeVs(game.away.probable, pre.home),
                 facing: game.away.probable?.name ?? "",
               }}
             />
