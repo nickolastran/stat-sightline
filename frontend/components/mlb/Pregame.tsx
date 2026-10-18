@@ -21,10 +21,12 @@ import {
   getVsPitcher,
   headToHead,
   lineupSeason,
+  log5,
   seasonOf,
   seriesGames,
   teamLogo,
   winProbability,
+  withSeasonRecords,
   type Game,
   type GameSide,
   type PlayerSummary,
@@ -194,21 +196,16 @@ export default async function Pregame({ game }: { game: Game }) {
       : null,
   ]);
 
-  /* In October a side's record is its series one, which says nothing about
-     who is better; the predictor reads the 162 off the standings instead.
-     No standings, no season record, no call. */
-  const season162 = (s: GameSide): GameSide => {
-    const r = standings?.flatMap((d) => d.teams).find((t) => t.id === s.id);
-    return { ...s, wins: r?.wins ?? null, losses: r?.losses ?? null };
-  };
-  const odds = winProbability(
-    game.series
-      ? { ...game, away: season162(game.away), home: season162(game.home) }
-      : game,
-  );
-  /* Off the original game, not the 162 copy: here the records are the
-     series score the round is worked from. */
-  const round = odds && game.series ? roundOdds(game, odds.home * 100) : null;
+  /* In October a side's record is its series one; the predictor reads the
+     162 off the standings instead. No standings, no season record, no call. */
+  const on162 = game.series ? withSeasonRecords(game, standings) : game;
+  const odds = winProbability(on162);
+  /* The round is worked off the original game, whose records are the series
+     score; the games after this one off the 162. */
+  const round =
+    odds && game.series
+      ? roundOdds(game, odds.home * 100, log5(on162) ?? 0.5)
+      : null;
   const matchups = awaySchedule ? headToHead(awaySchedule, game.home.id) : [];
   const series = seriesGames(matchups, game.pk);
 

@@ -7,20 +7,24 @@ import { playSwings, WP_FIELDS } from "@/lib/gamefeed";
  * Series Game 7 is worth a whole championship; the same swing in a Wild Card
  * opener is worth a sliver of one.
  *
- * ponytail: every game a coin flip, the way cWPA is usually figured — so a
- * game's stake is read off the series score and the rounds left, not who is
- * playing. Swap in team strength if the boards ever need to argue with
- * FanGraphs to the decimal.
+ * Every game a coin flip on the cWPA boards, the way Baseball-Reference
+ * figures cWPA ("coin-toss simulations of the remainder of the season") — so
+ * the boards stay comparable to theirs, and a game's stake is read off the series score and the rounds left,
+ * not who is playing. The series odds on a game page do know who is playing:
+ * the games still to come go by the two clubs' season records.
+ *
+ * ponytail: one chance for every game left, home field ignored. Weight each
+ * game by where the 2-3-2 puts it if the series odds need to be sharper.
  */
 
 /** Rounds still to win after this one, by MLB's postseason game type. */
 const ROUNDS_AFTER: Record<string, number> = { F: 3, D: 2, L: 1, W: 0 };
 
-/** Chance of winning `need` more games before losing `spare` more, 50/50 each. */
-export function seriesOdds(need: number, spare: number): number {
+/** Chance of winning `need` more games before losing `spare` more, at `p` a game. */
+export function seriesOdds(need: number, spare: number, p = 0.5): number {
   if (need <= 0) return 1;
   if (spare <= 0) return 0;
-  return (seriesOdds(need - 1, spare) + seriesOdds(need, spare - 1)) / 2;
+  return p * seriesOdds(need - 1, spare, p) + (1 - p) * seriesOdds(need, spare - 1, p);
 }
 
 /**
@@ -59,18 +63,18 @@ export function scoreBefore(g: Game): [number, number] {
 /**
  * The home club's odds of taking the round, as a percentage, given its
  * percentage chance in this game — the title itself in the World Series. Null
- * outside the postseason. Each game after this one is a coin flip, the same
- * as `gameStake`.
+ * outside the postseason. `strength` is its chance in each game after this
+ * one; a coin flip, the same as `gameStake`, unless the caller knows better.
  */
-export function roundOdds(g: Game, homeProb: number): number | null {
+export function roundOdds(g: Game, homeProb: number, strength = 0.5): number | null {
   if (ROUNDS_AFTER[g.gameType ?? ""] === undefined || !g.gamesInSeries) return null;
   const [w, l] = scoreBefore(g);
   const toWin = Math.ceil(g.gamesInSeries / 2);
   const p = homeProb / 100;
   return (
     100 *
-    (p * seriesOdds(toWin - w - 1, toWin - l) +
-      (1 - p) * seriesOdds(toWin - w, toWin - l - 1))
+    (p * seriesOdds(toWin - w - 1, toWin - l, strength) +
+      (1 - p) * seriesOdds(toWin - w, toWin - l - 1, strength))
   );
 }
 

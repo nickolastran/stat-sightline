@@ -6,6 +6,20 @@ import {
   mlb,
   FRESH,
 } from "./core";
+import type { Game, GameSide } from "./schedule";
+
+/**
+ * The game with each side's season record off the standings in place of the
+ * one it carries — in October that is the series score, which says nothing
+ * about who is better. A club missing from the standings gets no record.
+ */
+export function withSeasonRecords(g: Game, standings: Division[] | null): Game {
+  const season = (s: GameSide): GameSide => {
+    const r = standings?.flatMap((d) => d.teams).find((t) => t.id === s.id);
+    return { ...s, wins: r?.wins ?? null, losses: r?.losses ?? null };
+  };
+  return { ...g, away: season(g.away), home: season(g.home) };
+}
 
 
 /* ── Standings ──────────────────────────────────────────────────────── */

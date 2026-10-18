@@ -264,15 +264,10 @@ export const lineupSeason = (
 const HOME_FIELD_ODDS = 0.535 / 0.465;
 
 /**
- * Pre-game win probability, from the two clubs' records alone: log5, the
- * standard way to turn two winning percentages into a head-to-head number,
- * tilted for home field. Null before either club has played.
- *
- * ponytail: records and home field only — no starters, no bullpen, no park.
- * A starter-aware number would need projections this API doesn't publish;
- * blend one in here if it ever does.
+ * The home club's chance against the visitors on neutral ground, by log5 off
+ * the two records. Null before either club has played.
  */
-export function winProbability(g: Game): { home: number; away: number } | null {
+export function log5(g: Game): number | null {
   const pct = (s: GameSide) => {
     const played = (s.wins ?? 0) + (s.losses ?? 0);
     return s.wins === null || played === 0 ? null : s.wins / played;
@@ -283,8 +278,21 @@ export function winProbability(g: Game): { home: number; away: number } | null {
 
   const denom = h + a - 2 * h * a;
   /* Two unbeaten clubs, or two winless ones, log5 cannot separate. */
-  const base =
-    denom === 0 ? 0.5 : Math.min(0.99, Math.max(0.01, (h - h * a) / denom));
+  return denom === 0 ? 0.5 : Math.min(0.99, Math.max(0.01, (h - h * a) / denom));
+}
+
+/**
+ * Pre-game win probability, from the two clubs' records alone: log5, the
+ * standard way to turn two winning percentages into a head-to-head number,
+ * tilted for home field. Null before either club has played.
+ *
+ * ponytail: records and home field only — no starters, no bullpen, no park.
+ * A starter-aware number would need projections this API doesn't publish;
+ * blend one in here if it ever does.
+ */
+export function winProbability(g: Game): { home: number; away: number } | null {
+  const base = log5(g);
+  if (base === null) return null;
   const odds = (base / (1 - base)) * HOME_FIELD_ODDS;
   const home = odds / (1 + odds);
   return { home, away: 1 - home };

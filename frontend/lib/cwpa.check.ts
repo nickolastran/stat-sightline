@@ -70,5 +70,8 @@ near(roundOdds(g6("Live", 3, 2), 0)!, 50, "losing it means a Game 7");
 /* The same game once final reads 4-2, and has to come back to 3-2. */
 near(roundOdds(g6("Final", 4, 2, true), 100)!, 100, "a final reads off the score before it");
 assert.equal(roundOdds({ ...g6("Live", 3, 2), gameType: "R" }, 50), null, "no round in the regular season");
+/* The stronger club, .6 a game: losing tonight still leaves it a .6 Game 7. */
+near(roundOdds(g6("Live", 3, 2), 50, 0.6)!, 80, "a stronger club's Game 7 isn't a coin flip");
+near(seriesOdds(4, 4, 0.6), 0.710208, "a .6 club over seven");
 
 console.log("cwpa ok");
