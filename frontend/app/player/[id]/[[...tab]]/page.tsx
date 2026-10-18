@@ -9,6 +9,7 @@ import SprayChart from "@/components/mlb/SprayChart";
 import StatcastPanels from "@/components/mlb/StatcastPanels";
 import { getPercentiles } from "@/lib/advanced";
 import { getSeasonPAs, getSeasonPitches, STATCAST_FIRST_SEASON } from "@/lib/statcast";
+import { BAT_TRACKING_FIRST_SEASON, getBatTracking } from "@/lib/batTracking";
 import { gameLines, rollText, streak, type RollRole } from "@/lib/rolling";
 import { getHomePark, getSprayHits } from "@/lib/spray";
 import ParamTabs from "@/components/mlb/ParamTabs";
@@ -413,9 +414,12 @@ async function TabBody({
           );
         /* A two-way player is read as whichever line the group strip names. */
         const role = group === "pitching" ? "pitcher" : "batter";
-        const [pitches, percentiles] = await Promise.all([
+        const [pitches, percentiles, bat] = await Promise.all([
           getSeasonPitches(id, season, role),
           getPercentiles(id, season, role).catch(() => ({ sections: [], league: null })),
+          role === "batter" && season >= BAT_TRACKING_FIRST_SEASON
+            ? getBatTracking(id, season).catch(() => null)
+            : null,
         ]);
         return (
           <StatcastPanels
@@ -424,6 +428,7 @@ async function TabBody({
             league={percentiles.league}
             role={role}
             season={season}
+            bat={bat}
           />
         );
       }
