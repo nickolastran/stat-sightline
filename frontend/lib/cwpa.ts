@@ -1,4 +1,4 @@
-import { mlb, type Leaderboard, type LeaderRow } from "@/lib/mlb";
+import { mlb, toGame, type Game, type Leaderboard, type LeaderRow } from "@/lib/mlb";
 import { playSwings, WP_FIELDS } from "@/lib/gamefeed";
 
 /*
@@ -45,16 +45,33 @@ export function gameStake(
 }
 
 /**
- * The series score going into a game, off its schedule row. A final row
- * already counts the game in the club's record, so its result comes back off;
- * a game still being played hasn't been counted yet.
+ * The home club's series score going into a game. A final game is already
+ * counted in the club's record, so its result comes back off; a game still
+ * being played hasn't been counted yet.
  */
-function scoreBefore(g: any): [number, number] {
-  const home = g.teams?.home ?? {};
-  const w = home.leagueRecord?.wins ?? 0;
-  const l = home.leagueRecord?.losses ?? 0;
-  if (g.status?.abstractGameState !== "Final") return [w, l];
-  return home.isWinner ? [w - 1, l] : [w, l - 1];
+export function scoreBefore(g: Game): [number, number] {
+  const w = g.home.wins ?? 0;
+  const l = g.home.losses ?? 0;
+  if (g.state !== "Final") return [w, l];
+  return g.home.isWinner ? [w - 1, l] : [w, l - 1];
+}
+
+/**
+ * The home club's odds of taking the round, as a percentage, given its
+ * percentage chance in this game — the title itself in the World Series. Null
+ * outside the postseason. Each game after this one is a coin flip, the same
+ * as `gameStake`.
+ */
+export function roundOdds(g: Game, homeProb: number): number | null {
+  if (ROUNDS_AFTER[g.gameType ?? ""] === undefined || !g.gamesInSeries) return null;
+  const [w, l] = scoreBefore(g);
+  const toWin = Math.ceil(g.gamesInSeries / 2);
+  const p = homeProb / 100;
+  return (
+    100 *
+    (p * seriesOdds(toWin - w - 1, toWin - l) +
+      (1 - p) * seriesOdds(toWin - w, toWin - l - 1))
+  );
 }
 
 /** One player's running cWPA, before it is ranked. */
@@ -98,7 +115,7 @@ export function cwpaTotals(games: any[], wpLogs: unknown[]) {
   };
 
   games.forEach((g, i) => {
-    const [w, l] = scoreBefore(g);
+    const [w, l] = scoreBefore(toGame(g));
     const stake = gameStake(g.gameType, g.gamesInSeries ?? 0, w, l);
     const away = g.teams?.away?.team;
     const home = g.teams?.home?.team;

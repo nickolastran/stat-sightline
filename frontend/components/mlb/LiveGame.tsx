@@ -6,6 +6,7 @@ import WinProbChart from "@/components/mlb/WinProbChart";
 import PlayerLink from "@/components/mlb/PlayerLink";
 import TeamTotals from "@/components/mlb/TeamTotals";
 import SeasonSeries from "@/components/mlb/SeasonSeries";
+import { roundOdds } from "@/lib/cwpa";
 import {
   getHotZones,
   getLive,
@@ -685,7 +686,19 @@ export default async function LiveGame({
           {live.plays.length === 0 ? (
             <Notice what="NO PLAYS YET" />
           ) : (
-            <WinProbChart game={game} plays={live.plays} />
+            <WinProbChart
+              game={game}
+              plays={live.plays}
+              round={
+                /* "ALDS", "NLWC", "WS" — the series line before its game number. */
+                game.series && roundOdds(game, 50) !== null
+                  ? {
+                      label: game.series.split(" G")[0],
+                      homePcts: live.plays.map((p) => roundOdds(game, p.homeProb)!),
+                    }
+                  : undefined
+              }
+            />
           )}
         </Panel>
       </div>
