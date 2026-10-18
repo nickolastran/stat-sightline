@@ -51,7 +51,7 @@ export default async function AskPage({
     try {
       data = await ask(question);
     } catch {
-      failure = "THE WAREHOUSE API DIDN'T ANSWER. IS uvicorn RUNNING ON :8000?";
+      failure = "THE PITCH WAREHOUSE DIDN'T ANSWER. TRY AGAIN IN A MOMENT.";
     }
   }
 
