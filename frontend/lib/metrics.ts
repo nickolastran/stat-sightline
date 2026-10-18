@@ -19,7 +19,7 @@ const WHIFF = new Set([
 const CALLED_STRIKE = new Set(["called_strike"]);
 
 const inZone = (p: Pitch) => p.zone !== null && p.zone >= 1 && p.zone <= 9;
-const isSwing = (p: Pitch) => !!p.description && SWING.has(p.description);
+export const isSwing = (p: Pitch) => !!p.description && SWING.has(p.description);
 const isWhiff = (p: Pitch) => !!p.description && WHIFF.has(p.description);
 const isBattedBall = (p: Pitch) =>
   p.description === "hit_into_play" && p.launch_speed !== null;

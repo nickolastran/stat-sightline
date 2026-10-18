@@ -13,6 +13,7 @@ import MovementPlot from "@/components/dashboard/MovementPlot";
 import ZonePlot, { type ZonePlotMode } from "@/components/dashboard/ZonePlot";
 import RollingChart from "@/components/mlb/RollingChart";
 import SequencingGrid from "@/components/mlb/SequencingGrid";
+import SwingTakePanel from "@/components/mlb/SwingTakePanel";
 import { gameLines } from "@/lib/rolling";
 
 /*
@@ -185,6 +186,11 @@ export default function StatcastPanels({
           {role === "pitcher" && (
             <Panel title="Arsenal">
               <ArsenalTable rows={arsenal} />
+            </Panel>
+          )}
+          {role === "batter" && (
+            <Panel title="Swing / Take">
+              <SwingTakePanel pitches={pitches} />
             </Panel>
           )}
           {role === "pitcher" && (

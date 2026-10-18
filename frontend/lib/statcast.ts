@@ -67,6 +67,7 @@ export const toPitch = (r: Record<string, string>): Pitch => ({
   game_pk: num(r.game_pk),
   at_bat_number: num(r.at_bat_number),
   pitch_number: num(r.pitch_number),
+  run_value: num(r.delta_run_exp),
   xwoba: num(r.estimated_woba_using_speedangle),
   woba_value: num(r.woba_value),
   woba_denom: num(r.woba_denom),

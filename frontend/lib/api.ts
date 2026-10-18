@@ -64,6 +64,7 @@ export interface Pitch {
   game_pk?: number | null;
   at_bat_number?: number | null;
   pitch_number?: number | null; // 1 for the first pitch of the PA
+  run_value?: number | null; // change in run expectancy, batter's side
   xwoba?: number | null; // Statcast's expected wOBA on contact
   woba_value?: number | null;
   woba_denom?: number | null;
