@@ -32,6 +32,7 @@ import {
 } from "@/lib/mlb";
 import { getClubInjuries } from "@/lib/injuries";
 import { getMatchups } from "@/lib/api";
+import { roundOdds } from "@/lib/cwpa";
 
 /*
  * Everything a game is worth reading before it starts, since there is no box
@@ -205,6 +206,9 @@ export default async function Pregame({ game }: { game: Game }) {
       ? { ...game, away: season162(game.away), home: season162(game.home) }
       : game,
   );
+  /* Off the original game, not the 162 copy: here the records are the
+     series score the round is worked from. */
+  const round = odds && game.series ? roundOdds(game, odds.home * 100) : null;
   const matchups = awaySchedule ? headToHead(awaySchedule, game.home.id) : [];
   const series = seriesGames(matchups, game.pk);
 
@@ -225,7 +229,15 @@ export default async function Pregame({ game }: { game: Game }) {
         {(odds || !game.series) && (
           <Panel title="Matchup Predictor" tight>
             {odds ? (
-              <Donut game={game} odds={odds} />
+              <>
+                <Donut game={game} odds={odds} />
+                {round !== null && (
+                  <p className="mt-1 text-center text-[10px] tracking-wider text-ink-3 tabular-nums">
+                    TO TAKE THE {game.series!.split(" G")[0]} · {game.away.abbr}{" "}
+                    {(100 - round).toFixed(0)}% · {game.home.abbr} {round.toFixed(0)}%
+                  </p>
+                )}
+              </>
             ) : (
               <Notice what="NO RECORDS TO CALL IT ON YET" />
             )}
