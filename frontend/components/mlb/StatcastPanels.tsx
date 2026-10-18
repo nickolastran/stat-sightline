@@ -12,6 +12,7 @@ import ArsenalTable from "@/components/dashboard/ArsenalTable";
 import MovementPlot from "@/components/dashboard/MovementPlot";
 import ZonePlot, { type ZonePlotMode } from "@/components/dashboard/ZonePlot";
 import RollingChart from "@/components/mlb/RollingChart";
+import SequencingGrid from "@/components/mlb/SequencingGrid";
 import { gameLines } from "@/lib/rolling";
 
 /*
@@ -184,6 +185,11 @@ export default function StatcastPanels({
           {role === "pitcher" && (
             <Panel title="Arsenal">
               <ArsenalTable rows={arsenal} />
+            </Panel>
+          )}
+          {role === "pitcher" && (
+            <Panel title="Pitch Sequencing">
+              <SequencingGrid pitches={pitches} codes={arsenal.map((r) => r.code)} />
             </Panel>
           )}
         </>
