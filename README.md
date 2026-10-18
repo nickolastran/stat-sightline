@@ -151,7 +151,10 @@ uvicorn api.main:app --reload --port 8000    # docs at /docs
 cd frontend && npm install && npm run dev    # http://localhost:3000
 ```
 
-Set `NEXT_PUBLIC_API_URL` if the API isn't on `http://localhost:8000`.
+Set `NEXT_PUBLIC_API_URL` if the API isn't on `http://localhost:8000`. That
+default applies to `next dev` only: a production build with it unset makes no
+API calls and falls back to the snapshots. It is inlined at build time, so
+changing it on Vercel takes a redeploy.
 
 Neither `data/standings/` nor the Statcast cache is committed. Without the
 Statcast tables the pitcher pages are empty; without `train_standings.py` the

@@ -1,6 +1,12 @@
 import type { LineupLine, TeamStatCol } from "@/lib/mlb";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+/* localhost only in dev. A deployed build with no API configured must not
+   aim at localhost: on the server that is a dead socket per call, and in a
+   visitor's browser it is *their* machine. Unset, every call fails at once
+   and the callers' snapshot fallbacks and notices take over. */
+const API_URL =
+  process.env.NEXT_PUBLIC_API_URL ??
+  (process.env.NODE_ENV === "development" ? "http://localhost:8000" : null);
 
 /* Same ceiling as the Stats API client, and for the same reason: a backend
    that is cold, unreachable or simply slow must not be able to hold a
@@ -15,6 +21,7 @@ async function api<T>(
   init: RequestInit,
   timeout = true
 ): Promise<T> {
+  if (!API_URL) throw new Error(`API not configured: ${path}`);
   const res = await fetch(`${API_URL}${path}`, {
     ...init,
     ...(timeout && { signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) }),
