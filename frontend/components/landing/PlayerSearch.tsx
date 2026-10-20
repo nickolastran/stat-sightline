@@ -42,6 +42,8 @@ export default function PlayerSearch({
         const next = new URLSearchParams(window.location.search);
         next.set(param, String(p.player_id));
         router.push(`?${next}`);
+        // Clear the box so the placeholder shows who was picked.
+        setQ("");
       }
     );
 

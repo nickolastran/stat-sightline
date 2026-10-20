@@ -98,6 +98,16 @@ export default async function MatchupPage({
 
         {!both ? (
           <Panel title="PICK A MATCHUP">
+            <dl className="mb-3 grid grid-cols-[5rem_1fr] gap-y-1 text-xs">
+              <dt className="text-ink-3">BATTER</dt>
+              <dd className={bat ? "font-bold text-ink" : "text-ink-3"}>
+                {bat?.name ?? "— not picked"}
+              </dd>
+              <dt className="text-ink-3">PITCHER</dt>
+              <dd className={arm ? "font-bold text-ink" : "text-ink-3"}>
+                {arm?.name ?? "— not picked"}
+              </dd>
+            </dl>
             <p className="text-xs leading-5 text-ink-2">
               Choose a batter and a pitcher above. The forecast weights the
               pitcher&apos;s {season} mix by how this hitter and the league do
