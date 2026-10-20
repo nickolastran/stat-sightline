@@ -52,6 +52,7 @@ export const toPitch = (r: Record<string, string>): Pitch => ({
   pfx_z: num(r.pfx_z),
   description: str(r.description),
   stand: str(r.stand),
+  p_throws: str(r.p_throws),
   sz_top: num(r.sz_top),
   sz_bot: num(r.sz_bot),
   game_date: str(r.game_date),
