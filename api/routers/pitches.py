@@ -76,7 +76,10 @@ def _pitches(role: Role, player_id: int, pitch_type: str | None, stand: str | No
                        game_date, balls, strikes, outs_when_up, inning,
                        (on_1b IS NOT NULL OR on_2b IS NOT NULL OR on_3b IS NOT NULL)
                            AS runners_on,
-                       zone, launch_speed, launch_angle, events
+                       zone, launch_speed, launch_angle, events,
+                       launch_speed_angle, hc_x, hc_y, hit_distance_sc AS hit_distance,
+                       bat_speed, swing_length, delta_run_exp AS run_value,
+                       estimated_woba_using_speedangle AS xwoba, woba_value, woba_denom
                 FROM savant.pitches
                 WHERE {who} = :pid
                   AND plate_x IS NOT NULL AND plate_z IS NOT NULL

@@ -39,6 +39,17 @@ class Pitch(BaseModel):
     launch_speed: float | None = None # exit velocity, mph
     launch_angle: float | None = None # degrees
     events: str | None = None         # terminal PA outcome, else None
+    # Hitting module: barrels, spray, bat tracking, swing value, xwOBA.
+    launch_speed_angle: int | None = None  # Statcast 1-6; 6 = barrel
+    hc_x: float | None = None         # Gameday hit coordinates
+    hc_y: float | None = None
+    hit_distance: float | None = None # ft
+    bat_speed: float | None = None    # mph, swings only
+    swing_length: float | None = None # ft
+    run_value: float | None = None    # change in run expectancy
+    xwoba: float | None = None        # expected wOBA on contact
+    woba_value: float | None = None
+    woba_denom: float | None = None
 
 
 class PitcherPitches(BaseModel):

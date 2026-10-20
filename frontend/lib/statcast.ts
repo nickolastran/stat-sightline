@@ -75,6 +75,10 @@ export const toPitch = (r: Record<string, string>): Pitch => ({
   xwoba: num(r.estimated_woba_using_speedangle),
   woba_value: num(r.woba_value),
   woba_denom: num(r.woba_denom),
+  launch_speed_angle: num(r.launch_speed_angle),
+  hc_x: num(r.hc_x),
+  hc_y: num(r.hc_y),
+  hit_distance: num(r.hit_distance_sc),
 });
 
 /** The pitch that ended each of a pitcher's strikeouts this season. */

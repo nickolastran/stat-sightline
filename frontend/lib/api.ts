@@ -65,7 +65,8 @@ export interface Pitch {
   launch_speed: number | null; // exit velocity, mph
   launch_angle: number | null; // degrees
   events: string | null;
-  /* Savant's search carries these; the warehouse route doesn't send them. */
+  /* The warehouse route doesn't send game_pk, at_bat_number, pitch_number
+     or tto; Savant's search carries all of them. */
   game_pk?: number | null;
   at_bat_number?: number | null;
   pitch_number?: number | null; // 1 for the first pitch of the PA
@@ -76,6 +77,10 @@ export interface Pitch {
   xwoba?: number | null; // Statcast's expected wOBA on contact
   woba_value?: number | null;
   woba_denom?: number | null;
+  launch_speed_angle?: number | null; // Statcast 1-6; 6 = barrel
+  hc_x?: number | null; // Gameday hit coordinates
+  hc_y?: number | null;
+  hit_distance?: number | null; // ft
 }
 
 export interface PitcherPitches {

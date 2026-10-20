@@ -18,6 +18,11 @@ import FilterPanel, { type PitchTypeOption } from "./FilterPanel";
 import MovementPlot from "./MovementPlot";
 import Sidebar from "./Sidebar";
 import ZonePlot, { type ZonePlotMode } from "./ZonePlot";
+import SprayChart from "@/components/mlb/SprayChart";
+import SwingTakePanel from "@/components/mlb/SwingTakePanel";
+import BatTrackingPanel from "@/components/mlb/BatTrackingPanel";
+import { BAT_TRACKING_FIRST_SEASON, type BatLine } from "@/lib/batTracking";
+import { pitchHits, type Park } from "@/lib/spray";
 
 /*
  * State owner for the dashboard — the PITCHING module (pitches thrown) and
@@ -26,7 +31,19 @@ import ZonePlot, { type ZonePlotMode } from "./ZonePlot";
  * player; every filter change re-slices it in
  * memory (useMemo chain below), so cards, plot, and tables update
  * instantly and always agree on the same slice.
+ *
+ * HITTING leads with a hitter's own rates and swaps the movement chart —
+ * a pitcher's read — for where the slice's hits went, then the player page's
+ * swing-decision and bat-tracking panels over the same slice.
  */
+
+/** What the Hitting module needs beyond the pitches: the season's
+ *  bat-tracking line and league line, and the hitter's home park. */
+export interface Hitting {
+  season: number;
+  bat: { player: BatLine; league: BatLine } | null;
+  park: Park | null;
+}
 
 const NAMED_TYPES: ReadonlySet<string> = new Set(Object.keys(PITCH_SLOTS));
 
@@ -53,9 +70,11 @@ function Card({
 export default function DashboardClient({
   role,
   data,
+  hitting,
 }: {
   role: Role;
   data: PitcherPitches;
+  hitting?: Hitting;
 }) {
   const p = data.pitcher;
   const bbe = role === "pitcher" ? "VS. BATTED BALLS" : "ON BATTED BALLS";
@@ -74,6 +93,7 @@ export default function DashboardClient({
     () => arsenalRows(filtered, NAMED_TYPES),
     [filtered]
   );
+  const sprayHits = useMemo(() => pitchHits(filtered), [filtered]);
 
   /* Filter options + date bounds come from the FULL payload, so a filter
      never removes its own controls. */
@@ -189,6 +209,16 @@ export default function DashboardClient({
         </div>
 
         {/* Key metrics — all computed from the filtered slice. */}
+        {role === "batter" ? (
+          <div className="grid grid-cols-2 gap-px sm:grid-cols-3 xl:grid-cols-6">
+            <MetricCard label="xwOBA" value={fmt.rate(summary.xwoba)} sub={`${summary.pitches.toLocaleString()} PITCHES SEEN`} />
+            <MetricCard label="CHASE RATE" value={fmt.pct(summary.chaseRate)} sub="SWINGS / OUT-OF-ZONE" />
+            <MetricCard label="Z-CONTACT" value={fmt.pct(summary.zContactRate)} sub="CONTACT / IN-ZONE SWINGS" />
+            <MetricCard label="BARREL RATE" value={fmt.pct(summary.barrelRate)} sub="BARRELS / BATTED BALLS" />
+            <MetricCard label="HARD-HIT RATE" value={fmt.pct(summary.hardHitRate)} sub="95+ MPH / BATTED BALLS" />
+            <MetricCard label="AVG EXIT VELO" value={fmt.num(summary.avgExitVelo)} unit="MPH" sub={`LA ${fmt.num(summary.avgLaunchAngle)}° · ${bbe}`} />
+          </div>
+        ) : (
         <div className="grid grid-cols-2 gap-px sm:grid-cols-3 xl:grid-cols-6">
           <MetricCard label="AVG VELO" value={fmt.num(summary.avgVelo)} unit="MPH" sub={`${summary.pitches.toLocaleString()} PITCHES`} />
           <MetricCard label="WHIFF RATE" value={fmt.pct(summary.whiffRate)} sub="WHIFFS / SWINGS" />
@@ -197,6 +227,7 @@ export default function DashboardClient({
           <MetricCard label="AVG EXIT VELO" value={fmt.num(summary.avgExitVelo)} unit="MPH" sub={bbe} />
           <MetricCard label="AVG LAUNCH ANG" value={fmt.num(summary.avgLaunchAngle)} unit="°" sub={bbe} />
         </div>
+        )}
 
         <div className="grid gap-3 lg:grid-cols-2">
           <Card
@@ -217,10 +248,37 @@ export default function DashboardClient({
             <ZonePlot pitches={filtered} mode={mode} />
           </Card>
 
-          <Card title="PITCH MOVEMENT">
-            <MovementPlot pitches={filtered} arsenal={arsenal} />
-          </Card>
+          {role === "batter" ? (
+            <SprayChart
+              hits={sprayHits}
+              park={hitting?.park ?? null}
+              title={`Spray Chart — ${sprayHits.length} Hits in the Slice`}
+            />
+          ) : (
+            <Card title="PITCH MOVEMENT">
+              <MovementPlot pitches={filtered} arsenal={arsenal} />
+            </Card>
+          )}
         </div>
+
+        {role === "batter" && (
+          <div className="grid gap-3 xl:grid-cols-2">
+            <Card title="SWING DECISIONS — BY ATTACK ZONE">
+              <SwingTakePanel pitches={filtered} />
+            </Card>
+            <Card title={`BAT TRACKING — ${hitting?.season ?? ""} LINE, SWINGS IN THE SLICE`}>
+              {hitting?.bat ? (
+                <BatTrackingPanel pitches={filtered} line={hitting.bat} />
+              ) : (
+                <p className="text-xs text-ink-3">
+                  {(hitting?.season ?? 0) < BAT_TRACKING_FIRST_SEASON
+                    ? `BAT TRACKING BEGINS IN ${BAT_TRACKING_FIRST_SEASON}`
+                    : "NO BAT TRACKING LINE FOR THIS HITTER"}
+                </p>
+              )}
+            </Card>
+          </div>
+        )}
 
         <Card
           title={role === "pitcher" ? "ARSENAL — BY PITCH TYPE" : "PITCHES SEEN — BY TYPE"}
