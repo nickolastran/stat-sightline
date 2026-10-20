@@ -177,7 +177,7 @@ export default async function MatchupPage({
               </div>
               <p className="mt-2 text-[10px] leading-4 text-ink-3">
                 xwOBA, {season}. Each side&apos;s figure on a pitch is pulled
-                toward the league&apos;s with {REGRESS_PA} PAs of average; the
+                toward the league&apos;s with {`${REGRESS_PA} PAs`} of average; the
                 two edges over the league are added, then weighted by the
                 pitcher&apos;s usage. + favors the batter.
               </p>

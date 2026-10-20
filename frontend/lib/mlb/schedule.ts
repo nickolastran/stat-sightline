@@ -33,6 +33,8 @@ export interface Game {
   state: "Preview" | "Live" | "Final" | string;
   detailedState: string;
   startTime: string; // ISO
+  /** MLB's date for the game, YYYY-MM-DD — set even when the time is TBD. */
+  date?: string;
   /** The date is set but first pitch isn't — `startTime` is a placeholder. */
   timeTBD?: boolean;
   venue: string;
@@ -79,6 +81,7 @@ export const toGame = (g: any): Game => ({
   state: g.status?.abstractGameState ?? "Preview",
   detailedState: g.status?.detailedState ?? "",
   startTime: g.gameDate,
+  date: g.officialDate,
   timeTBD: !!g.status?.startTimeTBD,
   venue: g.venue?.name ?? "",
   night: g.dayNight === "night",

@@ -162,6 +162,30 @@ export function pitchEdges(
 }
 
 /**
+ * A lineup's projected xwOBA against one pitcher — each hitter weighted by his
+ * PAs this season against the pitches in the mix, so a regular counts and a
+ * bench bat barely does — beside the league's. Null when the pitcher is off
+ * the board or none of the hitters is on it.
+ */
+export function lineupEdge(
+  boards: ArsenalBoards,
+  pitcherId: number,
+  hitterIds: number[],
+): { proj: number; league: number } | null {
+  const s = scorer(boards, pitcherId);
+  if (!s) return null;
+  let x = 0;
+  let w = 0;
+  for (const id of hitterIds) {
+    const mix = s.edges(id);
+    const pa = mix.reduce((n, p) => n + p.pa, 0);
+    x += pa * mix.reduce((n, p) => n + (p.usage / 100) * p.proj, 0);
+    w += pa;
+  }
+  return w ? { proj: x / w, league: s.league } : null;
+}
+
+/**
  * Each hitter's projected line against one pitcher, by hitter id. Null when
  * the pitcher has nothing on the board — no mix, nothing to weight.
  */

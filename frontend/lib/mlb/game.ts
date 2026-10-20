@@ -261,7 +261,7 @@ export const lineupSeason = (
  * Home field is worth about .535 across a season — the odds multiplier that
  * shifts an even matchup to that number.
  */
-const HOME_FIELD_ODDS = 0.535 / 0.465;
+export const HOME_FIELD_ODDS = 0.535 / 0.465;
 
 /**
  * The home club's chance against the visitors on neutral ground, by log5 off
