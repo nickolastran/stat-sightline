@@ -116,6 +116,11 @@ export default function LeagueBar() {
           PLAYOFFS
         </Link>
         <StatsMenu current={seasonOf(todayPT())} />
+        {/* The pitch-level modules — pitching, hitting, matchups, queries —
+            open on their first, the heaviest-workload pitcher. */}
+        <Link href="/pitcher/top" className={TAB}>
+          MODULES
+        </Link>
         <MyTeamLink className={TAB} />
         <MoreMenu />
       </div>
