@@ -9,7 +9,7 @@
 import assert from "node:assert/strict";
 import type { Pitch } from "./api";
 import { pctColor } from "./pitchColors";
-import { arsenalRows, MIN_AB, normZ, summarize, ZONE, zoneGrid } from "./metrics";
+import { arsenalRows, MIN_AB, normZ, resultOf, summarize, ZONE, zoneGrid } from "./metrics";
 
 const pitch = (o: Partial<Pitch>): Pitch =>
   ({
@@ -128,5 +128,14 @@ assert.equal(line.barrelRate, 0.5, "one barrel in two batted balls");
 assert.equal(line.zContactRate, 2 / 3, "two of three zone swings made contact");
 assert.ok(Math.abs(line.xwoba! - (0.8 + 0.1 + 0 + 0.69) / 4) < 1e-9, `xwOBA ${line.xwoba}`);
 assert.equal(summarize([]).xwoba, null, "no PAs, no xwOBA");
+
+/* ── resultOf: the head-to-head chart's color key ───────────────────── */
+
+assert.equal(resultOf(pitch({ description: "hit_into_play", events: "home_run" })), "HIT");
+assert.equal(resultOf(pitch({ description: "hit_into_play", events: "field_error" })), "IN PLAY", "reached on an error isn't a hit");
+assert.equal(resultOf(pitch({ description: "called_strike" })), "CALLED STRIKE");
+assert.equal(resultOf(pitch({ description: "swinging_strike_blocked" })), "WHIFF");
+assert.equal(resultOf(pitch({ description: "foul_tip" })), "FOUL");
+assert.equal(resultOf(pitch({ description: "hit_by_pitch" })), "BALL");
 
 console.log("metrics.check.ts OK");

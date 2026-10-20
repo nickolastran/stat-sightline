@@ -112,6 +112,23 @@ export const getSeasonPitches = async (
     )
   ).map(toPitch);
 
+/** Every regular-season pitch one pitcher threw one batter. */
+export const getMatchupPitches = async (
+  pitcher: number,
+  batter: number,
+  season: number,
+) =>
+  (
+    await statcastSearch(
+      {
+        player_type: "pitcher",
+        "pitchers_lookup[]": String(pitcher),
+        "batters_lookup[]": String(batter),
+      },
+      season,
+    )
+  ).map(toPitch);
+
 /* Every event that ends a plate appearance. Rolling form reads nothing else,
    so asking Savant for these rows alone is under a third of the season's CSV
    — small enough for the fetch cache. Checked against a full pull: the same PAs. */

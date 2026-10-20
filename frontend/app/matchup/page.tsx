@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
 import Sidebar from "@/components/dashboard/Sidebar";
+import ZonePlot from "@/components/dashboard/ZonePlot";
 import PlayerSearch from "@/components/landing/PlayerSearch";
 import MetricCard from "@/components/ui/MetricCard";
 import Panel from "@/components/ui/Panel";
-import { getMatchups, MATCHUP_COLS } from "@/lib/api";
+import { getMatchups, getPlayerPitches, MATCHUP_COLS } from "@/lib/api";
 import {
   edgeLines,
   getArsenalBoards,
@@ -12,12 +13,14 @@ import {
 } from "@/lib/matchupEdge";
 import { getPlayer, seasonOf, todayPT } from "@/lib/mlb";
 import { slotFor } from "@/lib/pitchColors";
+import { getMatchupPitches } from "@/lib/statcast";
 
 /*
  * MATCHUP FORECAST: any hitter against any pitcher. The forecast is the
  * pregame lineup card's pitch-mix edge (lib/matchupEdge) for one pair, with
  * the per-pitch breakdown the card has no room for; under it, what actually
- * happened when the two met, pitch by pitch, from the warehouse. Both players
+ * happened when the two met, pitch by pitch, from the warehouse (Savant's
+ * search on the deployed site, which has none). Both players
  * live in the URL, so a forecast is a link.
  *
  * The forecast reads Savant's season boards, not the warehouse, so it works
@@ -54,11 +57,17 @@ export default async function MatchupPage({
   const season = seasonOf(todayPT());
   const both = pitcher !== undefined && batter !== undefined;
 
-  const [arm, bat, boards, h2h] = await Promise.all([
+  const [arm, bat, boards, h2h, metPitches] = await Promise.all([
     pitcher ? getPlayer(pitcher, season).catch(() => null) : null,
     batter ? getPlayer(batter, season).catch(() => null) : null,
     both ? getArsenalBoards(season).catch(() => null) : null,
     both ? getMatchups(pitcher, [batter]).catch(() => null) : null,
+    both
+      ? getPlayerPitches("pitcher", pitcher, { vs: batter })
+          .then((d) => d.pitches)
+          .catch(() => getMatchupPitches(pitcher, batter, season))
+          .catch(() => null)
+      : null,
   ]);
   const line = both && boards ? edgeLines(boards, pitcher, [batter])?.[batter] : null;
   const parts = both && boards ? pitchEdges(boards, pitcher, batter) : null;
@@ -187,7 +196,7 @@ export default async function MatchupPage({
 
         {both && (
           <Panel title="HEAD TO HEAD — TRACKED PITCHES">
-            {met ? (
+            {met && (
               <div className="grid grid-cols-2 gap-px sm:grid-cols-4 xl:grid-cols-7">
                 {MATCHUP_COLS.map((c) => (
                   <MetricCard
@@ -198,12 +207,19 @@ export default async function MatchupPage({
                   />
                 ))}
               </div>
+            )}
+            {metPitches?.length ? (
+              <div className={`max-w-md ${met ? "mt-3" : ""}`}>
+                <ZonePlot pitches={metPitches} mode="scatter" colorBy="result" />
+              </div>
             ) : (
-              <p className="text-xs text-ink-2">
-                {h2h
-                  ? "These two haven't met in the pitch warehouse."
-                  : "The pitch warehouse didn't answer for the head-to-head."}
-              </p>
+              !met && (
+                <p className="text-xs text-ink-2">
+                  {h2h || metPitches
+                    ? "These two haven't met in the pitch warehouse."
+                    : "The pitch warehouse didn't answer for the head-to-head."}
+                </p>
+              )
             )}
           </Panel>
         )}

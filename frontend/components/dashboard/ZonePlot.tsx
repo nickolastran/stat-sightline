@@ -8,16 +8,19 @@ import {
   BA_RAMP,
   heatColor,
   HEAT_RAMP,
+  OTHER_SLOT,
   PITCH_SLOTS,
-  slotFor,
+  RESULT_SLOTS,
+  type PitchSlot,
 } from "@/lib/pitchColors";
-import { MIN_AB, normZ, ZONE, zoneGrid } from "@/lib/metrics";
+import { MIN_AB, normZ, resultOf, ZONE, zoneGrid } from "@/lib/metrics";
 
 /*
  * Strike-zone plot, catcher's view. Three modes over the same geometry:
  *  - scatter: one mark per pitch, colored + SHAPED by pitch type (shape is
  *    the secondary encoding required by the palette's floor-band CVD ΔE),
  *    nearest-point hover within 24px so nobody has to hit a dot dead-center.
+ *    `colorBy="result"` keys the marks to what the pitch came to instead.
  *  - heat: a smoothed density (Gaussian kernel per pitch, blurred onto a
  *    0.1 ft grid) in banded blobs on a single-hue sequential ramp anchored to
  *    the dark surface (near-zero recedes; max reads brightest).
@@ -29,6 +32,17 @@ import { MIN_AB, normZ, ZONE, zoneGrid } from "@/lib/metrics";
  */
 
 export type ZonePlotMode = "scatter" | "heat" | "zones";
+
+/** A scatter mark's legend label and slot: its pitch type, or its result. */
+const encode = (p: Pitch, colorBy: "type" | "result"): [string, PitchSlot] => {
+  if (colorBy === "result") {
+    const r = resultOf(p);
+    return [r, RESULT_SLOTS[r]];
+  }
+  return p.pitch_type && PITCH_SLOTS[p.pitch_type]
+    ? [p.pitch_type, PITCH_SLOTS[p.pitch_type]]
+    : ["OTH", OTHER_SLOT];
+};
 
 /* Geometry — 80 viewBox px per foot in both axes (true aspect). */
 const PX_FT = 80;
@@ -127,9 +141,11 @@ interface TooltipState {
 export default function ZonePlot({
   pitches,
   mode,
+  colorBy = "type",
 }: {
   pitches: Pitch[];
   mode: ZonePlotMode;
+  colorBy?: "type" | "result";
 }) {
   const svgRef = useRef<SVGSVGElement>(null);
   const [tip, setTip] = useState<TooltipState | null>(null);
@@ -153,22 +169,18 @@ export default function ZonePlot({
   const pts = useMemo(() => {
     const capped =
       located.length > MAX_POINTS ? located.slice(-MAX_POINTS) : located;
-    return capped.map(({ p, x, z }, i) => ({
-      p,
-      i,
-      cx: sx(x),
-      cy: sz(z),
-    }));
-  }, [located]);
+    return capped.map(({ p, x, z }, i) => {
+      const [label, slot] = encode(p, colorBy);
+      return { p, i, label, slot, cx: sx(x), cy: sz(z) };
+    });
+  }, [located, colorBy]);
 
-  /* Series legend: fixed slot color/shape per type; counts from the slice. */
+  /* Series legend: fixed slot color/shape per series; counts from the slice. */
   const series = useMemo(() => {
-    const counts = new Map<string, number>();
-    for (const { p } of pts) {
-      const code = p.pitch_type && PITCH_SLOTS[p.pitch_type] ? p.pitch_type : "OTH";
-      counts.set(code, (counts.get(code) ?? 0) + 1);
-    }
-    return [...counts.entries()].sort((a, b) => b[1] - a[1]);
+    const counts = new Map<string, { slot: PitchSlot; n: number }>();
+    for (const { label, slot } of pts)
+      counts.set(label, { slot, n: (counts.get(label)?.n ?? 0) + 1 });
+    return [...counts.entries()].sort((a, b) => b[1].n - a[1].n);
   }, [pts]);
 
   /* Kernel density over the fixed grid: every pitch adds a Gaussian bump,
@@ -230,7 +242,7 @@ export default function ZonePlot({
     setTip({
       cx: best.cx,
       cy: best.cy,
-      color: slotFor(p.pitch_type).color,
+      color: best.slot.color,
       title: p.pitch_name ?? p.pitch_type ?? "UNKNOWN",
       lines: [
         { label: "VELO", value: p.release_speed ? `${p.release_speed.toFixed(1)} MPH` : "—" },
@@ -265,7 +277,7 @@ export default function ZonePlot({
             ? "density heatmap"
             : mode === "zones"
               ? "batting-average-allowed grid over the strike zone"
-              : "scatter plot"
+              : `scatter plot colored by pitch ${colorBy}`
         }, catcher's view, batter-normalized height, ${located.length} pitches`}
         onPointerMove={onMove}
         onPointerLeave={clearHover}
@@ -399,14 +411,8 @@ export default function ZonePlot({
         {/* Scatter marks. */}
         {mode === "scatter" && (
           <g>
-            {pts.map(({ p, i, cx, cy }) => (
-              <Mark
-                key={i}
-                shape={slotFor(p.pitch_type).shape}
-                cx={cx}
-                cy={cy}
-                color={slotFor(p.pitch_type).color}
-              />
+            {pts.map(({ i, slot, cx, cy }) => (
+              <Mark key={i} shape={slot.shape} cx={cx} cy={cy} color={slot.color} />
             ))}
             {hovered && (
               <circle
@@ -488,17 +494,14 @@ export default function ZonePlot({
         </div>
       ) : mode === "scatter" ? (
         <div className="flex flex-wrap gap-x-4 gap-y-1 border-t border-grid px-1 pt-2 text-[10px] text-ink-2">
-          {series.map(([code, n]) => {
-            const slot = code === "OTH" ? slotFor(null) : PITCH_SLOTS[code];
-            return (
-              <span key={code} className="flex items-center gap-1.5">
-                <svg width={12} height={12} viewBox="-6 -6 12 12" aria-hidden>
-                  <Mark shape={slot.shape} cx={0} cy={0} color={slot.color} r={3.4} />
-                </svg>
-                {code} <span className="text-ink-3">{n.toLocaleString()}</span>
-              </span>
-            );
-          })}
+          {series.map(([label, { slot, n }]) => (
+            <span key={label} className="flex items-center gap-1.5">
+              <svg width={12} height={12} viewBox="-6 -6 12 12" aria-hidden>
+                <Mark shape={slot.shape} cx={0} cy={0} color={slot.color} r={3.4} />
+              </svg>
+              {label} <span className="text-ink-3">{n.toLocaleString()}</span>
+            </span>
+          ))}
           {located.length > MAX_POINTS && (
             <span className="ml-auto text-ink-3">
               LATEST {MAX_POINTS.toLocaleString()} OF {located.length.toLocaleString()} PLOTTED

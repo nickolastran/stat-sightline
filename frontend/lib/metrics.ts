@@ -21,6 +21,17 @@ const CALLED_STRIKE = new Set(["called_strike"]);
 const inZone = (p: Pitch) => p.zone !== null && p.zone >= 1 && p.zone <= 9;
 export const isSwing = (p: Pitch) => !!p.description && SWING.has(p.description);
 const isWhiff = (p: Pitch) => !!p.description && WHIFF.has(p.description);
+/** What one pitch came to — the head-to-head chart's color key. */
+export type PitchResult = "BALL" | "CALLED STRIKE" | "WHIFF" | "FOUL" | "IN PLAY" | "HIT";
+export const resultOf = (p: Pitch): PitchResult => {
+  if (p.description === "hit_into_play")
+    return p.events && HITS.has(p.events) ? "HIT" : "IN PLAY";
+  if (p.description && CALLED_STRIKE.has(p.description)) return "CALLED STRIKE";
+  if (isWhiff(p)) return "WHIFF";
+  if (isSwing(p)) return "FOUL"; // every swing left: fouls, foul tips, bunt fouls
+  return "BALL"; // balls, pitchouts, HBP
+};
+
 const isBattedBall = (p: Pitch) =>
   p.description === "hit_into_play" && p.launch_speed !== null;
 

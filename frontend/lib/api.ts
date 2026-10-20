@@ -234,9 +234,10 @@ export async function searchPitchers(
 export async function getPlayerPitches(
   role: Role,
   playerId: number,
-  opts: { pitchType?: string; stand?: "L" | "R"; limit?: number } = {}
+  opts: { pitchType?: string; stand?: "L" | "R"; limit?: number; vs?: number } = {}
 ): Promise<PitcherPitches> {
   const params = new URLSearchParams();
+  if (opts.vs) params.set("vs", String(opts.vs)); // only pitches against this opponent
   if (opts.pitchType) params.set("pitch_type", opts.pitchType);
   if (opts.stand) params.set("stand", opts.stand);
   if (opts.limit) params.set("limit", String(opts.limit));
