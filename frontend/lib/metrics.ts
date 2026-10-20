@@ -39,6 +39,12 @@ const mean = (xs: number[]) =>
   xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : null;
 const rate = (num: number, den: number) => (den ? num / den : null);
 
+/** A hitter's pitches from both hands, each lefty's horizontal break flipped
+ *  so every pitch reads as a righty's — otherwise a lefty's fastball lands
+ *  opposite a righty's and every type's average cancels toward zero. */
+export const mirrorLefties = (pitches: Pitch[]): Pitch[] =>
+  pitches.map((p) => (p.p_throws === "L" && p.pfx_x !== null ? { ...p, pfx_x: -p.pfx_x } : p));
+
 export interface MetricSummary {
   pitches: number;
   avgVelo: number | null;

@@ -10,7 +10,7 @@ import {
   filtersToQuery,
   type FilterState,
 } from "@/lib/filters";
-import { arsenalRows, fmt, summarize } from "@/lib/metrics";
+import { arsenalRows, fmt, mirrorLefties, summarize } from "@/lib/metrics";
 import { PITCH_SLOTS, slotFor } from "@/lib/pitchColors";
 import ArsenalTable from "./ArsenalTable";
 import DataTable, { type Column } from "@/components/ui/DataTable";
@@ -108,10 +108,13 @@ export default function DashboardClient({
     [data.pitches, filters]
   );
   const summary = useMemo(() => summarize(filtered), [filtered]);
-  const arsenal = useMemo(
-    () => arsenalRows(filtered, NAMED_TYPES),
-    [filtered]
+  /* Movement as a hitter sees it, both hands at once: lefties mirrored, so
+     the chart and the table's H-BRK read every pitch as a righty's. */
+  const moved = useMemo(
+    () => (role === "batter" ? mirrorLefties(filtered) : filtered),
+    [filtered, role]
   );
+  const arsenal = useMemo(() => arsenalRows(moved, NAMED_TYPES), [moved]);
   const sprayHits = useMemo(() => pitchHits(filtered), [filtered]);
 
   /* Filter options + date bounds come from the FULL payload, so a filter
@@ -295,6 +298,9 @@ export default function DashboardClient({
                     : "NO BAT TRACKING LINE FOR THIS HITTER"}
                 </p>
               )}
+            </Card>
+            <Card title="PITCH MOVEMENT — PITCHES SEEN">
+              <MovementPlot pitches={moved} arsenal={arsenal} mirrored />
             </Card>
           </div>
         )}

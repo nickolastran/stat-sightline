@@ -9,7 +9,7 @@
 import assert from "node:assert/strict";
 import type { Pitch } from "./api";
 import { pctColor } from "./pitchColors";
-import { arsenalRows, MIN_AB, normZ, resultOf, summarize, ZONE, zoneGrid } from "./metrics";
+import { arsenalRows, MIN_AB, mirrorLefties, normZ, resultOf, summarize, ZONE, zoneGrid } from "./metrics";
 
 const pitch = (o: Partial<Pitch>): Pitch =>
   ({
@@ -137,5 +137,18 @@ assert.equal(resultOf(pitch({ description: "called_strike" })), "CALLED STRIKE")
 assert.equal(resultOf(pitch({ description: "swinging_strike_blocked" })), "WHIFF");
 assert.equal(resultOf(pitch({ description: "foul_tip" })), "FOUL");
 assert.equal(resultOf(pitch({ description: "hit_by_pitch" })), "BALL");
+
+/* ── mirrorLefties: both hands' fastballs land on the same side ─────── */
+
+const [rhp, lhp, unknown] = mirrorLefties([
+  pitch({ p_throws: "R", pfx_x: -0.6 }),
+  pitch({ p_throws: "L", pfx_x: 0.6 }),
+  pitch({ p_throws: null, pfx_x: 0.6 }),
+]);
+assert.equal(rhp.pfx_x, -0.6, "a righty is left alone");
+assert.equal(lhp.pfx_x, -0.6, "a lefty's arm-side run lands with the righty's");
+assert.equal(unknown.pfx_x, 0.6, "no hand, no flip");
+const avg = arsenalRows(mirrorLefties([pitch({ p_throws: "R", pfx_x: -0.5 }), pitch({ p_throws: "L", pfx_x: 0.5 })]), new Set(["FF"]));
+assert.equal(avg[0].avgHBreak, -6, "the type average no longer cancels to zero");
 
 console.log("metrics.check.ts OK");

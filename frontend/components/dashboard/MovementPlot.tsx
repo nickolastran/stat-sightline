@@ -13,6 +13,8 @@ import { Mark } from "./ZonePlot";
  * mark on top, so the arsenal's shape reads at a glance and the cloud shows
  * how tightly each pitch is repeated. The arsenal table's H-BRK / IVB
  * columns are the table twin; the average marks carry a native tooltip.
+ * `mirrored` says the caller flipped left-handers' horizontal break (a
+ * hitter's pitches seen, both hands), so the axis reads as a righty's.
  */
 
 const PX_IN = 8; // viewBox px per inch, both axes (true aspect)
@@ -34,9 +36,11 @@ const inRange = (v: number) => v >= D[0] && v <= D[1];
 export default function MovementPlot({
   pitches,
   arsenal,
+  mirrored = false,
 }: {
   pitches: Pitch[];
   arsenal: ArsenalRow[];
+  mirrored?: boolean;
 }) {
   const pts = useMemo(() => {
     const all = pitches.flatMap((p) => {
@@ -62,7 +66,7 @@ export default function MovementPlot({
         viewBox={`0 0 ${W} ${H}`}
         className="block w-full"
         role="img"
-        aria-label={`Pitch movement chart, catcher's view, horizontal against induced vertical break in inches, ${pts.length} pitches`}
+        aria-label={`Pitch movement chart, catcher's view${mirrored ? ", left-handers mirrored to a righty's" : ""}, horizontal against induced vertical break in inches, ${pts.length} pitches`}
       >
         {TICKS.map((t) => (
           <g key={t}>
@@ -99,7 +103,7 @@ export default function MovementPlot({
         })}
 
         <text x={PAD.l + PLOT / 2} y={H - 6} textAnchor="middle" fontSize={9} fill={MUTED} letterSpacing={1}>
-          HORIZONTAL BREAK IN — CATCHER&apos;S VIEW
+          HORIZONTAL BREAK IN — CATCHER&apos;S VIEW{mirrored ? ", LHP MIRRORED" : ""}
         </text>
         <text x={12} y={PAD.t + PLOT / 2} textAnchor="middle" fontSize={9} fill={MUTED} letterSpacing={1} transform={`rotate(-90 12 ${PAD.t + PLOT / 2})`}>
           INDUCED VERTICAL BREAK IN
