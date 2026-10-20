@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import type { Pitch, PitcherPitches } from "@/lib/api";
+import type { Pitch, PitcherPitches, Role } from "@/lib/api";
 import {
   applyFilters,
   DEFAULT_FILTERS,
@@ -20,8 +20,10 @@ import Sidebar from "./Sidebar";
 import ZonePlot, { type ZonePlotMode } from "./ZonePlot";
 
 /*
- * State owner for the dashboard. The full pitch payload arrives from the
- * server component once per player; every filter change re-slices it in
+ * State owner for the dashboard — the PITCHING module (pitches thrown) and
+ * the HITTING module (pitches seen) alike, since both read the same pitch
+ * rows. The full pitch payload arrives from the server component once per
+ * player; every filter change re-slices it in
  * memory (useMemo chain below), so cards, plot, and tables update
  * instantly and always agree on the same slice.
  */
@@ -48,7 +50,15 @@ function Card({
   );
 }
 
-export default function DashboardClient({ data }: { data: PitcherPitches }) {
+export default function DashboardClient({
+  role,
+  data,
+}: {
+  role: Role;
+  data: PitcherPitches;
+}) {
+  const p = data.pitcher;
+  const bbe = role === "pitcher" ? "VS. BATTED BALLS" : "ON BATTED BALLS";
   const [filters, setFilters] = useState<FilterState>(DEFAULT_FILTERS);
   const [mode, setMode] = useState<ZonePlotMode>("scatter");
 
@@ -138,8 +148,13 @@ export default function DashboardClient({ data }: { data: PitcherPitches }) {
     <div className="flex min-h-[calc(100vh-3rem)] flex-col lg:flex-row">
       {/* ── SIDEBAR: nav + the single filter scope ─────────────── */}
       <aside className="shrink-0 border-b border-line bg-surface lg:sticky lg:top-12 lg:h-[calc(100vh-3rem)] lg:w-64 lg:overflow-y-auto lg:border-r lg:border-b-0">
-        <Sidebar />
+        <Sidebar
+          active={role === "pitcher" ? "P-01" : "H-01"}
+          pitcher={role === "pitcher" ? p.player_id : undefined}
+          batter={role === "batter" ? p.player_id : undefined}
+        />
         <FilterPanel
+          role={role}
           filters={filters}
           onChange={patch}
           onReset={() => setFilters(DEFAULT_FILTERS)}
@@ -155,16 +170,21 @@ export default function DashboardClient({ data }: { data: PitcherPitches }) {
         <div className="flex flex-wrap items-center justify-between gap-3 border border-line bg-surface px-3 py-2">
           <div className="flex items-baseline gap-3">
             <h1 className="text-base font-bold tracking-wide">
-              {data.pitcher.full_name ?? `PITCHER #${data.pitcher.player_id}`}
+              {p.full_name ?? `${role.toUpperCase()} #${p.player_id}`}
             </h1>
             <span className="text-[11px] text-ink-3">
-              {data.pitcher.throws ?? "?"}HP · {data.count.toLocaleString()}{" "}
-              TRACKED PITCHES
+              {role === "pitcher"
+                ? `${p.throws ?? "?"}HP · ${data.count.toLocaleString()} TRACKED PITCHES`
+                : `BATS ${p.bats ?? "?"} · ${data.count.toLocaleString()} PITCHES SEEN`}
               {dateExtent && ` · ${dateExtent.min} → ${dateExtent.max}`}
             </span>
           </div>
           <div className="w-full sm:w-72">
-            <PlayerSearch size="compact" placeholder="SWITCH PITCHER" />
+            <PlayerSearch
+              role={role}
+              size="compact"
+              placeholder={`SWITCH ${role.toUpperCase()}`}
+            />
           </div>
         </div>
 
@@ -174,8 +194,8 @@ export default function DashboardClient({ data }: { data: PitcherPitches }) {
           <MetricCard label="WHIFF RATE" value={fmt.pct(summary.whiffRate)} sub="WHIFFS / SWINGS" />
           <MetricCard label="CSW RATE" value={fmt.pct(summary.cswRate)} sub="CALLED + SWINGING STR" />
           <MetricCard label="ZONE RATE" value={fmt.pct(summary.zoneRate)} sub="IN-ZONE / LOCATED" />
-          <MetricCard label="AVG EXIT VELO" value={fmt.num(summary.avgExitVelo)} unit="MPH" sub="VS. BATTED BALLS" />
-          <MetricCard label="AVG LAUNCH ANG" value={fmt.num(summary.avgLaunchAngle)} unit="°" sub="VS. BATTED BALLS" />
+          <MetricCard label="AVG EXIT VELO" value={fmt.num(summary.avgExitVelo)} unit="MPH" sub={bbe} />
+          <MetricCard label="AVG LAUNCH ANG" value={fmt.num(summary.avgLaunchAngle)} unit="°" sub={bbe} />
         </div>
 
         <div className="grid gap-3 lg:grid-cols-2">
@@ -202,7 +222,9 @@ export default function DashboardClient({ data }: { data: PitcherPitches }) {
           </Card>
         </div>
 
-        <Card title="ARSENAL — BY PITCH TYPE">
+        <Card
+          title={role === "pitcher" ? "ARSENAL — BY PITCH TYPE" : "PITCHES SEEN — BY TYPE"}
+        >
           <ArsenalTable rows={arsenal} />
         </Card>
 

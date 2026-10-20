@@ -11,7 +11,8 @@ class Pitcher(BaseModel):
     player_id: int
     full_name: str | None = None
     throws: str | None = None
-    pitches: int | None = None
+    bats: str | None = None           # L / R / S (switch)
+    pitches: int | None = None        # thrown (pitchers) or seen (batters)
 
 
 class Pitch(BaseModel):
@@ -25,6 +26,7 @@ class Pitch(BaseModel):
     pfx_z: float | None = None
     description: str | None = None
     stand: str | None = None          # batter handedness this pitch
+    p_throws: str | None = None       # pitcher handedness this pitch
     sz_top: float | None = None       # this batter's zone top, ft
     sz_bot: float | None = None       # this batter's zone bottom, ft
     game_date: date | None = None

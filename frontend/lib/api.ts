@@ -34,8 +34,12 @@ export interface Pitcher {
   player_id: number;
   full_name: string | null;
   throws: string | null;
-  pitches?: number | null;
+  bats?: string | null; // L / R / S
+  pitches?: number | null; // thrown, or seen for a batter
 }
+
+/** Which side of the pitch table a dashboard reads: thrown or seen. */
+export type Role = "pitcher" | "batter";
 
 export interface Pitch {
   pitch_type: string | null;
@@ -48,6 +52,7 @@ export interface Pitch {
   pfx_z: number | null;
   description: string | null;
   stand: string | null;
+  p_throws?: string | null; // pitcher's hand
   sz_top: number | null; // this batter's zone top, ft
   sz_bot: number | null; // this batter's zone bottom, ft
   game_date: string | null; // ISO date
@@ -211,24 +216,26 @@ export async function getPlayoffOdds(season: number): Promise<PlayoffOdds> {
 export async function searchPitchers(
   q = "",
   limit = 25,
-  revalidate?: number
+  revalidate?: number,
+  role: Role = "pitcher"
 ): Promise<Pitcher[]> {
   const params = new URLSearchParams({ q, limit: String(limit) });
   return api(
-    `/api/pitchers?${params}`,
+    `/api/${role}s?${params}`,
     revalidate ? { next: { revalidate } } : { cache: "no-store" }
   );
 }
 
-export async function getPitcherPitches(
-  pitcherId: number,
+export async function getPlayerPitches(
+  role: Role,
+  playerId: number,
   opts: { pitchType?: string; stand?: "L" | "R"; limit?: number } = {}
 ): Promise<PitcherPitches> {
   const params = new URLSearchParams();
   if (opts.pitchType) params.set("pitch_type", opts.pitchType);
   if (opts.stand) params.set("stand", opts.stand);
   if (opts.limit) params.set("limit", String(opts.limit));
-  return api(`/api/pitchers/${pitcherId}/pitches?${params}`, {
+  return api(`/api/${role}s/${playerId}/pitches?${params}`, {
     cache: "no-store",
   });
 }

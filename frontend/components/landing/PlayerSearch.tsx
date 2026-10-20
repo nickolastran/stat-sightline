@@ -3,22 +3,30 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useTypeahead } from "@/lib/useTypeahead";
-import { searchPitchers, type Pitcher } from "@/lib/api";
+import { searchPitchers, type Pitcher, type Role } from "@/lib/api";
 import { playerHeadshot } from "@/lib/mlb";
 
 /*
  * Debounced player typeahead. Selecting a result routes to the dashboard
- * scoped to that player. `size` switches between the landing hero input
- * and the compact dashboard-header variant.
+ * scoped to that player — or, given `param`, sets that query parameter on
+ * the current page instead (the matchup page's two pickers). `role` picks
+ * pitchers or batters. `size` switches between the landing hero input and
+ * the compact dashboard-header variant.
  */
 
+const ROUTE: Record<Role, string> = { pitcher: "/pitcher", batter: "/hitter" };
+
 interface Props {
+  role?: Role;
+  param?: string;
   size?: "hero" | "compact";
   placeholder?: string;
   autoFocus?: boolean;
 }
 
 export default function PlayerSearch({
+  role = "pitcher",
+  param,
   size = "hero",
   placeholder = "SEARCH PITCHER — NAME OR FRAGMENT",
   autoFocus = false,
@@ -28,8 +36,13 @@ export default function PlayerSearch({
   const { results, open, setOpen, active, setActive, error, rootRef, onKeyDown, pick } =
     useTypeahead<Pitcher>(
       q,
-      (query) => searchPitchers(query, 8),
-      (p) => router.push(`/pitcher/${p.player_id}`)
+      (query) => searchPitchers(query, 8, undefined, role),
+      (p) => {
+        if (!param) return router.push(`${ROUTE[role]}/${p.player_id}`);
+        const next = new URLSearchParams(window.location.search);
+        next.set(param, String(p.player_id));
+        router.push(`?${next}`);
+      }
     );
 
   const heroSizing = size === "hero" ? "h-14 text-base" : "h-8 text-xs";
@@ -48,7 +61,7 @@ export default function PlayerSearch({
           role="combobox"
           autoComplete="off"
           aria-expanded={open}
-          aria-label="Search pitchers"
+          aria-label={`Search ${role}s`}
           autoFocus={autoFocus}
           value={q}
           onChange={(e) => setQ(e.target.value)}
@@ -97,7 +110,10 @@ export default function PlayerSearch({
                   </span>
                 </span>
                 <span className="text-ink-3">
-                  {p.throws ?? "?"}HP · {p.pitches?.toLocaleString()} P
+                  {role === "pitcher"
+                    ? `${p.throws ?? "?"}HP`
+                    : `BATS ${p.bats ?? "?"}`}{" "}
+                  · {p.pitches?.toLocaleString()} P
                 </span>
               </button>
             </li>

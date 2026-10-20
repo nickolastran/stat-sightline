@@ -59,7 +59,7 @@ def _roster() -> list[dict]:
     frequent enough to notice.
     """
     sql = text("""
-        SELECT pl.player_id, pl.full_name, pl.throws,
+        SELECT pl.player_id, pl.full_name, pl.throws, pl.bats,
                COALESCE(b.n, 0) AS bat_n, COALESCE(t.n, 0) AS pit_n
         FROM savant.players pl
         LEFT JOIN (SELECT batter  AS id, COUNT(*) n FROM savant.pitches GROUP BY 1) b
@@ -83,17 +83,19 @@ def _index(rows: list[dict]) -> list[dict]:
     return rows
 
 
-def search_pitchers(q: str, limit: int, roster: list[dict] | None = None) -> list[dict]:
-    """Pitcher typeahead: everyone who has thrown a pitch whose name contains
-    the typed text — as stored ('skenes, p') or as read ('paul skenes') —
-    heaviest workload first. Off the cached roster, so a keystroke costs no
-    query."""
+def search_players(
+    q: str, limit: int, roster: list[dict] | None = None, workload: str = "pit_n"
+) -> list[dict]:
+    """Player typeahead: everyone with a `workload` (pitches thrown, `pit_n`,
+    or seen, `bat_n`) whose name contains the typed text — as stored
+    ('skenes, p') or as read ('paul skenes') — heaviest workload first. Off
+    the cached roster, so a keystroke costs no query."""
     f = _fold(q)
     hits = [
         r for r in (_roster() if roster is None else roster)
-        if r["pit_n"] and (f in r["stored"] or f in r["folded"])
+        if r[workload] and (f in r["stored"] or f in r["folded"])
     ]
-    return sorted(hits, key=lambda r: r["pit_n"], reverse=True)[:limit]
+    return sorted(hits, key=lambda r: r[workload], reverse=True)[:limit]
 
 
 def resolve_player(name: str) -> tuple[dict | None, list[str]]:

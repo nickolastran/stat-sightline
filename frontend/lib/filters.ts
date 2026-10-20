@@ -14,6 +14,7 @@ export interface FilterState {
   balls: number | null; // null = any
   strikes: number | null;
   stand: "L" | "R" | null; // batter side
+  pThrows: "L" | "R" | null; // pitcher hand
   risp: boolean; // runners on base
   twoOuts: boolean;
   lateInnings: boolean; // 7th or later
@@ -26,6 +27,7 @@ export const DEFAULT_FILTERS: FilterState = {
   balls: null,
   strikes: null,
   stand: null,
+  pThrows: null,
   risp: false,
   twoOuts: false,
   lateInnings: false,
@@ -47,6 +49,7 @@ export function applyFilters(
     if (f.balls !== null && p.balls !== f.balls) return false;
     if (f.strikes !== null && p.strikes !== f.strikes) return false;
     if (f.stand && p.stand !== f.stand) return false;
+    if (f.pThrows && p.p_throws !== f.pThrows) return false;
     if (f.risp && !p.runners_on) return false;
     if (f.twoOuts && p.outs_when_up !== 2) return false;
     if (f.lateInnings && (p.inning === null || p.inning < 7)) return false;
