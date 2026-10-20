@@ -8,8 +8,11 @@ import { getMatchups, getPlayerPitches, MATCHUP_COLS } from "@/lib/api";
 import {
   edgeLines,
   getArsenalBoards,
+  getSideMix,
   pitchEdges,
   REGRESS_PA,
+  REGRESS_PITCHES,
+  sideOf,
 } from "@/lib/matchupEdge";
 import { getPlayer, seasonOf, todayPT } from "@/lib/mlb";
 import { slotFor } from "@/lib/pitchColors";
@@ -24,7 +27,9 @@ import { getMatchupPitches } from "@/lib/statcast";
  * live in the URL, so a forecast is a link.
  *
  * The forecast reads Savant's season boards, not the warehouse, so it works
- * whether or not the two have ever faced each other.
+ * whether or not the two have ever faced each other — weighted by the
+ * pitcher's mix against the side this hitter bats from when both hands and
+ * that split are known.
  */
 
 export const metadata: Metadata = {
@@ -57,7 +62,7 @@ export default async function MatchupPage({
   const season = seasonOf(todayPT());
   const both = pitcher !== undefined && batter !== undefined;
 
-  const [arm, bat, boards, h2h, metPitches] = await Promise.all([
+  const [arm, bat, boards, h2h, metPitches, sideMix] = await Promise.all([
     pitcher ? getPlayer(pitcher, season).catch(() => null) : null,
     batter ? getPlayer(batter, season).catch(() => null) : null,
     both ? getArsenalBoards(season).catch(() => null) : null,
@@ -68,9 +73,14 @@ export default async function MatchupPage({
           .catch(() => getMatchupPitches(pitcher, batter, season))
           .catch(() => null)
       : null,
+    both ? getSideMix(pitcher, season).catch(() => null) : null,
   ]);
-  const line = both && boards ? edgeLines(boards, pitcher, [batter])?.[batter] : null;
-  const parts = both && boards ? pitchEdges(boards, pitcher, batter) : null;
+  /* The side he stands in against this arm; without it, or the split, the
+     forecast reads the pitcher's whole-season mix. */
+  const side = sideOf(bat?.bats, arm?.throws);
+  const platoon = both && sideMix && side ? { mix: sideMix, sides: { [batter]: side } } : null;
+  const line = both && boards ? edgeLines(boards, pitcher, [batter], platoon)?.[batter] : null;
+  const parts = both && boards ? pitchEdges(boards, pitcher, batter, platoon) : null;
   const met = both ? h2h?.[batter] : null;
 
   return (
@@ -140,7 +150,7 @@ export default async function MatchupPage({
                   key={key}
                   label={label}
                   value={line[key] === null ? "—" : String(line[key])}
-                  sub={sub}
+                  sub={key === "proj" && platoon ? `HIS MIX VS. ${side}HB` : sub}
                 />
               ))}
             </div>
@@ -188,7 +198,11 @@ export default async function MatchupPage({
                 xwOBA, {season}. Each side&apos;s figure on a pitch is pulled
                 toward the league&apos;s with {`${REGRESS_PA} PAs`} of average; the
                 two edges over the league are added, then weighted by the
-                pitcher&apos;s usage. + favors the batter.
+                pitcher&apos;s usage
+                {platoon
+                  ? ` against ${side === "L" ? "left" : "right"}-handed hitters (pulled toward his overall mix with ${REGRESS_PITCHES} pitches of it)`
+                  : ""}
+                . + favors the batter.
               </p>
             </Panel>
           </>

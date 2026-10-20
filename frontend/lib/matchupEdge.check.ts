@@ -8,7 +8,15 @@
  * Run with:  npx tsx lib/matchupEdge.check.ts
  */
 import assert from "node:assert/strict";
-import { edgeLines, pitchEdges, REGRESS_PA, type ArsenalBoards } from "./matchupEdge";
+import {
+  edgeLines,
+  pitchEdges,
+  REGRESS_PA,
+  REGRESS_PITCHES,
+  sideOf,
+  type ArsenalBoards,
+  type Platoon,
+} from "./matchupEdge";
 
 const row = (id: number, type: string, usage: number, pa: number, xwoba: number | null) => ({
   id, type, usage, pa, xwoba,
@@ -61,5 +69,33 @@ assert.deepEqual(parts.pitches.map((p) => p.type), ["FF", "SL"]);
 assert.ok(Math.abs(parts.pitches[0].proj - 0.375) < 1e-9, `FF ${parts.pitches[0].proj}`);
 assert.equal(parts.pitches[0].usage, 75);
 assert.equal(pitchEdges(boards, 404, 2), null);
+
+/* ── Platoon: each hitter weighted by the mix his side sees ──────────── */
+
+/* Pitcher 9's 75/25 season splits hard by side: sliders to lefties,
+   fastballs to righties, a thousand pitches each way. */
+const platoon: Platoon = {
+  mix: { L: { FF: 100, SL: 900 }, R: { FF: 900, SL: 100 } },
+  sides: { 2: "L", 5: "R" },
+};
+const split = edgeLines(boards, 9, [1, 2, 5], platoon)!;
+/* Hitter 2 batting left sees SL (900 + 100 * .25) / 1100 of the time, his
+   worst pitch, so he drops well under his season-mix .338. */
+const slShare = (900 + REGRESS_PITCHES * 0.25) / (1000 + REGRESS_PITCHES);
+const lefty = (1 - slShare) * 0.375 + slShare * 0.225;
+assert.ok(Math.abs(num(split[2]!.proj) - lefty) < 0.002, `lefty vs. sliders ${split[2]!.proj}`);
+assert.equal(split[1]!.proj, lines[1]!.proj, "a hitter with no known side reads the season mix");
+assert.ok(num(split[5]!.proj) < 0.3, "his mirror, batting right, gets the fastballs he can't hit");
+assert.equal(pitchEdges(boards, 9, 2, platoon)!.pitches[0].type, "SL", "the split reorders the breakdown");
+
+/* A side never faced is the season mix, not an empty one. */
+const unseen = edgeLines(boards, 9, [2], { mix: { L: {}, R: {} }, sides: { 2: "L" } })!;
+assert.equal(unseen[2]!.proj, lines[2]!.proj);
+
+assert.equal(sideOf("L", "R"), "L");
+assert.equal(sideOf("S", "L"), "R", "a switch-hitter bats right against a lefty");
+assert.equal(sideOf("S", "R"), "L");
+assert.equal(sideOf("S", "?"), undefined, "no hand, no side");
+assert.equal(sideOf("?", "R"), undefined);
 
 console.log("matchupEdge ok");

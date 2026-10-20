@@ -1,5 +1,7 @@
 import { savantCsv } from "./advanced";
+import { getPitcherSideMix } from "./api";
 import type { LineupLine, TeamStatCol } from "./mlb";
+import { statcastSearch } from "./statcast";
 
 /*
  * A hitter against tonight's starter by pitch mix — what he should do against
@@ -13,9 +15,15 @@ import type { LineupLine, TeamStatCol } from "./mlb";
  * whole league, so a lineup of nine costs two cached fetches, not eighteen
  * seasons of pitches.
  *
- * ponytail: no platoon split — the board doesn't carry handedness, and a
- * starter's mix against lefties can differ a lot from his mix against
- * righties. Pull it from the per-pitch search if the edges need it.
+ * The board doesn't carry handedness, and a starter's mix against lefties
+ * can differ a lot from his mix against righties, so a caller that knows the
+ * hands passes a Platoon: the starter's mix against each batter side (the
+ * warehouse, or Savant's search on the deployed site), and which side each
+ * hitter stands in. Each hitter is then weighted by the mix his side sees.
+ *
+ * ponytail: only the mix splits. The xwOBA figures on each pitch are still
+ * season-wide, not the hitter's against that hand or the pitcher's against
+ * that side; split those too if the mix alone undersells the platoon.
  */
 
 /** One player's season against (or with) one pitch type. */
@@ -55,6 +63,60 @@ export async function getArsenalBoards(season: number): Promise<ArsenalBoards> {
   const [bat, arm] = await Promise.all([board("batter"), board("pitcher")]);
   return { bat, arm };
 }
+
+export type Side = "L" | "R";
+
+/** A pitcher's pitches by type against each batter side, as counts. */
+export type SideMix = Record<Side, Record<string, number>>;
+
+/** A pitcher's split mix, and the side each hitter stands in against him. */
+export interface Platoon {
+  mix: SideMix;
+  sides: Record<number, Side | undefined>;
+}
+
+/** The side a hitter stands in against this arm — a switch-hitter turns
+ *  around to face him; anything unknown is undefined, the whole mix. */
+export const sideOf = (bats?: string | null, throws?: string | null): Side | undefined =>
+  bats === "L" || bats === "R"
+    ? bats
+    : bats === "S" && (throws === "L" || throws === "R")
+      ? throws === "L" ? "R" : "L"
+      : undefined;
+
+/** One pitcher's season mix against each batter side: the warehouse when it
+ *  answers, Savant's grouped search when it doesn't. */
+export async function getSideMix(pitcherId: number, season: number): Promise<SideMix> {
+  return getPitcherSideMix(pitcherId, season).catch(async () => {
+    const side = async (stand: Side) =>
+      Object.fromEntries(
+        (
+          await statcastSearch(
+            {
+              type: "",
+              group_by: "pitch-type",
+              player_type: "pitcher",
+              "pitchers_lookup[]": String(pitcherId),
+              batter_stands: stand,
+              hfGT: "R|PO|", // the warehouse's season holds October too
+              min_pitches: "0",
+              min_results: "0",
+              min_pas: "0",
+            },
+            season,
+          )
+        )
+          .filter((r) => r.pitch_type)
+          .map((r) => [r.pitch_type, Number(r.pitches) || 0]),
+      );
+    const [L, R] = await Promise.all([side("L"), side("R")]);
+    return { L, R };
+  });
+}
+
+/** Pitches of the season-wide mix folded into a split one — a reliever who
+ *  has seen six lefties throws to them mostly as he does to everyone. */
+export const REGRESS_PITCHES = 100;
 
 /** PAs of league average folded into every figure — a hitter with 12 PAs
  *  against sliders reads mostly as the league does, one with 200 as himself. */
@@ -96,9 +158,29 @@ export interface PitchEdge {
  * each pitch type and the pitcher's mix. Null when the pitcher has nothing on
  * the board — no mix, nothing to weight.
  */
-function scorer(boards: ArsenalBoards, pitcherId: number) {
-  const mix = boards.arm.filter((r) => r.id === pitcherId && r.usage > 0);
-  if (mix.length === 0) return null;
+function scorer(boards: ArsenalBoards, pitcherId: number, platoon?: Platoon | null) {
+  const season = boards.arm.filter((r) => r.id === pitcherId && r.usage > 0);
+  if (season.length === 0) return null;
+  const onBoard = new Map(season.map((r) => [r.type, r]));
+  const seasonUsed = season.reduce((n, r) => n + r.usage, 0);
+
+  /** The mix this hitter's side sees — the split, pulled toward the season's
+   *  mix by REGRESS_PITCHES — or the season's when his side isn't known. A
+   *  pitch only in the split has no board line, so it reads as the league. */
+  const mixFor = (batterId: number): MixRow[] => {
+    const side = platoon?.sides[batterId];
+    const split = side && platoon!.mix[side];
+    if (!split) return season;
+    const n = Object.values(split).reduce((a, b) => a + b, 0);
+    return [...new Set([...onBoard.keys(), ...Object.keys(split)])]
+      .map((type) => ({
+        ...(onBoard.get(type) ?? { id: pitcherId, type, pa: 0, xwoba: null }),
+        usage:
+          (100 * ((split[type] ?? 0) + (REGRESS_PITCHES * (onBoard.get(type)?.usage ?? 0)) / seasonUsed)) /
+          (n + REGRESS_PITCHES),
+      }))
+      .filter((r) => r.usage > 0);
+  };
 
   /* The league on each pitch type, PA-weighted over every hitter. */
   const sums = new Map<string, { x: number; pa: number }>();
@@ -121,10 +203,10 @@ function scorer(boards: ArsenalBoards, pitcherId: number) {
   const shrunk = (r: MixRow | undefined, lg: number) =>
     r && r.xwoba !== null ? (r.xwoba * r.pa + lg * REGRESS_PA) / (r.pa + REGRESS_PA) : lg;
 
-  const used = mix.reduce((n, r) => n + r.usage, 0);
-
   /** The hitter's edges on every pitch in the mix, most-thrown first. */
   const edges = (batterId: number): PitchEdge[] => {
+    const mix = mixFor(batterId);
+    const used = mix.reduce((n, r) => n + r.usage, 0);
     const mine = new Map(
       boards.bat.filter((r) => r.id === batterId).map((r) => [r.type, r]),
     );
@@ -156,8 +238,9 @@ export function pitchEdges(
   boards: ArsenalBoards,
   pitcherId: number,
   batterId: number,
+  platoon?: Platoon | null,
 ): { league: number; pitches: PitchEdge[] } | null {
-  const s = scorer(boards, pitcherId);
+  const s = scorer(boards, pitcherId, platoon);
   return s && { league: s.league, pitches: s.edges(batterId) };
 }
 
@@ -171,8 +254,9 @@ export function lineupEdge(
   boards: ArsenalBoards,
   pitcherId: number,
   hitterIds: number[],
+  platoon?: Platoon | null,
 ): { proj: number; league: number } | null {
-  const s = scorer(boards, pitcherId);
+  const s = scorer(boards, pitcherId, platoon);
   if (!s) return null;
   let x = 0;
   let w = 0;
@@ -193,8 +277,9 @@ export function edgeLines(
   boards: ArsenalBoards,
   pitcherId: number,
   batterIds: number[],
+  platoon?: Platoon | null,
 ): Record<number, LineupLine> | null {
-  const s = scorer(boards, pitcherId);
+  const s = scorer(boards, pitcherId, platoon);
   if (!s) return null;
 
   return Object.fromEntries(

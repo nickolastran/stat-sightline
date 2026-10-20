@@ -1,8 +1,16 @@
 import Link from "next/link";
 import MetricCard from "@/components/ui/MetricCard";
 import { getPlayoffOdds } from "@/lib/api";
-import { getArsenalBoards, lineupEdge } from "@/lib/matchupEdge";
-import { gameDay, getStandings, getTeamRoster, type Game, type GameSide, type StandingRow } from "@/lib/mlb";
+import { getArsenalBoards, getSideMix, lineupEdge, sideOf, type SideMix } from "@/lib/matchupEdge";
+import {
+  gameDay,
+  getArmIdentities,
+  getStandings,
+  getTeamRoster,
+  type Game,
+  type GameSide,
+  type StandingRow,
+} from "@/lib/mlb";
 import type { PostSeries } from "@/lib/playoffs";
 import {
   baseOdds,
@@ -90,11 +98,23 @@ export default async function WorldSeriesForecast({
     );
   const homeSP = starterOf(ws.home);
   const awaySP = starterOf(ws.away);
-  const hitters = (roster: typeof homeRoster) =>
-    roster.filter((r) => r.posType !== "Pitcher").map((r) => r.id);
+  /* Each starter's hand and mix by batter side, once a starter; a miss on
+     either reads his whole-season mix. */
+  const starterIds = [...new Set([...homeSP, ...awaySP].flatMap((s) => (s ? [s.id] : [])))];
+  const [arms, mixes] = await Promise.all([
+    getArmIdentities(starterIds),
+    Promise.all(starterIds.map((id) => getSideMix(id, season).catch(() => null))),
+  ]);
+  const mixOf = new Map<number, SideMix | null>(starterIds.map((id, i) => [id, mixes[i]]));
+  const hitters = (roster: typeof homeRoster) => roster.filter((r) => r.posType !== "Pitcher");
   /** A lineup's xwOBA over the league against a starter; 0 off the board. */
-  const over = (sp: Starter | null, lineup: number[]) => {
-    const e = sp && boards ? lineupEdge(boards, sp.id, lineup) : null;
+  const over = (sp: Starter | null, lineup: typeof homeRoster) => {
+    const mix = sp && mixOf.get(sp.id);
+    const platoon = mix && {
+      mix,
+      sides: Object.fromEntries(lineup.map((r) => [r.id, sideOf(r.bats, arms[sp.id]?.throws)])),
+    };
+    const e = sp && boards ? lineupEdge(boards, sp.id, lineup.map((r) => r.id), platoon) : null;
     return e ? { proj: e.proj, over: e.proj - e.league } : null;
   };
 

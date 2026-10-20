@@ -138,3 +138,28 @@ def batter_pitches(
 ) -> PitcherPitches:
     """Every located pitch one batter saw."""
     return _pitches("batter", batter_id, pitch_type, stand, date_from, date_to, limit, vs)
+
+
+@router.get("/pitchers/{pitcher_id}/mix", response_model=dict[str, dict[str, int]])
+def pitcher_mix(
+    pitcher_id: int,
+    season: int = Query(..., description="the season the mix is counted over"),
+) -> dict[str, dict[str, int]]:
+    """One pitcher's pitches by type against each batter side, as counts —
+    `{"L": {"FF": 412, ...}, "R": {...}}` — for the forecast's platoon split."""
+    with get_engine().connect() as conn:
+        rows = conn.execute(
+            text("""
+                SELECT stand, pitch_type, COUNT(*) AS n
+                FROM savant.pitches
+                WHERE pitcher = :pid AND pitch_type IS NOT NULL AND stand IN ('L', 'R')
+                  AND game_date >= make_date(:season, 1, 1)
+                  AND game_date < make_date(:season + 1, 1, 1)
+                GROUP BY stand, pitch_type
+            """),
+            {"pid": pitcher_id, "season": season},
+        ).all()
+    out: dict[str, dict[str, int]] = {"L": {}, "R": {}}
+    for stand, pitch_type, n in rows:
+        out[stand][pitch_type] = n
+    return out

@@ -246,6 +246,17 @@ export async function getPlayerPitches(
   });
 }
 
+/** One pitcher's pitch counts by type against each batter side, off the
+ *  warehouse — `{ L: { FF: 412, … }, R: { … } }`. */
+export async function getPitcherSideMix(
+  pitcherId: number,
+  season: number,
+): Promise<Record<"L" | "R", Record<string, number>>> {
+  return api(`/api/pitchers/${pitcherId}/mix?season=${season}`, {
+    next: { revalidate: 3600 },
+  });
+}
+
 /* ── Natural-language query ("ask") ─────────────────────────────────── */
 
 export interface AskAnswer {
