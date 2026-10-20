@@ -8,7 +8,7 @@
  * Run with:  npx tsx lib/matchupEdge.check.ts
  */
 import assert from "node:assert/strict";
-import { edgeLines, REGRESS_PA, type ArsenalBoards } from "./matchupEdge";
+import { edgeLines, pitchEdges, REGRESS_PA, type ArsenalBoards } from "./matchupEdge";
 
 const row = (id: number, type: string, usage: number, pa: number, xwoba: number | null) => ({
   id, type, usage, pa, xwoba,
@@ -54,5 +54,12 @@ assert.ok(Math.abs(num(lines[4]!.proj) - 0.3) < 0.002, "an unseen hitter is leag
 assert.equal(lines[4]!.pa, 0);
 
 assert.equal(edgeLines(boards, 404, [1]), null, "a pitcher off the board has no mix");
+
+/* The breakdown behind hitter 2's line: fastball first, as thrown, at .375. */
+const parts = pitchEdges(boards, 9, 2)!;
+assert.deepEqual(parts.pitches.map((p) => p.type), ["FF", "SL"]);
+assert.ok(Math.abs(parts.pitches[0].proj - 0.375) < 1e-9, `FF ${parts.pitches[0].proj}`);
+assert.equal(parts.pitches[0].usage, 75);
+assert.equal(pitchEdges(boards, 404, 2), null);
 
 console.log("matchupEdge ok");

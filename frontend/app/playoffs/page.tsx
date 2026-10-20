@@ -7,6 +7,7 @@ import WildCard from "@/components/mlb/WildCard";
 import PlayoffOddsTable, { TitleOdds } from "@/components/mlb/PlayoffOddsTable";
 import PlayoffBracket from "@/components/mlb/PlayoffBracket";
 import PostseasonSchedule from "@/components/mlb/PostseasonSchedule";
+import WorldSeriesForecast from "@/components/mlb/WorldSeriesForecast";
 import { Skeleton, SkeletonTable } from "@/components/ui/Skeleton";
 import { getStandings, getWildCard, seasonOf, todayPT } from "@/lib/mlb";
 import { getPlayoffOdds, type PlayoffOdds } from "@/lib/api";
@@ -24,7 +25,8 @@ import { fieldSet, getPostseason, realSeeds, type PostSeries } from "@/lib/playo
  *
  * Once MLB sets the field, October is no longer a projection: the odds of
  * making it give way to the odds of winning it all, a SCHEDULE of every
- * series joins, and the bracket fills in off MLB's own series.
+ * series joins, the bracket fills in off MLB's own series, and the WORLD
+ * SERIES is called game by game off the starters.
  */
 
 export const metadata: Metadata = {
@@ -48,10 +50,11 @@ const OCTOBER = [
   { value: "odds", label: "TITLE ODDS" },
   { value: "schedule", label: "SCHEDULE" },
   { value: "bracket", label: "BRACKET" },
+  { value: "ws", label: "WORLD SERIES" },
   { value: "wildcard", label: "WILD CARD" },
 ];
 
-type View = "odds" | "wildcard" | "bracket" | "schedule";
+type View = "odds" | "wildcard" | "bracket" | "schedule" | "ws";
 
 const pickView = (raw: string | undefined, views: { value: string }[]): View =>
   views.some((v) => v.value === raw) ? (raw as View) : "odds";
@@ -86,6 +89,8 @@ async function Body({
       return <WildCard groups={await getWildCard(season)} />;
 
     if (view === "schedule") return <PostseasonSchedule series={series} />;
+
+    if (view === "ws") return <WorldSeriesForecast season={season} series={series} />;
 
     if (view === "bracket") {
       const [divisions, odds] = await Promise.all([

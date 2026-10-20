@@ -3,22 +3,50 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useTypeahead } from "@/lib/useTypeahead";
-import { searchPitchers, type Pitcher } from "@/lib/api";
-import { playerHeadshot } from "@/lib/mlb";
+import { searchPitchers, type Pitcher, type Role } from "@/lib/api";
+import { playerHeadshot, type SearchHit } from "@/lib/mlb";
 
 /*
  * Debounced player typeahead. Selecting a result routes to the dashboard
- * scoped to that player. `size` switches between the landing hero input
- * and the compact dashboard-header variant.
+ * scoped to that player — or, given `param`, sets that query parameter on
+ * the current page instead (the matchup page's two pickers). `role` picks
+ * pitchers or batters. `size` switches between the landing hero input and
+ * the compact dashboard-header variant.
  */
 
+const ROUTE: Record<Role, string> = { pitcher: "/pitcher", batter: "/hitter" };
+
+/** A result: the warehouse's, or MLB's with its position and club. */
+type Hit = Pitcher & { detail?: string };
+
+/**
+ * MLB's people search through the site's own proxy — what the deployed site,
+ * which has no warehouse API, searches instead. The listed position tells a
+ * pitcher from a hitter; a two-way player is both.
+ */
+async function mlbSearch(q: string, role: Role): Promise<Hit[]> {
+  const res = await fetch(`/api/search?q=${encodeURIComponent(q)}&mlb`);
+  if (!res.ok) throw new Error(`search ${res.status}`);
+  const { hits } = (await res.json()) as { hits: SearchHit[] };
+  return hits
+    .filter((h) => {
+      const pos = h.detail.split(" · ")[0];
+      return h.kind === "player" && (pos === "TWP" || (pos === "P") === (role === "pitcher"));
+    })
+    .map((h) => ({ player_id: h.id, full_name: h.name, throws: null, detail: h.detail }));
+}
+
 interface Props {
+  role?: Role;
+  param?: string;
   size?: "hero" | "compact";
   placeholder?: string;
   autoFocus?: boolean;
 }
 
 export default function PlayerSearch({
+  role = "pitcher",
+  param,
   size = "hero",
   placeholder = "SEARCH PITCHER — NAME OR FRAGMENT",
   autoFocus = false,
@@ -26,10 +54,18 @@ export default function PlayerSearch({
   const router = useRouter();
   const [q, setQ] = useState("");
   const { results, open, setOpen, active, setActive, error, rootRef, onKeyDown, pick } =
-    useTypeahead<Pitcher>(
+    useTypeahead<Hit>(
       q,
-      (query) => searchPitchers(query, 8),
-      (p) => router.push(`/pitcher/${p.player_id}`)
+      (query) =>
+        searchPitchers(query, 8, undefined, role).catch(() => mlbSearch(query, role)),
+      (p) => {
+        if (!param) return router.push(`${ROUTE[role]}/${p.player_id}`);
+        const next = new URLSearchParams(window.location.search);
+        next.set(param, String(p.player_id));
+        router.push(`?${next}`);
+        // Clear the box so the placeholder shows who was picked.
+        setQ("");
+      }
     );
 
   const heroSizing = size === "hero" ? "h-14 text-base" : "h-8 text-xs";
@@ -48,7 +84,7 @@ export default function PlayerSearch({
           role="combobox"
           autoComplete="off"
           aria-expanded={open}
-          aria-label="Search pitchers"
+          aria-label={`Search ${role}s`}
           autoFocus={autoFocus}
           value={q}
           onChange={(e) => setQ(e.target.value)}
@@ -97,7 +133,8 @@ export default function PlayerSearch({
                   </span>
                 </span>
                 <span className="text-ink-3">
-                  {p.throws ?? "?"}HP · {p.pitches?.toLocaleString()} P
+                  {p.detail ??
+                    `${role === "pitcher" ? `${p.throws ?? "?"}HP` : `BATS ${p.bats ?? "?"}`} · ${p.pitches?.toLocaleString()} P`}
                 </span>
               </button>
             </li>

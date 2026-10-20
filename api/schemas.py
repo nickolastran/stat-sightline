@@ -11,7 +11,8 @@ class Pitcher(BaseModel):
     player_id: int
     full_name: str | None = None
     throws: str | None = None
-    pitches: int | None = None
+    bats: str | None = None           # L / R / S (switch)
+    pitches: int | None = None        # thrown (pitchers) or seen (batters)
 
 
 class Pitch(BaseModel):
@@ -25,6 +26,7 @@ class Pitch(BaseModel):
     pfx_z: float | None = None
     description: str | None = None
     stand: str | None = None          # batter handedness this pitch
+    p_throws: str | None = None       # pitcher handedness this pitch
     sz_top: float | None = None       # this batter's zone top, ft
     sz_bot: float | None = None       # this batter's zone bottom, ft
     game_date: date | None = None
@@ -37,6 +39,17 @@ class Pitch(BaseModel):
     launch_speed: float | None = None # exit velocity, mph
     launch_angle: float | None = None # degrees
     events: str | None = None         # terminal PA outcome, else None
+    # Hitting module: barrels, spray, bat tracking, swing value, xwOBA.
+    launch_speed_angle: int | None = None  # Statcast 1-6; 6 = barrel
+    hc_x: float | None = None         # Gameday hit coordinates
+    hc_y: float | None = None
+    hit_distance: float | None = None # ft
+    bat_speed: float | None = None    # mph, swings only
+    swing_length: float | None = None # ft
+    run_value: float | None = None    # change in run expectancy
+    xwoba: float | None = None        # expected wOBA on contact
+    woba_value: float | None = None
+    woba_denom: float | None = None
 
 
 class PitcherPitches(BaseModel):

@@ -129,6 +129,13 @@ assert.equal(done.winner, 111);
 assert.equal(seriesLine(done), "BOS WINS (2-0)");
 assert.equal(clubLine([done], 147), "LOST AL WILD CARD 0-2");
 
+/* A rainout listed twice under one gamePk — postponed, then played — is one game. */
+const rained = { ...game(NYY, BOS, null), gamePk: 7, status: { abstractGameState: "Preview" } };
+const madeUp = { ...game(NYY, BOS, false), gamePk: 7 };
+const makeup = toSeries({ series: { id: "F_2" }, games: [game(NYY, BOS, false), rained, madeUp] });
+assert.equal(makeup.games.length, 2);
+assert.equal(seriesLine(makeup), "BOS WINS (2-0)");
+
 /* A division series with its wild-card side still a placeholder is a bye —
    and the placeholder is no club, so the field isn't set off it alone. */
 const bye = toSeries({ series: { id: "D_1" }, games: [game([139, "TB"], [5529, "NYY/BOS"], null)] });

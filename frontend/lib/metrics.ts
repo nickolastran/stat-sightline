@@ -39,6 +39,11 @@ export interface MetricSummary {
   avgExitVelo: number | null; // vs. batted balls allowed
   avgLaunchAngle: number | null;
   hardHitRate: number | null; // EV >= 95 among batted balls
+  barrelRate: number | null; // Statcast barrels among batted balls
+  zContactRate: number | null; // in-zone swings that made contact
+  /** Statcast's expected wOBA on contact, the actual wOBA value on every
+   *  other PA ending (BB, HBP, K), over the wOBA denominator. */
+  xwoba: number | null;
   avgHBreak: number | null; // pfx_x in inches, catcher's view
   avgVBreak: number | null; // pfx_z in inches — induced, gravity removed
 }
@@ -59,6 +64,9 @@ export function summarize(pitches: Pitch[]): MetricSummary {
   const located = pitches.filter((p) => p.zone !== null);
   const batted = pitches.filter(isBattedBall);
   const evs = batted.map((p) => p.launch_speed as number);
+  const zoneSwings = swings.filter(inZone);
+  const pas = pitches.filter((p) => (p.woba_denom ?? 0) > 0);
+  const wobaDen = pas.reduce((n, p) => n + p.woba_denom!, 0);
 
   return {
     pitches: pitches.length,
@@ -71,6 +79,9 @@ export function summarize(pitches: Pitch[]): MetricSummary {
     avgExitVelo: mean(evs),
     avgLaunchAngle: avgOf(batted, (p) => p.launch_angle),
     hardHitRate: rate(evs.filter((v) => v >= 95).length, evs.length),
+    barrelRate: rate(batted.filter((p) => p.launch_speed_angle === 6).length, batted.length),
+    zContactRate: rate(zoneSwings.filter((p) => !isWhiff(p)).length, zoneSwings.length),
+    xwoba: rate(pas.reduce((n, p) => n + (p.xwoba ?? p.woba_value ?? 0), 0), wobaDen),
     avgHBreak: avgOf(pitches, (p) => p.pfx_x, 12),
     avgVBreak: avgOf(pitches, (p) => p.pfx_z, 12),
   };
@@ -137,6 +148,9 @@ export const fmt = {
     v === null ? "—" : Math.round(v).toLocaleString(),
   pct: (v: number | null, digits = 1) =>
     v === null ? "—" : `${(v * 100).toFixed(digits)}%`,
+  /** ".331" — a rate the way a box score writes it. */
+  rate: (v: number | null) =>
+    v === null ? "—" : v.toFixed(3).replace(/^0\./, "."),
 };
 
 /* ── Uniform strike zone ────────────────────────────────────────────────

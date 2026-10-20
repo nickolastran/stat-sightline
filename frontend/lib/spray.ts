@@ -10,6 +10,7 @@
  * gives the wall's distance down each line, to each gap and to center.
  */
 import { mlb, mlbTeams } from "./mlb";
+import type { Pitch } from "./api";
 import { statcastSearch, toPitch } from "./statcast";
 
 export type HitKind = "single" | "double" | "triple" | "home_run";
@@ -58,27 +59,29 @@ const hitRows = (id: number, season: number) =>
 export const seasonHitPitches = async (id: number, season: number) =>
   (await hitRows(id, season)).map(toPitch);
 
+/** The hits among `pitches` that Gameday placed on the field — the season
+ *  read off each one's date. */
+export const pitchHits = (pitches: Pitch[]): SprayHit[] =>
+  pitches.flatMap((p): SprayHit[] =>
+    p.events && KINDS.has(p.events) && p.hc_x != null && p.hc_y != null && p.game_date
+      ? [
+          {
+            ...toFeet(p.hc_x, p.hc_y),
+            kind: p.events as HitKind,
+            season: Number(p.game_date.slice(0, 4)),
+            date: p.game_date,
+            feet: p.hit_distance == null ? null : Math.trunc(p.hit_distance),
+          },
+        ]
+      : [],
+  );
+
 /** One season's regular-season hits that Gameday placed on the field. */
 export async function seasonHits(
   id: number,
   season: number,
 ): Promise<SprayHit[]> {
-  return (await hitRows(id, season)).flatMap((r): SprayHit[] => {
-    const hcX = Number.parseFloat(r.hc_x);
-    const hcY = Number.parseFloat(r.hc_y);
-    if (!KINDS.has(r.events) || !Number.isFinite(hcX) || !Number.isFinite(hcY))
-      return [];
-    const feet = Number.parseInt(r.hit_distance_sc, 10);
-    return [
-      {
-        ...toFeet(hcX, hcY),
-        kind: r.events as HitKind,
-        season,
-        date: r.game_date,
-        feet: Number.isFinite(feet) ? feet : null,
-      },
-    ];
-  });
+  return pitchHits((await hitRows(id, season)).map(toPitch));
 }
 
 /**

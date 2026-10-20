@@ -1,5 +1,6 @@
 "use client";
 
+import type { Role } from "@/lib/api";
 import type { FilterState } from "@/lib/filters";
 import { PITCH_SLOTS, slotFor } from "@/lib/pitchColors";
 import SegmentedControl from "@/components/ui/SegmentedControl";
@@ -17,6 +18,7 @@ export interface PitchTypeOption {
 }
 
 interface Props {
+  role: Role;
   filters: FilterState;
   onChange: (patch: Partial<FilterState>) => void;
   onReset: () => void;
@@ -50,6 +52,7 @@ const daysBack = (max: string, min: string, days: number) => {
 };
 
 export default function FilterPanel({
+  role,
   filters,
   onChange,
   onReset,
@@ -193,15 +196,21 @@ export default function FilterPanel({
       </Section>
 
       <Section title="SITUATION">
-        <p className="mb-1 text-[10px] text-ink-3">BATTER SIDE</p>
+        {/* A pitcher's slice splits on who's batting, a batter's on who's
+            throwing. */}
+        <p className="mb-1 text-[10px] text-ink-3">
+          {role === "pitcher" ? "BATTER SIDE" : "PITCHER HAND"}
+        </p>
         <SegmentedControl<"L" | "R" | null>
-          ariaLabel="Batter side"
-          value={filters.stand}
-          onChange={(v) => onChange({ stand: v })}
+          ariaLabel={role === "pitcher" ? "Batter side" : "Pitcher hand"}
+          value={role === "pitcher" ? filters.stand : filters.pThrows}
+          onChange={(v) =>
+            onChange(role === "pitcher" ? { stand: v } : { pThrows: v })
+          }
           options={[
             { value: null, label: "ANY" },
-            { value: "L", label: "LHB" },
-            { value: "R", label: "RHB" },
+            { value: "L", label: role === "pitcher" ? "LHB" : "LHP" },
+            { value: "R", label: role === "pitcher" ? "RHB" : "RHP" },
           ]}
         />
         <div className="mt-2 space-y-1">

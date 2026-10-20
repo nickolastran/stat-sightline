@@ -34,8 +34,12 @@ export interface Pitcher {
   player_id: number;
   full_name: string | null;
   throws: string | null;
-  pitches?: number | null;
+  bats?: string | null; // L / R / S
+  pitches?: number | null; // thrown, or seen for a batter
 }
+
+/** Which side of the pitch table a dashboard reads: thrown or seen. */
+export type Role = "pitcher" | "batter";
 
 export interface Pitch {
   pitch_type: string | null;
@@ -48,6 +52,7 @@ export interface Pitch {
   pfx_z: number | null;
   description: string | null;
   stand: string | null;
+  p_throws?: string | null; // pitcher's hand
   sz_top: number | null; // this batter's zone top, ft
   sz_bot: number | null; // this batter's zone bottom, ft
   game_date: string | null; // ISO date
@@ -60,7 +65,8 @@ export interface Pitch {
   launch_speed: number | null; // exit velocity, mph
   launch_angle: number | null; // degrees
   events: string | null;
-  /* Savant's search carries these; the warehouse route doesn't send them. */
+  /* The warehouse route doesn't send game_pk, at_bat_number, pitch_number
+     or tto; Savant's search carries all of them. */
   game_pk?: number | null;
   at_bat_number?: number | null;
   pitch_number?: number | null; // 1 for the first pitch of the PA
@@ -71,6 +77,10 @@ export interface Pitch {
   xwoba?: number | null; // Statcast's expected wOBA on contact
   woba_value?: number | null;
   woba_denom?: number | null;
+  launch_speed_angle?: number | null; // Statcast 1-6; 6 = barrel
+  hc_x?: number | null; // Gameday hit coordinates
+  hc_y?: number | null;
+  hit_distance?: number | null; // ft
 }
 
 export interface PitcherPitches {
@@ -211,24 +221,26 @@ export async function getPlayoffOdds(season: number): Promise<PlayoffOdds> {
 export async function searchPitchers(
   q = "",
   limit = 25,
-  revalidate?: number
+  revalidate?: number,
+  role: Role = "pitcher"
 ): Promise<Pitcher[]> {
   const params = new URLSearchParams({ q, limit: String(limit) });
   return api(
-    `/api/pitchers?${params}`,
+    `/api/${role}s?${params}`,
     revalidate ? { next: { revalidate } } : { cache: "no-store" }
   );
 }
 
-export async function getPitcherPitches(
-  pitcherId: number,
+export async function getPlayerPitches(
+  role: Role,
+  playerId: number,
   opts: { pitchType?: string; stand?: "L" | "R"; limit?: number } = {}
 ): Promise<PitcherPitches> {
   const params = new URLSearchParams();
   if (opts.pitchType) params.set("pitch_type", opts.pitchType);
   if (opts.stand) params.set("stand", opts.stand);
   if (opts.limit) params.set("limit", String(opts.limit));
-  return api(`/api/pitchers/${pitcherId}/pitches?${params}`, {
+  return api(`/api/${role}s/${playerId}/pitches?${params}`, {
     cache: "no-store",
   });
 }

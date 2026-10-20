@@ -194,7 +194,12 @@ const SLOTS: Record<string, [number, number, number | null]> = {
 export function toSeries(raw: any): PostSeries {
   const id: string = raw.series?.id ?? "";
   const round = ROUND_OF[id[0]] ?? "WS";
-  const games: Game[] = (raw.games ?? []).map(toGame);
+  /* A postponed game is listed twice under one gamePk — on the day it was
+     washed out and on its makeup date. Keep the last listing, the makeup,
+     in the slot of the first. */
+  const games: Game[] = [
+    ...new Map((raw.games ?? []).map((g: any) => [g.gamePk, g])).values(),
+  ].map(toGame);
   const best = raw.games?.[0]?.gamesInSeries ?? ROUND_LENGTH[round];
   const wins = new Map<number, number>();
   for (const g of games)

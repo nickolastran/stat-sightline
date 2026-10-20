@@ -9,7 +9,7 @@
 import assert from "node:assert/strict";
 import type { Pitch } from "./api";
 import { pctColor } from "./pitchColors";
-import { arsenalRows, MIN_AB, normZ, ZONE, zoneGrid } from "./metrics";
+import { arsenalRows, MIN_AB, normZ, summarize, ZONE, zoneGrid } from "./metrics";
 
 const pitch = (o: Partial<Pitch>): Pitch =>
   ({
@@ -110,5 +110,23 @@ assert.equal(pctColor(0), "rgb(54, 97, 173)");
 assert.equal(pctColor(50), "rgb(180, 196, 201)");
 assert.equal(pctColor(100), "rgb(216, 33, 41)");
 assert.equal(pctColor(140), pctColor(100), "out-of-range clamps, never extrapolates");
+
+
+/* ── summarize: the Hitting module's rates ──────────────────────────── */
+
+const line = summarize([
+  /* A barrel, .800 expected on contact. */
+  pitch({ description: "hit_into_play", launch_speed: 105, launch_speed_angle: 6, xwoba: 0.8, woba_value: 0, woba_denom: 1 }),
+  /* A weak grounder: contact, no barrel, .100 expected. */
+  pitch({ description: "hit_into_play", launch_speed: 70, launch_speed_angle: 1, xwoba: 0.1, woba_value: 0, woba_denom: 1 }),
+  /* A strikeout swinging in the zone: no contact, a wOBA value of 0. */
+  pitch({ description: "swinging_strike", woba_value: 0, woba_denom: 1, events: "strikeout" }),
+  /* A walk: no expected value, its actual .69 counts. */
+  pitch({ description: "ball", zone: 13, woba_value: 0.69, woba_denom: 1, events: "walk" }),
+]);
+assert.equal(line.barrelRate, 0.5, "one barrel in two batted balls");
+assert.equal(line.zContactRate, 2 / 3, "two of three zone swings made contact");
+assert.ok(Math.abs(line.xwoba! - (0.8 + 0.1 + 0 + 0.69) / 4) < 1e-9, `xwOBA ${line.xwoba}`);
+assert.equal(summarize([]).xwoba, null, "no PAs, no xwOBA");
 
 console.log("metrics.check.ts OK");

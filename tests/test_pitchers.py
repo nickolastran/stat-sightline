@@ -22,7 +22,7 @@ def _roster() -> list[dict]:
 
 
 def _ids(q: str, limit: int = 25) -> list[int]:
-    return [r["player_id"] for r in R.search_pitchers(q, limit, roster=_roster())]
+    return [r["player_id"] for r in R.search_players(q, limit, roster=_roster())]
 
 
 def test_empty_query_is_every_pitcher_by_workload():
@@ -44,3 +44,8 @@ def test_accents_and_first_last_order_match_too():
 
 def test_limit_keeps_the_heaviest_workloads():
     assert _ids("", limit=2) == [1, 2]
+
+
+def test_batter_search_ranks_by_pitches_seen():
+    hits = R.search_players("martin", 25, roster=_roster(), workload="bat_n")
+    assert [r["player_id"] for r in hits] == [5], "only the one who has batted"
