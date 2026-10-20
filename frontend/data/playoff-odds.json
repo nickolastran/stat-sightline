@@ -2597,7 +2597,7 @@
    "log_loss": 0.6893,
    "run_diff_mae": 3.523,
    "train_games": 12069,
-   "trained_at": "2026-10-19T18:21:29+00:00"
+   "trained_at": "2026-10-20T16:22:42+00:00"
   },
   "postseason": true,
   "season": 2026,
@@ -2621,7 +2621,7 @@
     "team_id": 158,
     "win_division": 1.0,
     "win_pct": 0.636,
-    "win_world_series": 0.5324,
+    "win_world_series": 0.508,
     "wins": 103
    },
    {
@@ -2663,7 +2663,7 @@
     "team_id": 139,
     "win_division": 1.0,
     "win_pct": 0.605,
-    "win_world_series": 0.388,
+    "win_world_series": 0.492,
     "wins": 98
    },
    {
@@ -2831,7 +2831,7 @@
     "team_id": 114,
     "win_division": 1.0,
     "win_pct": 0.525,
-    "win_world_series": 0.0796,
+    "win_world_series": 0.0,
     "wins": 85
    },
    {
