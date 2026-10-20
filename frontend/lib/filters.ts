@@ -56,3 +56,59 @@ export function applyFilters(
     return true;
   });
 }
+
+/*
+ * The filters as URL parameters, so a slice is a link that survives a
+ * refresh. Only what differs from the default is written, and everything
+ * read back is checked — the URL is whatever someone pasted.
+ *
+ *   from, to  ISO dates          pt     pitch codes, comma-separated
+ *   b, s      balls, strikes     bat    batter side L/R   arm  pitcher hand L/R
+ *   risp, outs2, late            flags, "1" when on
+ */
+
+const DATE = /^\d{4}-\d{2}-\d{2}$/;
+const CODE = /^[A-Z]{2,3}$/;
+
+const side = (v: string | null): "L" | "R" | null =>
+  v === "L" || v === "R" ? v : null;
+const count = (v: string | null, max: number): number | null => {
+  const n = Number(v);
+  return v !== null && Number.isInteger(n) && n >= 0 && n <= max ? n : null;
+};
+
+export function filtersToQuery(f: FilterState): URLSearchParams {
+  const q = new URLSearchParams();
+  if (f.dateFrom) q.set("from", f.dateFrom);
+  if (f.dateTo) q.set("to", f.dateTo);
+  if (f.pitchTypes) q.set("pt", f.pitchTypes.join(","));
+  if (f.balls !== null) q.set("b", String(f.balls));
+  if (f.strikes !== null) q.set("s", String(f.strikes));
+  if (f.stand) q.set("bat", f.stand);
+  if (f.pThrows) q.set("arm", f.pThrows);
+  if (f.risp) q.set("risp", "1");
+  if (f.twoOuts) q.set("outs2", "1");
+  if (f.lateInnings) q.set("late", "1");
+  return q;
+}
+
+export function filtersFromQuery(q: URLSearchParams): FilterState {
+  const date = (k: string) => {
+    const v = q.get(k);
+    return v && DATE.test(v) ? v : null;
+  };
+  const pt = q.get("pt");
+  return {
+    dateFrom: date("from"),
+    dateTo: date("to"),
+    /* An empty list is a real slice (every type unchecked); junk is dropped. */
+    pitchTypes: pt === null ? null : pt.split(",").filter((c) => CODE.test(c)),
+    balls: count(q.get("b"), 3),
+    strikes: count(q.get("s"), 2),
+    stand: side(q.get("bat")),
+    pThrows: side(q.get("arm")),
+    risp: q.get("risp") === "1",
+    twoOuts: q.get("outs2") === "1",
+    lateInnings: q.get("late") === "1",
+  };
+}

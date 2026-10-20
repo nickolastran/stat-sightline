@@ -1,10 +1,13 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import type { Pitch, PitcherPitches, Role } from "@/lib/api";
 import {
   applyFilters,
   DEFAULT_FILTERS,
+  filtersFromQuery,
+  filtersToQuery,
   type FilterState,
 } from "@/lib/filters";
 import { arsenalRows, fmt, summarize } from "@/lib/metrics";
@@ -31,6 +34,11 @@ import { pitchHits, type Park } from "@/lib/spray";
  * player; every filter change re-slices it in
  * memory (useMemo chain below), so cards, plot, and tables update
  * instantly and always agree on the same slice.
+ *
+ * The slice lives in the URL too (lib/filters), so it's a link and survives
+ * a refresh. Written with history.replaceState rather than the router: the
+ * router would re-render the page on the server and refetch the whole
+ * payload on every click, for parameters only this component reads.
  *
  * HITTING leads with a hitter's own rates and swaps the movement chart —
  * a pitcher's read — for where the slice's hits went, then the player page's
@@ -78,8 +86,19 @@ export default function DashboardClient({
 }) {
   const p = data.pitcher;
   const bbe = role === "pitcher" ? "VS. BATTED BALLS" : "ON BATTED BALLS";
-  const [filters, setFilters] = useState<FilterState>(DEFAULT_FILTERS);
-  const [mode, setMode] = useState<ZonePlotMode>("scatter");
+  const params = useSearchParams();
+  const [filters, setFilters] = useState<FilterState>(() => filtersFromQuery(params));
+  const [mode, setMode] = useState<ZonePlotMode>(() => {
+    const plot = params.get("plot");
+    return plot === "heat" || plot === "zones" ? plot : "scatter";
+  });
+
+  useEffect(() => {
+    const q = filtersToQuery(filters);
+    if (mode !== "scatter") q.set("plot", mode);
+    const url = q.size ? `?${q}` : window.location.pathname;
+    window.history.replaceState(null, "", url);
+  }, [filters, mode]);
 
   const patch = (p: Partial<FilterState>) =>
     setFilters((f) => ({ ...f, ...p }));
