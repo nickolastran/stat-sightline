@@ -177,6 +177,9 @@ export interface TeamOdds {
   clinch_wild_card: number;
   make_playoffs: number;
   win_world_series: number;
+  /** The title odds before a postseason game was played — null until the
+   *  field is set, and missing from snapshots written before it existed. */
+  pre_postseason_world_series?: number | null;
 }
 
 export interface PlayoffOdds {

@@ -262,6 +262,8 @@ export function TitleOdds({
   postseason: boolean;
 }) {
   const odds = new Map(teams.map((t) => [t.team_id, t.win_world_series]));
+  const pre = new Map(teams.map((t) => [t.team_id, t.pre_postseason_world_series ?? undefined]));
+  const showPre = postseason && pre.size > 0 && [...pre.values()].some((p) => p !== undefined);
   const rows = seeds
     .flatMap((league, lg) => league.map((s) => ({ ...s, lg: lg ? "NL" : "AL" })))
     .sort((a, b) => (odds.get(b.team.id) ?? 0) - (odds.get(a.team.id) ?? 0));
@@ -278,6 +280,11 @@ export function TitleOdds({
               <th scope="col" className={`${TH} text-left`} title="Where the club's postseason stands">
                 SERIES
               </th>
+              {showPre && (
+                <th scope="col" className={TH} title="Share of simulations this club won the World Series before a postseason game was played">
+                  PRE-PLAYOFF
+                </th>
+              )}
               <th scope="col" className={TH} title="Share of simulations this club wins the World Series">
                 WIN WS
               </th>
@@ -286,6 +293,7 @@ export function TitleOdds({
           <tbody>
             {rows.map((r) => {
               const p = odds.get(r.team.id);
+              const before = pre.get(r.team.id);
               return (
                 <tr key={r.team.id} className="border-b border-grid last:border-b-0 hover:bg-surface-2">
                   <td className="w-36 min-w-36 px-2 py-1.5 whitespace-nowrap">
@@ -300,6 +308,11 @@ export function TitleOdds({
                   <td className="px-2 py-1.5 whitespace-nowrap text-[10px] tracking-wider text-ink-3">
                     {clubLine(series, r.team.id)}
                   </td>
+                  {showPre && (
+                    <td className="px-2 py-1.5 text-right tabular-nums text-ink-2">
+                      {before === undefined ? "—" : PCT(before)}
+                    </td>
+                  )}
                   <td className={`px-2 py-1.5 text-right tabular-nums ${p === undefined ? "text-ink-3" : shade(p)}`}>
                     {p === undefined ? "—" : PCT(p)}
                   </td>
@@ -313,7 +326,9 @@ export function TitleOdds({
         {postseason
           ? `${simulations.toLocaleString()} playings of the bracket from where every series stands${
               asOf ? `, off form through ${asOf}` : ""
-            }. Each game left is drawn at the model's own probability for it, with home field as MLB schedules it.`
+            }. Each game left is drawn at the model's own probability for it, with home field as MLB schedules it.${
+              showPre ? " PRE-PLAYOFF is the same bracket played out before a postseason game." : ""
+            }`
           : `${simulations.toLocaleString()} simulated seasons${
               asOf ? `, through ${asOf}` : ""
             } — the odds as the regular season ended, before a postseason game was played.`}

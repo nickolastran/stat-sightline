@@ -10,11 +10,14 @@ import { playerHeadshot, type SearchHit } from "@/lib/mlb";
  * Debounced player typeahead. Selecting a result routes to the dashboard
  * scoped to that player — or, given `param`, sets that query parameter on
  * the current page instead (the matchup page's two pickers). `role` picks
- * pitchers or batters. `size` switches between the landing hero input and
+ * pitchers or batters — or "player", anyone at all, off MLB's search, through
+ * to their player page. `size` switches between the landing hero input and
  * the compact dashboard-header variant.
  */
 
-const ROUTE: Record<Role, string> = { pitcher: "/pitcher", batter: "/hitter" };
+type Who = Role | "player";
+
+const ROUTE: Record<Who, string> = { pitcher: "/pitcher", batter: "/hitter", player: "/player" };
 
 /** A result: the warehouse's, or MLB's with its position and club. */
 type Hit = Pitcher & { detail?: string };
@@ -24,20 +27,23 @@ type Hit = Pitcher & { detail?: string };
  * which has no warehouse API, searches instead. The listed position tells a
  * pitcher from a hitter; a two-way player is both.
  */
-async function mlbSearch(q: string, role: Role): Promise<Hit[]> {
+async function mlbSearch(q: string, role: Who): Promise<Hit[]> {
   const res = await fetch(`/api/search?q=${encodeURIComponent(q)}&mlb`);
   if (!res.ok) throw new Error(`search ${res.status}`);
   const { hits } = (await res.json()) as { hits: SearchHit[] };
   return hits
     .filter((h) => {
       const pos = h.detail.split(" · ")[0];
-      return h.kind === "player" && (pos === "TWP" || (pos === "P") === (role === "pitcher"));
+      return (
+        h.kind === "player" &&
+        (role === "player" || pos === "TWP" || (pos === "P") === (role === "pitcher"))
+      );
     })
     .map((h) => ({ player_id: h.id, full_name: h.name, throws: null, detail: h.detail }));
 }
 
 interface Props {
-  role?: Role;
+  role?: Who;
   param?: string;
   size?: "hero" | "compact";
   placeholder?: string;
@@ -57,7 +63,9 @@ export default function PlayerSearch({
     useTypeahead<Hit>(
       q,
       (query) =>
-        searchPitchers(query, 8, undefined, role).catch(() => mlbSearch(query, role)),
+        role === "player"
+          ? mlbSearch(query, role)
+          : searchPitchers(query, 8, undefined, role).catch(() => mlbSearch(query, role)),
       (p) => {
         if (!param) return router.push(`${ROUTE[role]}/${p.player_id}`);
         const next = new URLSearchParams(window.location.search);

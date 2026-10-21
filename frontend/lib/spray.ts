@@ -12,6 +12,7 @@
 import { mlb, mlbTeams } from "./mlb";
 import type { Pitch } from "./api";
 import { statcastSearch, toPitch } from "./statcast";
+import OUTLINES from "./park-outlines.json";
 
 export type HitKind = "single" | "double" | "triple" | "home_run";
 
@@ -30,6 +31,10 @@ export interface Park {
   name: string;
   /** Left line, left-center, center, right-center, right line — in feet. */
   walls: [number, number, number, number, number];
+  /** The field's traced edge, wall and foul ground: a distance per whole
+   *  degree from straight back (-180) round to 179 — scripts/park_outlines.py.
+   *  Missing for parks never traced. */
+  outline?: number[];
 }
 
 /** Gameday's coordinates begin with the 2008 season. */
@@ -115,5 +120,9 @@ export async function getHomePark(teamId: number): Promise<Park | null> {
     f.rightLine,
   ];
   if (!walls.every((w) => typeof w === "number" && w > 0)) return null;
-  return { name: v.name, walls: walls as Park["walls"] };
+  return {
+    name: v.name,
+    walls: walls as Park["walls"],
+    outline: (OUTLINES as Record<string, number[]>)[teamId],
+  };
 }

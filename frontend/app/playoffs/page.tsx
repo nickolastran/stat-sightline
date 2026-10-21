@@ -53,10 +53,10 @@ const RACE = [
 /** Once the field is set: the same views, the odds now of the title, and the
  *  schedule of the series. */
 const OCTOBER = [
+  { value: "ws", label: "WORLD SERIES" },
   { value: "odds", label: "TITLE ODDS" },
   { value: "schedule", label: "SCHEDULE" },
   { value: "bracket", label: "BRACKET" },
-  { value: "ws", label: "WORLD SERIES" },
   { value: "wildcard", label: "WILD CARD" },
 ];
 

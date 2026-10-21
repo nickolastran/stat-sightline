@@ -149,6 +149,17 @@ export async function postseasonStart(season: number): Promise<string | null> {
   return data.dates?.[0]?.date ?? null;
 }
 
+/** Whether `date` falls within the season's postseason, first game to last
+ *  scheduled — the same read as postseasonStart, so the one cache entry. */
+export async function inPostseason(season: number, date: string): Promise<boolean> {
+  const data = await mlb(
+    `/schedule?sportId=1&season=${season}&gameType=F,D,L,W&fields=dates,date`,
+    3600,
+  );
+  const dates: { date: string }[] = data.dates ?? [];
+  return dates.length > 0 && dates[0].date <= date && date <= dates[dates.length - 1].date;
+}
+
 /**
  * One game's schedule row — the header half of /game/[pk] (records, status,
  * venue, probables), which the box score payload alone doesn't carry. Null for
