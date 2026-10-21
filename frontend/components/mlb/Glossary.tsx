@@ -19,8 +19,8 @@ export default function Glossary({ entries }: { entries: GlossaryEntry[] }) {
   );
 }
 
-/* Fixed-width columns centred in the box, so every gap is the same width and
-   a short block (one mark) lines up under the columns of the long one. */
+/* As many columns as fit at 16rem or wider, stretched to fill the box, so a
+   short block (one mark) lines up under the columns of the long one. */
 function Section({
   name,
   entries,
@@ -31,7 +31,7 @@ function Section({
   return (
     <section className="space-y-1.5">
       <h4 className="text-[10px] tracking-[0.2em] text-ink-3">{name}</h4>
-      <dl className="grid grid-cols-[repeat(auto-fill,16rem)] justify-center gap-x-6 gap-y-1 text-[10px] leading-relaxed">
+      <dl className="grid grid-cols-[repeat(auto-fill,minmax(16rem,1fr))] gap-x-6 gap-y-1 text-[10px] leading-relaxed">
         {entries.map((e) => (
           <div
             key={e.label}

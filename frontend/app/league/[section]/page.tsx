@@ -302,6 +302,11 @@ export default async function LeagueSectionPage({
     pitch?: string;
     zone?: string;
     split?: string;
+    as?: string;
+    gt?: string;
+    level?: string;
+    leverage?: string;
+    left?: string;
   }>;
 }) {
   const { section } = await params;

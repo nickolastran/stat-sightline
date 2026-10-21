@@ -5,9 +5,10 @@
  * this reads Baseball Savant's own ABS page, which ships its table as a
  * `const absData = [...]` literal in the HTML — and the league's own line as
  * a `leagueData` one beside it, already narrowed to whatever the filters say.
- * Scraping those is the whole client: there is no JSON endpoint behind them,
- * and the CSV export drops the challenge-rate and "reasonable take" columns
- * the board is built around.
+ * Scraping those is the whole client: there is no JSON endpoint behind them.
+ * Every row carries both sides of the ledger — its challenges as the
+ * challenger, and the same fields suffixed `_against` for the challenges made
+ * against it — so the AS CHALLENGED view is the same page, read the other way.
  *
  * Server-only, like lib/mlb. Cached for an hour — the figures move once a
  * day at most, and the batter page is well over a megabyte of HTML.
@@ -36,6 +37,40 @@ export const ABS_MINS = [0, 1, 2, 5, 10, 20].map((n) => ({
   value: String(n),
   label: String(n),
 }));
+
+/** Which side of the challenge a row is read from. */
+export const ABS_SIDES = [
+  { value: "for", label: "AS CHALLENGER" },
+  { value: "against", label: "AS CHALLENGED (OPP. POV)" },
+];
+
+/** Regular season, the postseason's four rounds, or both — Savant's game types. */
+export const ABS_GAME_TYPES = [
+  { value: "R", label: "REGULAR SEASON" },
+  { value: "F|D|L|W", label: "POSTSEASON" },
+  { value: "R|F|D|L|W", label: "ALL" },
+];
+
+export const ABS_LEVELS = [
+  { value: "mlb", label: "MLB" },
+  { value: "aaa", label: "AAA" },
+];
+
+/** How much the pitch could swing the game, in Savant's bands. */
+export const ABS_LEVERAGE = [
+  { value: "", label: "ALL" },
+  { value: "vlow", label: "VERY LOW" },
+  { value: "low", label: "LOW" },
+  { value: "med", label: "MEDIUM" },
+  { value: "high", label: "HIGH" },
+];
+
+/** Challenges the team had left when the pitch came. */
+export const ABS_REMAINING = [
+  { value: "", label: "ALL" },
+  { value: "2", label: "2" },
+  { value: "1", label: "1" },
+];
 
 /** Whether the pitch was over the plate — the call, not the challenge. */
 export const ABS_IN_OUT = [
@@ -109,6 +144,13 @@ export const ABS_GROUP_BY = [
 /** Everything the board is filtered by, as the page resolves it once. */
 export interface AbsQuery {
   type: AbsType;
+  /** "for" reads each row as the challenger; "against", as the challenged. */
+  side: string;
+  gameType: string;
+  level: string;
+  leverage: string;
+  /** Challenges left: "", "2", "1". */
+  remaining: string;
   min: string;
   minOpp: string;
   /** Whether the pitch was in the zone: "", "in", "out". */
@@ -136,6 +178,11 @@ const isTeamId = (v: string) => /^\d{3}$/.test(v);
 /** The whole filter set out of the query string, junk dropped. */
 export function pickAbsQuery(sp: {
   type?: string;
+  as?: string;
+  gt?: string;
+  level?: string;
+  leverage?: string;
+  left?: string;
   min?: string;
   minopp?: string;
   inout?: string;
@@ -154,6 +201,11 @@ export function pickAbsQuery(sp: {
   const groups = new Set(ABS_GROUP_BY.map((g) => g.value));
   return {
     type: inList(sp.type, ABS_TYPES as unknown as { value: string }[], "batting-team") as AbsType,
+    side: inList(sp.as, ABS_SIDES, "for"),
+    gameType: inList(sp.gt, ABS_GAME_TYPES, "R"),
+    level: inList(sp.level, ABS_LEVELS, "mlb"),
+    leverage: inList(sp.leverage, ABS_LEVERAGE, ""),
+    remaining: inList(sp.left, ABS_REMAINING, ""),
     min: inList(sp.min, ABS_MINS, "1"),
     minOpp: inList(sp.minopp, ABS_MINS, "0"),
     inOut: inList(sp.inout, ABS_IN_OUT, ""),
@@ -177,27 +229,39 @@ export interface AbsRow {
   teamAbbr: string | null;
   /** What this row is a slice of, when GROUP BY is on — else null. */
   split: string | null;
+  /** Run value of the challenges above what an average challenger gets out
+   *  of the same calls: what the wins gained over expected, plus what the
+   *  losses cost under it. */
+  raa: number;
+  runsGained: number;
+  runsCost: number;
+  xRunsGained: number;
+  xRunsCost: number;
+  gainVsExp: number;
+  costVsExp: number;
+  /** Run value of every call that went against this row with a challenge in
+   *  hand — what was there to take, the share taken, and what was left. */
+  possRuns: number;
+  pctRunsTaken: number | null;
+  runsNotTaken: number;
   chal: number;
   won: number;
   lost: number;
   /** Share of challenges overturned, 0-1. */
   wonPct: number | null;
-  /** Overturns above what an average challenger gets on the same calls. */
-  netOvr: number;
-  /** Runs gained above expected on those same challenges. */
-  netRuns: number;
-  /** Strikeouts gained and walks erased by an overturn. */
+  xChal: number;
+  xWon: number;
+  xLost: number;
+  xWonPct: number | null;
+  wonVsExp: number;
+  lostVsExp: number;
+  /** Overturns there were to win, the share won, and what was left. */
+  possOvr: number;
+  pctOvrTaken: number | null;
+  ovrNotTaken: number;
+  /** Strikeouts and walks an overturn turned around. */
   kFlip: number;
   bbFlip: number;
-  /** Challenges per challengeable take, actual / expected / difference. */
-  rate: number | null;
-  xRate: number | null;
-  rateDiff: number | null;
-  /** Takes worth challenging, and how many were actually challenged. */
-  rsnOpp: number;
-  rsnChal: number;
-  pctRsn: number | null;
-  pctTaken: number | null;
 }
 
 /** The board, and the league's own line on the same slice to read it against. */
@@ -209,11 +273,13 @@ export interface AbsBoard {
 const num = (v: unknown): number => (typeof v === "number" ? v : 0);
 const rate = (v: unknown): number | null => (typeof v === "number" ? v : null);
 
-function toRow(r: Record<string, unknown>, group: string[]): AbsRow {
+function toRow(r: Record<string, unknown>, group: string[], side: string): AbsRow {
   const split = group
     .map((k) => r[k])
     .filter((v) => v !== null && v !== undefined && v !== "")
     .join(" · ");
+  /* The challenged side is every challenger field again, suffixed. */
+  const f = (k: string) => r[side === "against" ? `${k}_against` : k];
   return {
     key: String(r.uniqueId ?? r.id ?? r.player_name),
     id: num(r.id),
@@ -221,21 +287,31 @@ function toRow(r: Record<string, unknown>, group: string[]): AbsRow {
     teamId: typeof r.player_team === "number" ? r.player_team : null,
     teamAbbr: typeof r.team_abbr === "string" ? r.team_abbr : null,
     split: split || null,
-    chal: num(r.n_challenges),
-    won: num(r.n_overturns),
-    lost: num(r.n_fails),
-    wonPct: rate(r.rate_overturns),
-    netOvr: num(r.net_net_chal),
-    netRuns: num(r.net_net_runs),
-    kFlip: num(r.n_strikeouts),
-    bbFlip: num(r.n_walks),
-    rate: rate(r.rate_challenges),
-    xRate: rate(r.exp_rate_challenges),
-    rateDiff: rate(r.exp_rate_challenges_diff),
-    rsnOpp: num(r.n_chal_reasonable_opps),
-    rsnChal: num(r.n_chal_reasonable),
-    pctRsn: rate(r.rate_chal_reasonable),
-    pctTaken: rate(r.rate_reasonable_opp_taken),
+    raa: num(f("runs_above_average")),
+    runsGained: num(f("n_chal_runs_gained")),
+    runsCost: num(f("runs_cost")),
+    xRunsGained: num(f("exp_chal_runs_gained")),
+    xRunsCost: num(f("exp_runs_cost")),
+    gainVsExp: num(f("net_chal_gained_runs")),
+    costVsExp: num(f("cost_vs_exp")),
+    possRuns: num(f("runs_available")),
+    pctRunsTaken: rate(f("runs_percent")),
+    runsNotTaken: num(f("runs_not_taken")),
+    chal: num(f("n_challenges")),
+    won: num(f("n_overturns")),
+    lost: num(f("n_fails")),
+    wonPct: rate(f("rate_overturns")),
+    xChal: num(f("exp_chal")),
+    xWon: num(f("exp_chal_gained")),
+    xLost: num(f("exp_chal_lost")),
+    xWonPct: rate(f("exp_rate_overturns")),
+    wonVsExp: num(f("net_chal_gained")),
+    lostVsExp: num(f("net_chal_lost")),
+    possOvr: num(f("ot_available")),
+    pctOvrTaken: rate(f("ot_percent")),
+    ovrNotTaken: num(f("ot_not_taken")),
+    kFlip: num(f("n_strikeouts")),
+    bbFlip: num(f("n_walks")),
   };
 }
 
@@ -253,7 +329,7 @@ const literal = (html: string, name: string): Record<string, unknown>[] | null =
  * real empty array. The league line is optional: losing it costs one row at
  * the top of a board that is otherwise fine.
  */
-export function parseAbs(html: string, group: string[] = []): AbsBoard {
+export function parseAbs(html: string, group: string[] = [], side = "for"): AbsBoard {
   const raw = literal(html, "absData");
   if (!raw) throw new Error("Savant ABS: no absData in page");
   /* GROUP BY splits the league line the same way it splits the board, so
@@ -262,8 +338,8 @@ export function parseAbs(html: string, group: string[] = []): AbsBoard {
      wrong one; ungrouping brings it back. */
   const league = group.length ? undefined : literal(html, "leagueData")?.[0];
   return {
-    rows: raw.map((r) => toRow(r, group)),
-    league: league ? { ...toRow(league, []), name: "LEAGUE" } : null,
+    rows: raw.map((r) => toRow(r, group, side)),
+    league: league ? { ...toRow(league, [], side), name: "LEAGUE" } : null,
   };
 }
 
@@ -280,11 +356,15 @@ export async function getAbsLeaders(
     year: String(season),
     minChal: q.min,
     minOppChal: q.minOpp,
+    gameType: q.gameType,
+    level: q.level,
   });
   /* Every one of these is "no filter" when absent, and Savant rejects some of
      them when present and empty — so an unset control sends nothing at all. */
   const optional: Record<string, string> = {
     ballStrike: q.inOut,
+    leverage: q.leverage,
+    chalRemaining: q.remaining,
     breakeven: q.conf,
     chalOrg: joined(q.org),
     oppOrg: joined(q.opp),
@@ -298,5 +378,5 @@ export async function getAbsLeaders(
     next: { revalidate: 3600 },
   });
   if (!res.ok) throw new Error(`Savant ABS ${res.status}: ${q.type}`);
-  return parseAbs(await res.text(), q.group);
+  return parseAbs(await res.text(), q.group, q.side);
 }

@@ -6,9 +6,14 @@ import { slotFor } from "@/lib/pitchColors";
 import type { Club } from "@/lib/mlb";
 import {
   ABS_CONF,
+  ABS_GAME_TYPES,
   ABS_GROUP_BY,
   ABS_IN_OUT,
+  ABS_LEVELS,
+  ABS_LEVERAGE,
   ABS_MINS,
+  ABS_REMAINING,
+  ABS_SIDES,
   ABS_PITCH_GROUPS,
   ABS_TYPES,
   ABS_ZONES,
@@ -19,7 +24,7 @@ import {
 
 /*
  * Everything the ABS board is filtered by, in one block above the table —
- * Savant's own control set, minus the level picker while this is MLB only.
+ * Savant's own control set — under a short note on how the board reads.
  *
  * A server component holding client controls: the club list behind the two
  * org pickers is a cached MLB read, so it is resolved once here rather than
@@ -69,8 +74,44 @@ export default function AbsFilterBar({
   const orgs = orgGroups(clubs);
 
   return (
+    <>
+    <details open className="mb-3 border border-line bg-bg px-3 py-2 text-xs leading-5 text-ink-2">
+      <summary className="cursor-pointer text-[10px] tracking-[0.2em] text-ink-3">
+        HOW TO READ THIS BOARD
+      </summary>
+      <div className="mt-2 space-y-2">
+        <p>
+          The Automated Ball-Strike challenge system arrived in 2026. Only the
+          batter, pitcher or catcher can challenge a call; each team starts a
+          game with two and keeps a challenge it wins. The ABS zone runs from
+          27% to 53.5% of the batter&apos;s height, measured at the middle of the
+          plate.
+        </p>
+        <p>
+          <b className="text-ink">RUNS ABOVE AVG.</b>{" "}is what a side&apos;s challenges
+          were worth in runs beyond what an average challenger gets out of the
+          very same calls — the runs its wins gained over expected, plus the
+          runs its losses cost under expected.{" "}
+          <b className="text-ink">POSS. RUNS</b> is the run value of every wrong
+          call against it while it still had a challenge, and{" "}
+          <b className="text-ink">% RUNS TAKEN</b> the share of that it actually
+          won back; <b className="text-ink">POSS. OVR.</b> and{" "}
+          <b className="text-ink">% OVR. TAKEN</b> are the same read in plain
+          overturns. A high share is a side taking its chances, a low one a
+          side sitting on them.
+        </p>
+        <p>
+          <b className="text-ink">AS CHALLENGED</b> flips every row to the
+          challenges made against it. Hover any heading for its definition,
+          or see the glossary under the table.
+        </p>
+      </div>
+    </details>
     <div className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-2 border border-line bg-bg px-3 py-2">
       <ParamSelect param="type" label="BOARD" value={query.type} options={ABS_TYPES} />
+      <ParamSelect param="as" label="VIEW" value={query.side} options={ABS_SIDES} />
+      <ParamSelect param="gt" label="SEASON TYPE" value={query.gameType} options={ABS_GAME_TYPES} />
+      <ParamSelect param="level" label="LEVEL" value={query.level} options={ABS_LEVELS} />
       <ParamMultiSelect
         param="org"
         label="CHAL. ORG."
@@ -113,10 +154,22 @@ export default function AbsFilterBar({
         options={ABS_IN_OUT}
       />
       <ParamSelect
+        param="leverage"
+        label="LEVERAGE"
+        value={query.leverage}
+        options={ABS_LEVERAGE}
+      />
+      <ParamSelect
         param="conf"
         label="CHAL. CONF. REQ."
         value={query.conf}
         options={ABS_CONF}
+      />
+      <ParamSelect
+        param="left"
+        label="CHAL. REMAINING"
+        value={query.remaining}
+        options={ABS_REMAINING}
       />
       <ParamMultiSelect
         param="split"
@@ -134,5 +187,6 @@ export default function AbsFilterBar({
         options={ABS_MINS}
       />
     </div>
+    </>
   );
 }

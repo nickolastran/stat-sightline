@@ -10,20 +10,24 @@ import { sortRows, toggleSort, type Sort } from "@/lib/sortTable";
 import { isTeamBoard, type AbsBoard as Board, type AbsRow, type AbsType } from "@/lib/abs";
 
 /*
- * One ABS challenge board — a club or a player per row, its challenges, and
- * how many of them beat what an average challenger would have got out of the
- * same calls.
+ * One ABS challenge board — a club or a player per row, laid out the way
+ * Savant's own board is: what the challenges were worth in runs against what
+ * an average challenger gets out of the same calls, then the run value there
+ * was to take and how much of it was taken, then the same two reads in plain
+ * overturns, then the strikeouts and walks an overturn turned around. SHOW
+ * MORE COLUMNS opens the expected figures each "vs. expected" comes from.
  *
  * Built here rather than on DataTable because the rank column is a property
  * of the sort rather than of a row: #1 is whoever leads the column the reader
  * is currently sorting by, so it can only be numbered after the sort runs.
  * The board arrives whole (thirty clubs, five hundred hitters at the outside),
- * so the search box and the page both work on rows already in hand — nothing
- * here goes back to the server.
+ * so the search box, the page and the extra columns all work on rows already
+ * in hand — nothing here goes back to the server.
  *
- * The two "vs expected" columns are shaded rather than just signed: they are
- * the point of the table, and a column of ±numbers all reads the same at a
- * glance. Everything else is plain, so the shading means one thing.
+ * Three columns are shaded, the ones Savant shades: RUNS ABOVE AVG. away from
+ * zero, and the two "% taken" columns away from the league's own share, so
+ * red is more than the league takes and blue less. Everything else is plain,
+ * so the shading means one thing.
  *
  * The league's own line is pinned above the board on the same slice of
  * pitches, so every figure below it has something to be read against. It is
@@ -34,58 +38,67 @@ import { isTeamBoard, type AbsBoard as Board, type AbsRow, type AbsType } from "
 /** Rows added per click of the button under the table. */
 const PAGE = 50;
 
-const pct = (v: number | null, digits = 0) =>
-  v === null ? "—" : `${(v * 100).toFixed(digits)}%`;
+const pct = (v: number | null) => (v === null ? "—" : `${Math.round(v * 100)}%`);
+const runs = (v: number) => v.toFixed(1);
 
 /** A signed figure, so a column of them reads as a difference, not a total. */
 const signed = (v: number, digits = 1) =>
   `${v > 0 ? "+" : v < 0 ? "−" : ""}${Math.abs(v).toFixed(digits)}`;
 
-/** The stat columns, in table order. `width` is the colgroup track. */
-const COLUMNS: {
+type Column = {
   key: keyof AbsRow;
   label: string;
   title: string;
+  /** The colgroup track. */
   width: string;
   text: (r: AbsRow) => string;
-  /** Set on the two shaded columns — the max is computed per board. */
-  heat?: boolean;
-}[] = [
+  /** Shaded: away from zero, or away from the league's own figure. */
+  heat?: "zero" | "league";
+  /** Only under SHOW MORE COLUMNS. */
+  more?: true;
+  /** Opens a group, behind a rule. */
+  edge?: true;
+};
+
+/** The stat columns, in table order. */
+const COLUMNS: Column[] = [
   {
-    key: "netOvr", label: "NET", width: "w-16", heat: true,
-    title: "Overturns above the number an average challenger wins on the same calls",
-    text: (r) => signed(r.netOvr),
+    key: "raa", label: "RUNS ABOVE AVG.", width: "w-20", heat: "zero", edge: true,
+    title: "Run value of the challenges above what an average challenger gets on the same calls: gain vs. expected plus cost value vs. expected",
+    text: (r) => signed(r.raa),
   },
+  { key: "runsGained", label: "RUNS GAINED", width: "w-16", title: "Run value won back by successful challenges", text: (r) => runs(r.runsGained) },
+  { key: "runsCost", label: "RUNS COST", width: "w-16", title: "Run value given up by failed challenges", text: (r) => runs(r.runsCost) },
+  { key: "xRunsGained", label: "xRUNS GAINED", width: "w-16", more: true, title: "Runs an average challenger gains on the same calls", text: (r) => runs(r.xRunsGained) },
+  { key: "xRunsCost", label: "xRUNS COST", width: "w-16", more: true, title: "Runs an average challenger costs on the same calls", text: (r) => runs(r.xRunsCost) },
+  { key: "gainVsExp", label: "GAIN VS. EXP.", width: "w-16", more: true, title: "Runs gained above expected", text: (r) => signed(r.gainVsExp) },
+  { key: "costVsExp", label: "COST VALUE VS. EXP.", width: "w-20", more: true, title: "Runs cost below expected — positive is cheaper than average", text: (r) => signed(r.costVsExp) },
   {
-    key: "netRuns", label: "RUNS", width: "w-16", heat: true,
-    title: "Run value gained by those challenges, above expected",
-    text: (r) => signed(r.netRuns),
+    key: "possRuns", label: "POSS. RUNS", width: "w-16",
+    title: "Run value of every wrong call against this side while it still had a challenge",
+    text: (r) => runs(r.possRuns),
   },
-  { key: "chal", label: "CHAL", width: "w-14", title: "Challenges used", text: (r) => String(r.chal) },
+  { key: "pctRunsTaken", label: "% RUNS TAKEN", width: "w-16", heat: "league", title: "Share of those possible runs actually won back", text: (r) => pct(r.pctRunsTaken) },
+  { key: "runsNotTaken", label: "RUNS NOT TAKEN", width: "w-16", title: "Possible runs left on the table", text: (r) => runs(r.runsNotTaken) },
+  { key: "chal", label: "CHAL", width: "w-14", edge: true, title: "Challenges made", text: (r) => String(r.chal) },
   { key: "won", label: "WON", width: "w-14", title: "Challenges that overturned the call", text: (r) => String(r.won) },
   { key: "lost", label: "LOST", width: "w-14", title: "Challenges that confirmed the call", text: (r) => String(r.lost) },
   { key: "wonPct", label: "WON%", width: "w-14", title: "Share of challenges overturned", text: (r) => pct(r.wonPct) },
-  { key: "kFlip", label: "+K", width: "w-12", title: "Strikeouts gained by an overturn", text: (r) => String(r.kFlip) },
-  { key: "bbFlip", label: "−BB", width: "w-12", title: "Walks erased by an overturn", text: (r) => String(r.bbFlip) },
-  { key: "rate", label: "RATE", width: "w-14", title: "Challenges per challengeable take", text: (r) => pct(r.rate, 1) },
+  { key: "xChal", label: "xCHAL", width: "w-14", more: true, title: "Challenges an average challenger makes in the same spots", text: (r) => runs(r.xChal) },
+  { key: "xWon", label: "xWON", width: "w-14", more: true, title: "Overturns an average challenger wins on the same calls", text: (r) => runs(r.xWon) },
+  { key: "xLost", label: "xLOST", width: "w-14", more: true, title: "Failed challenges an average challenger makes on the same calls", text: (r) => runs(r.xLost) },
+  { key: "xWonPct", label: "xWON%", width: "w-14", more: true, title: "Expected share of challenges overturned", text: (r) => pct(r.xWonPct) },
+  { key: "wonVsExp", label: "WON VS. EXP.", width: "w-16", more: true, title: "Overturns above expected", text: (r) => signed(r.wonVsExp) },
+  { key: "lostVsExp", label: "LOST VS. EXP.", width: "w-16", more: true, title: "Failed challenges above expected — negative is better", text: (r) => signed(r.lostVsExp) },
   {
-    key: "xRate", label: "xRATE", width: "w-14",
-    title: "Challenge rate an average challenger would have run in the same spots",
-    text: (r) => pct(r.xRate, 1),
+    key: "possOvr", label: "POSS. OVR.", width: "w-16", edge: true,
+    title: "Wrong calls against this side while it still had a challenge",
+    text: (r) => String(r.possOvr),
   },
-  {
-    key: "rateDiff", label: "±RATE", width: "w-14",
-    title: "Challenge rate above or below that expectation, in points",
-    text: (r) => (r.rateDiff === null ? "—" : signed(r.rateDiff * 100)),
-  },
-  {
-    key: "rsnOpp", label: "OPP", width: "w-14",
-    title: "Takes worth challenging — the call went against the taking side",
-    text: (r) => String(r.rsnOpp),
-  },
-  { key: "rsnChal", label: "RSN", width: "w-14", title: "Those opportunities that were actually challenged", text: (r) => String(r.rsnChal) },
-  { key: "pctRsn", label: "%RSN", width: "w-14", title: "Share of challenges that were worth making", text: (r) => pct(r.pctRsn) },
-  { key: "pctTaken", label: "%OPP", width: "w-14", title: "Share of worthwhile opportunities taken", text: (r) => pct(r.pctTaken) },
+  { key: "pctOvrTaken", label: "% OVR. TAKEN", width: "w-16", heat: "league", title: "Share of those possible overturns actually won", text: (r) => pct(r.pctOvrTaken) },
+  { key: "ovrNotTaken", label: "OVR. NOT TAKEN", width: "w-16", title: "Possible overturns left unchallenged", text: (r) => String(r.ovrNotTaken) },
+  { key: "kFlip", label: "K FLIP", width: "w-14", edge: true, title: "Strikeouts an overturn turned around", text: (r) => String(r.kFlip) },
+  { key: "bbFlip", label: "BB FLIP", width: "w-14", title: "Walks an overturn turned around", text: (r) => String(r.bbFlip) },
 ];
 
 const GLOSSARY = [
@@ -105,7 +118,9 @@ export default function AbsBoard({
   /* GROUP BY splits every club or player into several rows; the column only
      exists when there is something in it. */
   const split = rows.some((r) => r.split !== null);
-  const [sort, setSort] = useState<Sort>({ key: "netOvr", dir: "desc" });
+  const [sort, setSort] = useState<Sort>({ key: "raa", dir: "desc" });
+  const [more, setMore] = useState(false);
+  const cols = COLUMNS.filter((c) => more || !c.more);
   const [query, setQuery] = useState("");
   const [visible, setVisible] = useState(PAGE);
 
@@ -113,13 +128,20 @@ export default function AbsBoard({
      nothing to do with how far down the last one the reader had got. */
   useEffect(() => setVisible(PAGE), [rows, query]);
 
-  const max = useMemo(
-    () => ({
-      netOvr: Math.max(1, ...rows.map((r) => Math.abs(r.netOvr))),
-      netRuns: Math.max(1, ...rows.map((r) => Math.abs(r.netRuns))),
-    }),
-    [rows],
-  );
+  /* Each shaded column's reference point, and the furthest any row sits from
+     it — the shade is a share of that. A % column with no league line to
+     read against goes plain. */
+  const shade = useMemo(() => {
+    const out = new Map<keyof AbsRow, { at: number; max: number }>();
+    for (const c of COLUMNS) {
+      if (!c.heat) continue;
+      const base = c.heat === "zero" ? 0 : league?.[c.key];
+      if (typeof base !== "number") continue;
+      const gaps = rows.map((r) => r[c.key]).filter((v): v is number => typeof v === "number");
+      out.set(c.key, { at: base, max: Math.max(...gaps.map((v) => Math.abs(v - base)), 1e-9) });
+    }
+    return out;
+  }, [rows, league]);
 
   const ranked = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -140,7 +162,14 @@ export default function AbsBoard({
 
   return (
     <div className="space-y-2">
-      <div className="flex justify-end">
+      <div className="flex items-center justify-between gap-2">
+        <button
+          type="button"
+          onClick={() => setMore((m) => !m)}
+          className="border border-line bg-bg px-2 py-1 text-[10px] tracking-wider text-ink-2 hover:border-accent hover:text-ink"
+        >
+          {more ? "HIDE MORE COLUMNS" : "SHOW MORE COLUMNS"}
+        </button>
         <input
           type="search"
           value={query}
@@ -163,7 +192,7 @@ export default function AbsBoard({
             <col className="w-48" />
             <col className="w-16" />
             {split && <col className="w-24" />}
-            {COLUMNS.map((c) => (
+            {cols.map((c) => (
               <col key={c.key} className={c.width} />
             ))}
           </colgroup>
@@ -202,7 +231,7 @@ export default function AbsBoard({
                   className="sticky top-0 z-10"
                 />
               )}
-              {COLUMNS.map((c, i) => (
+              {cols.map((c) => (
                 <SortHeader
                   key={c.key}
                   label={c.label}
@@ -211,7 +240,7 @@ export default function AbsBoard({
                   sort={sort}
                   onSort={(k) => setSort((s) => toggleSort(s, k))}
                   align="right"
-                  className={`sticky top-0 z-10 ${i === 0 ? "border-l border-grid" : ""}`}
+                  className={`sticky top-0 z-10 align-bottom ${c.edge ? "border-l border-grid" : ""}`}
                 />
               ))}
             </tr>
@@ -220,7 +249,7 @@ export default function AbsBoard({
             {shown.length === 0 && (
               <tr>
                 <td
-                  colSpan={COLUMNS.length + (split ? 4 : 3)}
+                  colSpan={cols.length + (split ? 4 : 3)}
                   className="px-3 py-6 text-center text-ink-3"
                 >
                   {query ? "NOBODY BY THAT NAME ON THIS BOARD" : "NO ABS CHALLENGES ON THIS BOARD"}
@@ -237,11 +266,11 @@ export default function AbsBoard({
                 </td>
                 <td className="border-l border-grid px-3 py-1.5" />
                 {split && <td className="px-3 py-1.5" />}
-                {COLUMNS.map((c, j) => (
+                {cols.map((c) => (
                   <td
                     key={c.key}
                     className={`px-3 py-1.5 text-right tabular-nums ${
-                      j === 0 ? "border-l border-grid" : ""
+                      c.edge ? "border-l border-grid" : ""
                     }`}
                   >
                     {c.text(league)}
@@ -283,18 +312,17 @@ export default function AbsBoard({
                     {r.split ?? "—"}
                   </td>
                 )}
-                {COLUMNS.map((c, j) => {
+                {cols.map((c) => {
                   const value = r[c.key];
+                  const s = shade.get(c.key);
                   return (
                     <td
                       key={c.key}
                       style={
-                        c.heat && typeof value === "number"
-                          ? heat(value, max[c.key as "netOvr" | "netRuns"])
-                          : undefined
+                        s && typeof value === "number" ? heat(value - s.at, s.max) : undefined
                       }
                       className={`px-3 py-1.5 text-right tabular-nums ${
-                        j === 0 ? "border-l border-grid" : ""
+                        c.edge ? "border-l border-grid" : ""
                       } ${c.heat ? "font-bold text-ink" : "text-ink-2"}`}
                     >
                       {c.text(r)}
