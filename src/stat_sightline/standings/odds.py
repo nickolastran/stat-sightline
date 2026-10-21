@@ -357,11 +357,15 @@ def playoff_odds(season: int, games: pd.DataFrame, bundle: dict, sims: int = SIM
     # Once MLB has set the field, the regular-season draws are moot: the
     # berths are known, and the ring is played out from the real bracket.
     bracket = read_bracket(get_postseason(season), {int(t): i for i, t in enumerate(field.ids)})
+    pre_ring = None
     if bracket:
         seeds, won = bracket
         made = np.zeros(field.n)
         made[[i for league in seeds for i in league]] = sims
         out = {**out, "made": made, "ring": simulate_postseason(field, seeds, won, sims)}
+        # The same bracket with nothing yet won: the title odds on the eve of
+        # the postseason, to set beside where they stand now.
+        pre_ring = _rate(simulate_postseason(field, seeds, {}, sims), sims)
     totals = out["totals"]
 
     played = field.wins + field.losses
@@ -425,6 +429,7 @@ def playoff_odds(season: int, games: pd.DataFrame, bundle: dict, sims: int = SIM
             "clinch_wild_card": round(float(made[i] - div[i]), 4),
             "make_playoffs": float(made[i]),
             "win_world_series": float(ring[i]),
+            "pre_postseason_world_series": None if pre_ring is None else float(pre_ring[i]),
         }
         for i in range(field.n)
     ]

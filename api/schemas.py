@@ -117,6 +117,7 @@ class TeamOdds(BaseModel):
     clinch_wild_card: float
     make_playoffs: float
     win_world_series: float
+    pre_postseason_world_series: float | None = None  # before a postseason game, once the field is set
 
 
 class PlayoffOdds(BaseModel):
