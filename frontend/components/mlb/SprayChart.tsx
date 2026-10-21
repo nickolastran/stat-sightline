@@ -139,8 +139,8 @@ function Field({ park }: { park: Park }) {
   );
 }
 
-/** The listed distances, drawn over the dots so a hit never hides one — just
- *  past the wall as drawn, which a traced park's may not quite match. */
+/** The listed distances, just past the wall as drawn (which a traced park's
+ *  may not quite match) — under the dots, so a hit is never hidden by one. */
 function Dims({ park }: { park: Park }) {
   const edge = fieldEdge(park);
   return (
@@ -155,7 +155,8 @@ function Dims({ park }: { park: Park }) {
             textAnchor="middle"
             dominantBaseline="middle"
             fontSize={15}
-            fill="var(--color-ink-2)"
+            fontWeight={700}
+            fill="var(--color-ink)"
             stroke="var(--color-surface)"
             strokeWidth={4}
             paintOrder="stroke"
@@ -225,6 +226,7 @@ export default function SprayChart({
               aria-label={`${shown.length} hits on ${field.name}`}
             >
               <Field park={field} />
+              <Dims park={field} />
               {shown.map((h, i) => (
                 <circle
                   key={i}
@@ -243,7 +245,6 @@ export default function SprayChart({
                   </title>
                 </circle>
               ))}
-              <Dims park={field} />
             </svg>
             {/* Bottom right, beside the right-field line: foul ground, where
                 no hit on the chart ever lands. */}
