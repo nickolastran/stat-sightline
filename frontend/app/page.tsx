@@ -216,19 +216,20 @@ async function RightRail() {
   );
 }
 
-/** One trending chart: which board the player trends on, and their page. */
+/** One trending chart: which board the player trends on, and the whole card
+ *  a link through to their page. */
 function Trend({ pick, children }: { pick: Pick; children: React.ReactNode }) {
   return (
     <div className="space-y-1">
       <p className="text-[10px] tracking-[0.25em] text-ink-3">
         #{pick.leader.rank} {pick.card.label}
       </p>
-      {children}
       <Link
         href={`/player/${pick.leader.id}`}
-        className="block text-right text-[10px] tracking-[0.2em] text-ink-3 hover:text-ink"
+        aria-label={`${pick.leader.name}'s player page`}
+        className="block hover:[&>section]:border-accent"
       >
-        PLAYER PAGE →
+        {children}
       </Link>
     </div>
   );
