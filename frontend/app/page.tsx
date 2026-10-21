@@ -252,6 +252,12 @@ async function ZoneTrend({
     <Trend pick={pick}>
       <Panel title={`${name} · ${SEASON()} ${what}`}>
         <ZonePlot pitches={pitches} mode={mode} />
+        <p className="mt-2 text-[10px] leading-4 text-ink-3">
+          Where the pitch {what === "Hits" ? "behind each" : "that ended each"} of{" "}
+          {pitches.length} {what.toLowerCase()} crossed the plate, from the{" "}
+          catcher&apos;s view. The box is the strike zone;{" "}
+          {mode === "heat" ? "darker means more of them." : "dots are colored by pitch type."}
+        </p>
       </Panel>
     </Trend>
   );

@@ -442,10 +442,10 @@ export default function ZonePlot({
           </text>
         ))}
         <text x={PAD.l + PLOT_W / 2} y={H - 6} textAnchor="middle" fontSize={9} fill={MUTED} letterSpacing={1}>
-          HORIZONTAL FT — CATCHER&apos;S VIEW
+          FT FROM CENTER OF PLATE — CATCHER&apos;S VIEW
         </text>
         <text x={12} y={PAD.t + PLOT_H / 2} textAnchor="middle" fontSize={9} fill={MUTED} letterSpacing={1} transform={`rotate(-90 12 ${PAD.t + PLOT_H / 2})`}>
-          HEIGHT FT
+          FT OFF THE GROUND
         </text>
 
         {located.length === 0 && (
@@ -510,12 +510,12 @@ export default function ZonePlot({
         </div>
       ) : (
         <div className="flex items-center gap-1.5 border-t border-grid px-1 pt-2 text-[10px] text-ink-3">
-          <span>NONE</span>
+          <span>FEWER</span>
           <span className="inline-block h-3 w-4 border border-grid" style={{ background: SURFACE }} aria-hidden />
           {HEAT_RAMP.map((c) => (
             <span key={c} className="inline-block h-3 w-4" style={{ background: c }} aria-hidden />
           ))}
-          <span>DENSEST</span>
+          <span>MORE</span>
         </div>
       )}
     </div>
