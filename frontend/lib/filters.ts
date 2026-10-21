@@ -111,7 +111,8 @@ const side = (v: string | null): "L" | "R" | null =>
   v === "L" || v === "R" ? v : null;
 const count = (v: string | null, max: number): number | null => {
   const n = Number(v);
-  return v !== null && Number.isInteger(n) && n >= 0 && n <= max ? n : null;
+  /* "" is an untouched select on a plain form — "any", not Number("")'s 0. */
+  return v !== null && v !== "" && Number.isInteger(n) && n >= 0 && n <= max ? n : null;
 };
 
 export function filtersToQuery(f: FilterState): URLSearchParams {

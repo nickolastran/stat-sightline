@@ -23,7 +23,7 @@ export default function Sidebar({ active, pitcher, batter }: Props) {
     { code: "P-01", label: "PITCHING", href: `/pitcher/${pitcher ?? "top"}` },
     { code: "H-01", label: "HITTING", href: `/hitter/${batter ?? "top"}` },
     { code: "M-01", label: "MATCHUP FORECAST", href: `/matchup?${pair}` },
-    { code: "Q-01", label: "CUSTOM QUERIES", href: "/ask" },
+    { code: "Q-01", label: "CUSTOM QUERIES", href: "/query" },
   ];
 
   return (
