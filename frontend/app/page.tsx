@@ -286,7 +286,7 @@ export default function LandingPage() {
   return (
     <div className="mx-auto grid max-w-[96rem] grid-cols-1 gap-6 px-4 py-6 lg:grid-cols-[17rem_minmax(0,1fr)_17rem] xl:grid-cols-[19rem_minmax(0,1fr)_19rem]">
       {/* ── CENTER ──────────────────────────────────────────── */}
-      <section className="border border-line bg-bg lg:col-start-2 lg:row-start-1">
+      <section className="lg:col-start-2 lg:row-start-1">
         <div className="border-b border-line px-6 py-10 sm:px-8">
           <p className="mb-3 text-xs tracking-[0.3em] text-ink-3">
             MLB ANALYTICS // LIVE LEAGUE + STATCAST
