@@ -229,6 +229,10 @@ export async function getPostseason(season: number): Promise<PostSeries[]> {
     60,
   );
   const series: PostSeries[] = (data.series ?? [])
+    /* Only the four rounds. MLB lists a Game 163 tiebreaker ("R_112_55")
+       under the postseason too, and read as a round it took the World
+       Series' place — 2007-09, 2013, 2018. */
+    .filter((raw: any) => ROUND_OF[raw.series?.id?.[0]])
     .map(toSeries)
     .filter((s: PostSeries) => s.home && s.away)
     .sort(

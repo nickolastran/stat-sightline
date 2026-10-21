@@ -9,6 +9,8 @@
  * outside the six slots fold into a muted "other" — never a 7th generated hue.
  */
 
+import type { PitchResult } from "./metrics";
+
 export interface PitchSlot {
   color: string;
   shape: "circle" | "square" | "triangle" | "diamond" | "cross" | "star";
@@ -33,6 +35,17 @@ for (const [code, family] of Object.entries(FAMILY))
 
 export const slotFor = (pitchType: string | null): PitchSlot =>
   (pitchType && PITCH_SLOTS[pitchType]) || OTHER_SLOT;
+
+/* Pitch results on the same validated hues, each with its own shape; a ball
+   takes the muted "other" slot since it's the pitch that came to nothing. */
+export const RESULT_SLOTS: Record<PitchResult, PitchSlot> = {
+  BALL: OTHER_SLOT,
+  "CALLED STRIKE": { color: "#3987e5", shape: "square" },
+  WHIFF: { color: "#d55181", shape: "cross" },
+  FOUL: { color: "#c98500", shape: "triangle" },
+  "IN PLAY": { color: "#008300", shape: "diamond" },
+  HIT: { color: "#e66767", shape: "star" },
+};
 
 /*
  * Sequential ramp for the density heatmap — one hue (blue), anchored for the

@@ -231,6 +231,19 @@ export async function getArmIdentities(
   );
 }
 
+/** Which side each hitter bats from — "L", "R", "S" — in one request; the
+ *  posted lineups don't carry it. */
+export async function getBatSides(ids: number[]): Promise<Record<number, string>> {
+  if (ids.length === 0) return {};
+  const data = await mlb(
+    `/people?personIds=${ids.join(",")}&fields=people,id,batSide,code`,
+    86400,
+  ).catch(() => null);
+  return Object.fromEntries(
+    ((data?.people ?? []) as any[]).map((p) => [p.id, p.batSide?.code ?? ""]),
+  );
+}
+
 /**
  * A cell shaded by how far a figure sits from the league's, at the saturation
  * the swing deserves: red for a positive swing, blue for a negative one, and

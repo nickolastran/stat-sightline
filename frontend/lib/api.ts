@@ -234,14 +234,26 @@ export async function searchPitchers(
 export async function getPlayerPitches(
   role: Role,
   playerId: number,
-  opts: { pitchType?: string; stand?: "L" | "R"; limit?: number } = {}
+  opts: { pitchType?: string; stand?: "L" | "R"; limit?: number; vs?: number } = {}
 ): Promise<PitcherPitches> {
   const params = new URLSearchParams();
+  if (opts.vs) params.set("vs", String(opts.vs)); // only pitches against this opponent
   if (opts.pitchType) params.set("pitch_type", opts.pitchType);
   if (opts.stand) params.set("stand", opts.stand);
   if (opts.limit) params.set("limit", String(opts.limit));
   return api(`/api/${role}s/${playerId}/pitches?${params}`, {
     cache: "no-store",
+  });
+}
+
+/** One pitcher's pitch counts by type against each batter side, off the
+ *  warehouse — `{ L: { FF: 412, … }, R: { … } }`. */
+export async function getPitcherSideMix(
+  pitcherId: number,
+  season: number,
+): Promise<Record<"L" | "R", Record<string, number>>> {
+  return api(`/api/pitchers/${pitcherId}/mix?season=${season}`, {
+    next: { revalidate: 3600 },
   });
 }
 

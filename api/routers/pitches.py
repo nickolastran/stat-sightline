@@ -47,16 +47,18 @@ def search_batters(
 
 
 def _pitches(role: Role, player_id: int, pitch_type: str | None, stand: str | None,
-             date_from: str | None, date_to: str | None, limit: int) -> PitcherPitches:
+             date_from: str | None, date_to: str | None, limit: int,
+             vs: int | None = None) -> PitcherPitches:
     """All located pitches one player threw (pitcher) or saw (batter) — the
     dashboard's working set.
 
     The payload carries game state (count, outs, runners, inning) and
     batted-ball tracking so the frontend can slice it client-side without
     a round trip per filter change. `role` picks the column from a fixed
-    pair, never from the request text.
+    pair, never from the request text; `vs` narrows to the one opponent on
+    the other side of it — a head-to-head.
     """
-    who = "pitcher" if role == "pitcher" else "batter"
+    who, other = ("pitcher", "batter") if role == "pitcher" else ("batter", "pitcher")
     with get_engine().connect() as conn:
         meta = conn.execute(
             text("""
@@ -85,6 +87,7 @@ def _pitches(role: Role, player_id: int, pitch_type: str | None, stand: str | No
                   AND plate_x IS NOT NULL AND plate_z IS NOT NULL
                   AND (:ptype IS NULL OR pitch_type = :ptype)
                   AND (:stand IS NULL OR stand = :stand)
+                  AND (CAST(:vs AS integer) IS NULL OR {other} = CAST(:vs AS integer))
                   AND (CAST(:date_from AS date) IS NULL OR game_date >= CAST(:date_from AS date))
                   AND (CAST(:date_to AS date) IS NULL OR game_date <= CAST(:date_to AS date))
                 ORDER BY game_date, at_bat_number, pitch_number
@@ -96,6 +99,7 @@ def _pitches(role: Role, player_id: int, pitch_type: str | None, stand: str | No
                 "stand": stand,
                 "date_from": date_from,
                 "date_to": date_to,
+                "vs": vs,
                 "limit": limit,
             },
         ).mappings().all()
@@ -116,9 +120,10 @@ def pitcher_pitches(
     date_from: str | None = Query(None, description="ISO date lower bound (inclusive)"),
     date_to: str | None = Query(None, description="ISO date upper bound (inclusive)"),
     limit: int = Query(5000, le=20000),
+    vs: int | None = Query(None, description="only pitches against this batter (MLBAM id)"),
 ) -> PitcherPitches:
     """Every located pitch one pitcher threw."""
-    return _pitches("pitcher", pitcher_id, pitch_type, stand, date_from, date_to, limit)
+    return _pitches("pitcher", pitcher_id, pitch_type, stand, date_from, date_to, limit, vs)
 
 
 @router.get("/batters/{batter_id}/pitches", response_model=PitcherPitches)
@@ -129,6 +134,32 @@ def batter_pitches(
     date_from: str | None = Query(None, description="ISO date lower bound (inclusive)"),
     date_to: str | None = Query(None, description="ISO date upper bound (inclusive)"),
     limit: int = Query(5000, le=20000),
+    vs: int | None = Query(None, description="only pitches against this pitcher (MLBAM id)"),
 ) -> PitcherPitches:
     """Every located pitch one batter saw."""
-    return _pitches("batter", batter_id, pitch_type, stand, date_from, date_to, limit)
+    return _pitches("batter", batter_id, pitch_type, stand, date_from, date_to, limit, vs)
+
+
+@router.get("/pitchers/{pitcher_id}/mix", response_model=dict[str, dict[str, int]])
+def pitcher_mix(
+    pitcher_id: int,
+    season: int = Query(..., description="the season the mix is counted over"),
+) -> dict[str, dict[str, int]]:
+    """One pitcher's pitches by type against each batter side, as counts —
+    `{"L": {"FF": 412, ...}, "R": {...}}` — for the forecast's platoon split."""
+    with get_engine().connect() as conn:
+        rows = conn.execute(
+            text("""
+                SELECT stand, pitch_type, COUNT(*) AS n
+                FROM savant.pitches
+                WHERE pitcher = :pid AND pitch_type IS NOT NULL AND stand IN ('L', 'R')
+                  AND game_date >= make_date(:season, 1, 1)
+                  AND game_date < make_date(:season + 1, 1, 1)
+                GROUP BY stand, pitch_type
+            """),
+            {"pid": pitcher_id, "season": season},
+        ).all()
+    out: dict[str, dict[str, int]] = {"L": {}, "R": {}}
+    for stand, pitch_type, n in rows:
+        out[stand][pitch_type] = n
+    return out
