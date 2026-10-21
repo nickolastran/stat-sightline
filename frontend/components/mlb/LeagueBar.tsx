@@ -2,7 +2,7 @@ import Link from "next/link";
 import StatsMenu from "@/components/mlb/StatsMenu";
 import MyTeamLink from "@/components/mlb/MyTeamLink";
 import { LEAGUE_SECTIONS } from "@/lib/leagueSections";
-import { seasonOf, todayPT } from "@/lib/mlb";
+import { inPostseason, seasonOf, todayPT } from "@/lib/mlb";
 
 /*
  * League bar — the dashboard's reference sections, and the places you bring
@@ -10,9 +10,11 @@ import { seasonOf, todayPT } from "@/lib/mlb";
  * so they stay reachable from any page; navigating in place, so the bar
  * itself carries you back out to another section.
  *
- * PLAYOFFS and STATISTICS follow the sections in the same row even though
+ * STATISTICS and MODULES follow the sections in the same row even though
  * neither is a `/league/` route, because from a reader's side they are the
- * same kind of thing: one strip of everywhere the site goes. The two that
+ * same kind of thing: one strip of everywhere the site goes. PLAYOFFS leads
+ * the row while the postseason is on, and waits in the grid the rest of the
+ * year. The two that
  * aren't a league-wide board at all — a pair of players or clubs held up
  * against each other, and the season's hardware — sit behind the grid at the
  * end instead, out of the run of sections without being any harder to reach.
@@ -48,7 +50,7 @@ const TAB =
  *
  * Anchored to its right edge, which is where the grid sits.
  */
-function MoreMenu() {
+function MoreMenu({ playoffs }: { playoffs: boolean }) {
   return (
     <div className="group relative ml-auto shrink-0">
       <input
@@ -81,6 +83,7 @@ function MoreMenu() {
       <div className="invisible absolute top-full right-0 z-50 -translate-y-1 border border-line bg-bg p-3 opacity-0 shadow-lg transition peer-checked:visible peer-checked:translate-y-0 peer-checked:opacity-100 group-focus-within:visible group-focus-within:translate-y-0 group-focus-within:opacity-100 group-hover:visible group-hover:translate-y-0 group-hover:opacity-100">
         <div className="space-y-1.5">
           {[
+            ...(playoffs ? [{ href: "/playoffs", label: "PLAYOFFS" }] : []),
             { href: "/minors", label: "MINOR LEAGUES" },
             { href: "/draft", label: "DRAFT TRACKER" },
             { href: "/injuries", label: "INJURY REPORT" },
@@ -103,26 +106,30 @@ function MoreMenu() {
   );
 }
 
-export default function LeagueBar() {
+export default async function LeagueBar() {
+  const today = todayPT();
+  const live = await inPostseason(seasonOf(today), today).catch(() => false);
   return (
     <div className="sticky top-12 z-30 border-b border-line bg-bg">
       <div className="no-scrollbar flex items-center gap-px overflow-x-auto px-4 py-1.5 lg:flex-wrap lg:overflow-x-visible">
+        {live && (
+          <Link href="/playoffs" className={TAB}>
+            PLAYOFFS
+          </Link>
+        )}
         {LEAGUE_SECTIONS.filter((s) => !("inBar" in s) || s.inBar).map((s) => (
           <Link key={s.id} href={`/league/${s.id}`} className={TAB}>
             {s.tab}
           </Link>
         ))}
-        <Link href="/playoffs" className={TAB}>
-          PLAYOFFS
-        </Link>
-        <StatsMenu current={seasonOf(todayPT())} />
         {/* The pitch-level modules — pitching, hitting, matchups, queries —
             open on their first, the heaviest-workload pitcher. */}
         <Link href="/pitcher/top" className={TAB}>
           MODULES
         </Link>
+        <StatsMenu current={seasonOf(today)} />
         <MyTeamLink className={TAB} />
-        <MoreMenu />
+        <MoreMenu playoffs={!live} />
       </div>
     </div>
   );
