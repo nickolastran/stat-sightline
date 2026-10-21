@@ -87,8 +87,7 @@ not. With no `DATABASE_URL_UNPOOLED` set, direct falls back to the pooled URL,
 so a plain local Postgres is unaffected.
 
 Lakebase Postgres is the only Neon service this app uses — no Auth, Object
-Storage, Functions, or AI Gateway. The landing-page sign-in is a stubbed
-client-side form (`components/landing/AccessCta.tsx`), not a backend.
+Storage, Functions, or AI Gateway.
 
 ## Load the data
 

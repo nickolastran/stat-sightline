@@ -2,7 +2,6 @@ import Link from "next/link";
 import { connection } from "next/server";
 import { cache, Suspense } from "react";
 import PlayerSearch from "@/components/landing/PlayerSearch";
-import AccessCta from "@/components/landing/AccessCta";
 import { Card } from "@/components/mlb/TopPerformers";
 import SprayChart from "@/components/mlb/SprayChart";
 import ZonePlot, { type ZonePlotMode } from "@/components/dashboard/ZonePlot";
@@ -14,30 +13,47 @@ import { getHomePark, getSprayHits, seasonHitPitches } from "@/lib/spray";
 import { getStrikeouts } from "@/lib/statcast";
 import { seasonOf, todayPT } from "@/lib/mlb";
 
+/* The pitch-level modules, with the codes the module sidebar gives them. */
 const FEATURES: {
   index: string;
   code: string;
   title: string;
   body: string;
-  href?: string;
+  href: string;
 }[] = [
   {
     index: "01",
-    code: "K-PROB",
-    title: "STRIKEOUT PREDICTION",
-    body: "Per-plate-appearance strikeout probability from pitch-level inputs: arsenal shape, whiff profiles, count leverage, and platoon splits.",
+    code: "P-01",
+    title: "PITCHING",
+    body: "One pitcher's every pitch: arsenal, movement and strike-zone plots, sliced by count, batter side, pitch type and date.",
+    href: "/pitcher/top",
   },
   {
     index: "02",
-    code: "MATCHUP",
-    title: "BATTER VS PITCHER FORECAST",
-    body: "Head-to-head projection built on shared pitch-type exposure — not thin historical BvP samples. Expected contact quality per pitch class.",
+    code: "H-01",
+    title: "HITTING",
+    body: "One hitter's pitches seen: where in the zone they do damage, where their hits land, and how they're trending.",
+    href: "/hitter/top",
   },
   {
     index: "03",
-    code: "QUERY",
-    title: "CUSTOM STATCAST QUERIES",
-    body: "Direct filtered access to the pitch warehouse: every tracked pitch with location, movement, spin, and batted-ball outcome fields. Ask for a slice in plain English.",
+    code: "M-01",
+    title: "MATCHUP FORECAST",
+    body: "Any hitter against any pitcher: an edge built from the pitcher's mix and the hitter's results against each pitch, plus every pitch the two have actually seen from each other.",
+    href: "/matchup",
+  },
+  {
+    index: "04",
+    code: "Q-01",
+    title: "CUSTOM QUERIES",
+    body: "Pick a stat, a pitch-level slice and a minimum, and rank every pitcher or hitter in the league on it.",
+    href: "/query",
+  },
+  {
+    index: "05",
+    code: "ASK",
+    title: "ASK",
+    body: "Put a question to the pitch warehouse in plain English and get the slice back as a table.",
     href: "/ask",
   },
 ];
@@ -57,13 +73,13 @@ async function TopPitcherChips() {
   if (topPitchers.length === 0) return null;
 
   return (
-    <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
-      <span className="text-ink-3">HIGH-WORKLOAD:</span>
+    <div className="no-scrollbar mt-3 flex items-center gap-1.5 overflow-x-auto text-xs">
+      <span className="shrink-0 text-ink-3">HIGH-WORKLOAD:</span>
       {topPitchers.map((p) => (
         <Link
           key={p.player_id}
           href={`/pitcher/${p.player_id}`}
-          className="border border-line px-2 py-1 text-ink-2 hover:border-accent hover:text-ink"
+          className="shrink-0 whitespace-nowrap border border-line px-1.5 py-1 text-ink-2 hover:border-accent hover:text-ink"
         >
           {p.full_name ?? `#${p.player_id}`}
         </Link>
@@ -272,7 +288,7 @@ export default function LandingPage() {
       <section className="border border-line bg-bg lg:col-start-2 lg:row-start-1">
         <div className="border-b border-line px-6 py-10 sm:px-8">
           <p className="mb-3 text-xs tracking-[0.3em] text-ink-3">
-            PITCH-LEVEL MLB ANALYTICS // STATCAST WAREHOUSE
+            MLB ANALYTICS // LIVE LEAGUE + STATCAST
           </p>
           <h1 className="text-4xl font-bold leading-tight tracking-tight sm:text-5xl">
             EVERY PITCH.
@@ -280,11 +296,12 @@ export default function LandingPage() {
             <span className="text-accent">MEASURED.</span> QUERYABLE.
           </h1>
           <p className="mt-4 max-w-xl text-sm leading-6 text-ink-2">
-            Live game feeds, standings, playoff odds, Statcast leaderboards and
-            pitch-level breakdowns. No narrative. Numbers.
+            Live gamecasts, scores, standings and playoff odds; Statcast
+            leaderboards, player and team pages; and pitch-level breakdowns of
+            every pitcher and hitter. No narrative. Numbers.
           </p>
           <div className="mt-6 max-w-2xl">
-            <PlayerSearch autoFocus />
+            <PlayerSearch role="player" placeholder="SEARCH PLAYER" autoFocus />
             <Suspense fallback={null}>
               <TopPitcherChips />
             </Suspense>
@@ -301,13 +318,9 @@ export default function LandingPage() {
               <span className="text-xl font-bold text-ink-3">{f.index}</span>
               <div className="min-w-0 flex-1">
                 <h3 className="flex flex-wrap items-baseline gap-2 text-sm font-bold tracking-wide">
-                  {f.href ? (
-                    <Link href={f.href} className="hover:text-accent">
-                      {f.title} →
-                    </Link>
-                  ) : (
-                    f.title
-                  )}
+                  <Link href={f.href} className="hover:text-accent">
+                    {f.title} →
+                  </Link>
                   <span className="border border-line px-1.5 py-0.5 text-[10px] font-normal tracking-widest text-ink-2">
                     {f.code}
                   </span>
@@ -318,19 +331,18 @@ export default function LandingPage() {
           ))}
         </ul>
 
-        {/* ── ACCESS / AUTH CTA ─────────────────────────────── */}
-        <div id="access" className="px-6 py-8 sm:px-8">
-          <h2 className="text-xs tracking-[0.3em] text-ink-3">ACCESS</h2>
-          <p className="mt-2 mb-5 text-xs leading-5 text-ink-2">
-            Terminal access is gated. Request an operator account, or enter the
-            dashboard read-only with the public dataset.
+        {/* ── LEAGUE ────────────────────────────────────────── */}
+        <div className="px-6 py-8 sm:px-8">
+          <h2 className="text-xs tracking-[0.3em] text-ink-3">LEAGUE</h2>
+          <p className="mt-2 mb-4 text-xs leading-5 text-ink-2">
+            Today&apos;s scoreboard, probable pitchers, standings and stat
+            leaders on one page. Every board is also in the bar up top.
           </p>
-          <AccessCta />
           <Link
             href="/dashboard"
-            className="mt-4 inline-block border border-line px-4 py-2 text-xs text-ink-2 hover:border-accent hover:text-ink"
+            className="inline-block border border-line px-4 py-2 text-xs text-ink-2 hover:border-accent hover:text-ink"
           >
-            ENTER READ-ONLY →
+            LEAGUE OVERVIEW →
           </Link>
         </div>
       </section>
