@@ -32,6 +32,15 @@ pybaseball ──► ETL (pandas) ──► PostgreSQL ──► FastAPI ──�
 | `scripts/` | `init_db.py`, `run_etl.py`, `train_standings.py` |
 | `tests/` | pytest for cleaning, feature math, question parsing, and projection leakage |
 
+Each of these folders has a README of its own, file by file:
+[`api/`](api/README.md), [`config/`](config/README.md),
+[`scripts/`](scripts/README.md), [`sql/`](sql/README.md),
+[`src/`](src/README.md), [`tests/`](tests/README.md),
+[`.github/workflows/`](.github/workflows/README.md), and
+[`frontend/`](frontend/README.md) with its [`app/`](frontend/app/README.md),
+[`components/`](frontend/components/README.md), [`lib/`](frontend/lib/README.md)
+and [`data/`](frontend/data/README.md).
+
 Packages carry no `__init__.py`: every import (`api.*`, `src.stat_sightline.*`,
 `config.*`) resolves as a PEP 420 namespace package off the repo root, which
 pytest gets from `pythonpath = ["."]` in `pyproject.toml`. Add `__init__.py`
