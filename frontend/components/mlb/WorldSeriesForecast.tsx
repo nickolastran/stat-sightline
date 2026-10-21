@@ -166,7 +166,18 @@ export default async function WorldSeriesForecast({
           : atHome ? pHome : 1 - pHome;
       return { g, i, atHome, hSP, aSP, hitHome, hitAway, pHome, pSeriesHome };
     });
-    const f = seriesForecast(rows.map((r) => r.pSeriesHome));
+    /* MLB drops the "if necessary" games once a series is won, so a six-game
+       series lists six; played out as six it's first to three, not four.
+       Pad back to the full length: each missing game at its 2-3-2 park on
+       the clubs' strength alone, no starter swing — the pre-series call
+       needs them, and a decided series never reaches them. */
+    const missing = Array.from({ length: ws.best - rows.length }, (_, k) => {
+      const atHome = rows.length + k < 2 || rows.length + k >= 5;
+      return atHome
+        ? baseOdds(strength[ws.home.id], strength[ws.away.id])
+        : 1 - baseOdds(strength[ws.away.id], strength[ws.home.id]);
+    });
+    const f = seriesForecast([...rows.map((r) => r.pSeriesHome), ...missing]);
     const outcomes = [
       ...f.aIn.map((q, k) => ({ who: ws.home.abbr, k, q })),
       ...f.bIn.map((q, k) => ({ who: ws.away.abbr, k, q })),

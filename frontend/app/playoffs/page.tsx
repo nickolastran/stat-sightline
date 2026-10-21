@@ -38,6 +38,12 @@ export const metadata: Metadata = {
 /** The first season under the twelve-club bracket this page draws. */
 const FIRST_SEASON = 2022;
 
+/** Before it, back to the first season Savant's arsenal board covers — the
+ *  World Series forecast's starter matchups — that tab alone: the bracket,
+ *  wild card and title odds all draw the twelve-club format. */
+const WS_FIRST_SEASON = 2017;
+const WS_ONLY = [{ value: "ws", label: "WORLD SERIES" }];
+
 const RACE = [
   { value: "odds", label: "PLAYOFF ODDS" },
   { value: "wildcard", label: "WILD CARD" },
@@ -57,11 +63,11 @@ const OCTOBER = [
 type View = "odds" | "wildcard" | "bracket" | "schedule" | "ws";
 
 const pickView = (raw: string | undefined, views: { value: string }[]): View =>
-  views.some((v) => v.value === raw) ? (raw as View) : "odds";
+  (views.some((v) => v.value === raw) ? raw : views[0].value) as View;
 
 function pickSeason(raw: string | undefined, current: number): number {
   const n = Number(raw);
-  return Number.isInteger(n) && n >= FIRST_SEASON && n <= current ? n : current;
+  return Number.isInteger(n) && n >= WS_FIRST_SEASON && n <= current ? n : current;
 }
 
 /** The odds, or null — never a thrown error, so one dead service is one view. */
@@ -149,7 +155,7 @@ export default async function PlayoffsPage({
   const season = pickSeason(sp.season, current);
   /* A dead MLB API reads as no postseason: the race views still answer. */
   const series = await getPostseason(season).catch(() => [] as PostSeries[]);
-  const views = fieldSet(series) ? OCTOBER : RACE;
+  const views = season < FIRST_SEASON ? WS_ONLY : fieldSet(series) ? OCTOBER : RACE;
   const view = pickView(sp.view, views);
 
   return (
@@ -158,7 +164,7 @@ export default async function PlayoffsPage({
         heading="h1"
         title="Playoffs"
         right={
-          <SeasonSelect value={season} first={FIRST_SEASON} last={current} />
+          <SeasonSelect value={season} first={WS_FIRST_SEASON} last={current} />
         }
       >
         <div className="mb-3 flex">
