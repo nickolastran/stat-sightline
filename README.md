@@ -27,7 +27,7 @@ pybaseball ──► ETL (pandas) ──► PostgreSQL ──► FastAPI ──�
 | `src/stat_sightline/standings/` | Standings projection: MLB results ingest, rolling-form features, model training, season projection |
 | `src/stat_sightline/db/` | Cached SQLAlchemy engine |
 | `sql/` | `01_schema.sql` (tables + indexes), `02_feature_views.sql` (barrel, attack-zone, swing-take views) |
-| `api/` | FastAPI app + `/api/ask`, `/api/matchups`, `/api/pitchers` and `/api/standings` routers |
+| `api/` | FastAPI app + `/api/ask`, `/api/matchups`, `/api/pitchers` + `/api/batters` and `/api/standings` routers |
 | `frontend/` | Next.js 16 app (App Router, Tailwind v4, Recharts, Framer Motion); `lib/mlb/` is the MLB Stats API client every league / team / player / game page reads through |
 | `scripts/` | `init_db.py`, `run_etl.py`, `train_standings.py` |
 | `tests/` | pytest for cleaning, feature math, question parsing, and projection leakage |
@@ -166,7 +166,11 @@ standings render in full, just without the projection columns.
 | --- | --- |
 | `GET /health` | liveness |
 | `GET /api/pitchers?q=&limit=` | name typeahead, ordered by pitch count |
-| `GET /api/pitchers/{id}/pitches` | full pitch payload; filters `pitch_type`, `stand`, `date_from`, `date_to`, `limit` (≤20000) |
+| `GET /api/batters?q=&limit=` | the same, ordered by pitches seen |
+| `GET /api/pitchers/{id}/pitches` | full pitch payload; filters `pitch_type`, `stand`, `date_from`, `date_to`, `limit` (≤20000), and `vs` — one batter's id, for only the pitches between the two |
+| `GET /api/batters/{id}/pitches` | the same read from the hitter's side — every pitch he saw; `vs` takes a pitcher's id |
+| `GET /api/pitchers/{id}/mix?season=` | pitch counts by type against each batter side, `{"L": {"FF": 412, …}, "R": {…}}` — the matchup forecast's platoon split |
+| `GET /api/matchups?pitcher=&batters=` | each listed hitter's pitch-level line against one pitcher (PA, whiff%, EV, hard-hit%, xwOBA, top pitches); a hitter who never faced him is absent |
 | `GET /api/ask?q=` | plain-English question → headline number, splits, and the game log behind it. Always `200`: a stat the pitch table can't carry, or a name that matches nobody, comes back in `notes`/`suggestions` rather than as an error |
 | `GET /api/standings/projections?season=` | per club: actual W-L, games remaining, projected final W-L, both paces, plus the model's holdout metrics. Defaults to the current season (Eastern). `503` until `train_standings.py` has run |
 
@@ -255,15 +259,47 @@ every remaining game to answer, and a retrain invalidates it without a restart.
   it). Figures are written as stored — no thousands separators, an untracked
   figure left blank rather than an em dash — so a spreadsheet can add the
   column up
-- `/pitcher/[id]` — pitch-level analysis: strike-zone scatter, filter panel,
-  summary metrics. A non-numeric id falls back to the highest-workload pitcher.
+- `/pitcher/[id]`, `/hitter/[id]` — the PITCHING and HITTING modules: one
+  player's pitches thrown or seen, filtered in memory (dates, pitch type,
+  count, batter side, pitcher hand, situation) with the whole slice in the URL,
+  so a filtered view is a link. Headline tiles, the strike-zone plot (scatter /
+  density / hot-cold), movement, arsenal table and pitch log all read the same
+  slice. HITTING swaps in a spray chart, swing decisions and bat tracking, and
+  its movement chart mirrors left-handers' horizontal break so pitches from
+  both hands don't land opposite each other. COMPARE TO sets a second date
+  range — HALVES, SPLIT AT a date, or any two ranges — and every tile shows
+  its change from it, green or red by whether that's good news for the role,
+  left uncolored and flagged under 50 of the tile's own sample. A non-numeric
+  id falls back to the highest-workload player. With no API, the payload comes
+  from Savant's Statcast search instead
+- `/matchup?pitcher=&batter=` — MATCHUP FORECAST: projected xwOBA for any
+  hitter against any pitcher, weighted by the pitcher's pitch mix against the
+  side the hitter bats from (switch-hitters turn around; the split is pulled
+  toward the season mix by 100 pitches), with the per-pitch breakdown. Under
+  it, the head-to-head: the warehouse line and every pitch the two have
+  exchanged on the zone plot, colored by result
+- `/query` — CUSTOM QUERIES: a leaderboard over any pitch-level slice. Pick
+  pitchers or hitters, a season back to 2015, one of fifteen stats, a minimum
+  sample in that stat's own unit, and the modules' pitch filters; get the
+  league ranked best-first for the role, sortable, as a CSV, each row opening
+  that player's module on the same slice. One grouped Savant search per board,
+  so it needs no API. No runners-on filter — Savant's search doesn't honor one
+- `/playoffs` — title odds, schedule, bracket, wild card, and the WORLD SERIES
+  forecast: each game called off the clubs' run-based strength and the
+  starters' pitch-mix matchups, played out exactly. Once a game is final it
+  shows the call from before Game 1 beside how it stands — tiles, a before /
+  after row of outcomes with the one that happened ticked, and each game's
+  pre-series odds next to its score. Seasons from 2022 carry every tab;
+  2017–2021, back to Savant's first arsenal board, the World Series alone
 - `/api/games`, `/api/search` — same-origin proxies for the day's schedule and
   the header typeahead, both reusing `lib/mlb/`'s cached server fetch so the
   client scoreboard bar and search box never hit statsapi cross-origin
 
 Everything under `/league`, `/team`, `/player` and `/game` comes from the public
-MLB Stats API through `lib/mlb/`; only `/ask`, `/pitcher` and the projection
-columns touch our own API.
+MLB Stats API through `lib/mlb/`. Only `/ask`, the modules (`/pitcher`,
+`/hitter`, `/matchup`) and the projection columns touch our own API, and the
+modules fall back to Savant when it doesn't answer — the deployed site has
+none. `/query` reads Savant alone.
 
 ## Tests
 
@@ -282,5 +318,9 @@ wrong answer is worse than a crash:
 | `advanced.check.ts` | the Savant CSV reader (`"Last, First"` shifts every column if commas are split naively), the column catalogues, the custom board's query parsing, and the CSV writer round-tripping back through the reader |
 | `gamefeed.check.ts` | which pitch counts as a swing and miss, one row per player rather than one per batted ball, and which side of a win-probability swing the batter is on |
 | `abs.check.ts` | pulling Savant's ABS table out of the 1.6 MB page it is embedded in, next to a second array a loose regex would grab instead |
-| `metrics.check.ts` | the zone grid's batter-normalized pitch height, and the BA denominator (walks and sacs are plate appearances but not at-bats) |
+| `metrics.check.ts` | the zone grid's batter-normalized pitch height, the BA denominator (walks and sacs are plate appearances but not at-bats), pitch-result buckets (reaching on an error isn't a hit), mirroring lefties' break, and a compared tile's change — points not percent, and colored only on a big enough sample |
+| `filters.check.ts` | a filtered slice round-tripping through its own URL, junk in a pasted one rejected, an empty `?b=` read as any count rather than 0, and SPLIT AT / HALVES leaving no day in both ranges or between them |
+| `matchupEdge.check.ts` | small samples pulled toward the league, the best and worst pitch the right way round, and the platoon split: a lefty weighted by the mix lefties see, a switch-hitter on the side opposite the pitcher |
+| `customQuery.check.ts` | the modules' filters as Savant parameters (two strikes is every two-strike count), pitcher boards led by the lowest allowed, and the sample floor |
+| `worldSeries.check.ts` | log5 and home field, the starters' swing, the rotation projection, and the series played out exactly |
 | `playoffs.check.ts` | the seeding: a division winner outranks every club that didn't win one, and the bracket doesn't reseed after the wild-card round |
