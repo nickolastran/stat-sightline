@@ -5,6 +5,10 @@ import type { Pitch } from "./api";
  * plot, and table renders from the same filtered slice, so the numbers always
  * agree. Filtering is client-side over the fetched payload: filter changes
  * are instant, no refetch.
+ *
+ * A comparison range (vsFrom/vsTo) is a second slice, A: every filter the
+ * same but the dates. The tiles then read the main slice, B, with its change
+ * from A — first half against second, before and after a new pitch.
  */
 
 export interface FilterState {
@@ -18,6 +22,8 @@ export interface FilterState {
   risp: boolean; // runners on base
   twoOuts: boolean;
   lateInnings: boolean; // 7th or later
+  vsFrom: string | null; // comparison range, A; both null = no comparison
+  vsTo: string | null;
 }
 
 export const DEFAULT_FILTERS: FilterState = {
@@ -31,7 +37,37 @@ export const DEFAULT_FILTERS: FilterState = {
   risp: false,
   twoOuts: false,
   lateInnings: false,
+  vsFrom: null,
+  vsTo: null,
 };
+
+export const comparing = (f: FilterState) => f.vsFrom !== null || f.vsTo !== null;
+
+/** The comparison slice's filters: the main slice's, on A's dates. */
+export const baselineOf = (f: FilterState): FilterState => ({
+  ...f,
+  dateFrom: f.vsFrom,
+  dateTo: f.vsTo,
+});
+
+/** An ISO date `n` days on (or back, negative). */
+export const addDays = (iso: string, n: number) => {
+  const d = new Date(`${iso}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + n);
+  return d.toISOString().slice(0, 10);
+};
+
+/** Before against after `date`: A runs to the day before, B starts on it. */
+export const splitAt = (date: string): Partial<FilterState> => ({
+  vsFrom: null,
+  vsTo: addDays(date, -1),
+  dateFrom: date,
+  dateTo: null,
+});
+
+/** The day halfway between two ISO dates, where HALVES splits. */
+export const midpoint = (min: string, max: string) =>
+  addDays(min, Math.round((Date.parse(max) - Date.parse(min)) / 86400000 / 2));
 
 export function applyFilters(
   pitches: Pitch[],
@@ -65,6 +101,7 @@ export function applyFilters(
  *   from, to  ISO dates          pt     pitch codes, comma-separated
  *   b, s      balls, strikes     bat    batter side L/R   arm  pitcher hand L/R
  *   risp, outs2, late            flags, "1" when on
+ *   vsfrom, vsto  the comparison range's ISO dates
  */
 
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
@@ -89,6 +126,8 @@ export function filtersToQuery(f: FilterState): URLSearchParams {
   if (f.risp) q.set("risp", "1");
   if (f.twoOuts) q.set("outs2", "1");
   if (f.lateInnings) q.set("late", "1");
+  if (f.vsFrom) q.set("vsfrom", f.vsFrom);
+  if (f.vsTo) q.set("vsto", f.vsTo);
   return q;
 }
 
@@ -110,5 +149,7 @@ export function filtersFromQuery(q: URLSearchParams): FilterState {
     risp: q.get("risp") === "1",
     twoOuts: q.get("outs2") === "1",
     lateInnings: q.get("late") === "1",
+    vsFrom: date("vsfrom"),
+    vsTo: date("vsto"),
   };
 }

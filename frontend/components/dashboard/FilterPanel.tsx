@@ -1,7 +1,7 @@
 "use client";
 
 import type { Role } from "@/lib/api";
-import type { FilterState } from "@/lib/filters";
+import { addDays, comparing, midpoint, splitAt, type FilterState } from "@/lib/filters";
 import { PITCH_SLOTS, slotFor } from "@/lib/pitchColors";
 import SegmentedControl from "@/components/ui/SegmentedControl";
 
@@ -71,6 +71,13 @@ export default function FilterPanel({
     onChange({ pitchTypes: next.length === all.length ? null : next });
   };
 
+  /* The ranges are a SPLIT AT: A runs up to the day before B starts. */
+  const isSplit =
+    filters.dateFrom !== null &&
+    filters.dateTo === null &&
+    filters.vsFrom === null &&
+    filters.vsTo === addDays(filters.dateFrom, -1);
+
   const checkbox =
     "h-3.5 w-3.5 shrink-0 appearance-none border border-line bg-surface checked:border-accent checked:bg-accent";
 
@@ -87,7 +94,7 @@ export default function FilterPanel({
         </button>
       </div>
 
-      <Section title="DATE RANGE">
+      <Section title={comparing(filters) ? "DATE RANGE — B" : "DATE RANGE"}>
         {dateExtent && (
           <div className="mb-2 flex flex-wrap gap-px">
             {[
@@ -134,6 +141,63 @@ export default function FilterPanel({
             min={dateExtent?.min}
             max={dateExtent?.max}
             onChange={(e) => onChange({ dateTo: e.target.value || null })}
+            className="border border-line bg-surface px-2 py-1 text-[11px] text-ink-2 focus:border-accent focus:outline-none"
+          />
+        </div>
+      </Section>
+
+      {/* Slice A: the same filters on other dates; the tiles show B's change
+          from it. HALVES and SPLIT AT set both ranges at once. */}
+      <Section title="COMPARE TO — A">
+        <div className="mb-2 flex flex-wrap gap-px">
+          {dateExtent && (
+            <button
+              type="button"
+              onClick={() => onChange(splitAt(midpoint(dateExtent.min, dateExtent.max)))}
+              className="border border-line px-2 py-1 text-[11px] text-ink-3 hover:text-ink"
+            >
+              HALVES
+            </button>
+          )}
+          {comparing(filters) && (
+            <button
+              type="button"
+              onClick={() => onChange({ vsFrom: null, vsTo: null })}
+              className="border border-line px-2 py-1 text-[11px] text-ink-3 hover:text-ink"
+            >
+              OFF
+            </button>
+          )}
+        </div>
+        <label className="mb-2 flex items-center justify-between gap-2 text-[10px] text-ink-3">
+          SPLIT AT
+          <input
+            type="date"
+            aria-label="Split date: A before it, B from it on"
+            value={isSplit ? filters.dateFrom! : ""}
+            min={dateExtent?.min}
+            max={dateExtent?.max}
+            onChange={(e) => e.target.value && onChange(splitAt(e.target.value))}
+            className="border border-line bg-surface px-2 py-1 text-[11px] text-ink-2 focus:border-accent focus:outline-none"
+          />
+        </label>
+        <div className="grid grid-cols-2 gap-px">
+          <input
+            type="date"
+            aria-label="Comparison range from date"
+            value={filters.vsFrom ?? ""}
+            min={dateExtent?.min}
+            max={dateExtent?.max}
+            onChange={(e) => onChange({ vsFrom: e.target.value || null })}
+            className="border border-line bg-surface px-2 py-1 text-[11px] text-ink-2 focus:border-accent focus:outline-none"
+          />
+          <input
+            type="date"
+            aria-label="Comparison range to date"
+            value={filters.vsTo ?? ""}
+            min={dateExtent?.min}
+            max={dateExtent?.max}
+            onChange={(e) => onChange({ vsTo: e.target.value || null })}
             className="border border-line bg-surface px-2 py-1 text-[11px] text-ink-2 focus:border-accent focus:outline-none"
           />
         </div>

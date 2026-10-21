@@ -63,6 +63,34 @@ export interface MetricSummary {
   xwoba: number | null;
   avgHBreak: number | null; // pfx_x in inches, catcher's view
   avgVBreak: number | null; // pfx_z in inches — induced, gravity removed
+  /* The denominators behind the rates, for a sample-size read. */
+  swings: number;
+  zoneSwings: number;
+  outOfZone: number;
+  bbe: number; // batted balls with an exit velocity
+  pa: number; // the wOBA denominator
+}
+
+/** Each slice of a comparison needs this many of a tile's own denominator —
+ *  swings for whiff rate, batted balls for exit velo — before its change is
+ *  called good or bad.
+ *  ponytail: one floor for every stat; per-stat stabilization points
+ *  (velo settles in dozens of pitches, xwOBA in hundreds of PAs) if it misleads. */
+export const MIN_SAMPLE = 50;
+
+/** Whether B's change from A is good news, bad news, or nothing to call: no
+ *  call on a stat with no better direction, a change that rounds to nothing
+ *  (`shown`, the formatted delta), or a slice under MIN_SAMPLE. */
+export function changeTone(
+  b: number | null,
+  a: number | null,
+  shown: string,
+  better: 1 | -1 | 0,
+  samples: [number, number],
+): "good" | "bad" | null {
+  if (a === null || b === null || better === 0 || /^[±—]/.test(shown)) return null;
+  if (Math.min(...samples) < MIN_SAMPLE) return null;
+  return (b - a) * better > 0 ? "good" : "bad";
 }
 
 /** Mean of a pitch field that may be missing, scaled (ft → in for breaks). */
@@ -101,6 +129,11 @@ export function summarize(pitches: Pitch[]): MetricSummary {
     xwoba: rate(pas.reduce((n, p) => n + (p.xwoba ?? p.woba_value ?? 0), 0), wobaDen),
     avgHBreak: avgOf(pitches, (p) => p.pfx_x, 12),
     avgVBreak: avgOf(pitches, (p) => p.pfx_z, 12),
+    swings: swings.length,
+    zoneSwings: zoneSwings.length,
+    outOfZone: outOfZone.length,
+    bbe: batted.length,
+    pa: wobaDen,
   };
 }
 
@@ -168,6 +201,16 @@ export const fmt = {
   /** ".331" — a rate the way a box score writes it. */
   rate: (v: number | null) =>
     v === null ? "—" : v.toFixed(3).replace(/^0\./, "."),
+  /** B's change from A in the figure's own terms: "+1.2", "-3.4 PTS" for a
+   *  percentage (points, not percent of a percent), "+.012" for a rate. */
+  delta: (b: number | null, a: number | null, kind: "num" | "pct" | "rate") => {
+    if (a === null || b === null) return "—";
+    const d = kind === "pct" ? (b - a) * 100 : b - a;
+    const shown = Math.abs(d).toFixed(kind === "rate" ? 3 : 1);
+    /* Signed on what's shown, so a change that rounds away reads "±0.0". */
+    const sign = Number(shown) === 0 ? "±" : d > 0 ? "+" : "-";
+    return `${sign}${kind === "rate" ? shown.replace(/^0\./, ".") : shown}${kind === "pct" ? " PTS" : ""}`;
+  },
 };
 
 /* ── Uniform strike zone ────────────────────────────────────────────────

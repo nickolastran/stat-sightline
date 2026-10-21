@@ -5,12 +5,22 @@ import { useSearchParams } from "next/navigation";
 import type { Pitch, PitcherPitches, Role } from "@/lib/api";
 import {
   applyFilters,
+  baselineOf,
+  comparing,
   DEFAULT_FILTERS,
   filtersFromQuery,
   filtersToQuery,
   type FilterState,
 } from "@/lib/filters";
-import { arsenalRows, fmt, mirrorLefties, summarize } from "@/lib/metrics";
+import {
+  arsenalRows,
+  changeTone,
+  fmt,
+  MIN_SAMPLE,
+  mirrorLefties,
+  summarize,
+  type MetricSummary,
+} from "@/lib/metrics";
 import { PITCH_SLOTS, slotFor } from "@/lib/pitchColors";
 import ArsenalTable from "./ArsenalTable";
 import DataTable, { type Column } from "@/components/ui/DataTable";
@@ -43,6 +53,10 @@ import { pitchHits, type Park } from "@/lib/spray";
  * HITTING leads with a hitter's own rates and swaps the movement chart —
  * a pitcher's read — for where the slice's hits went, then the player page's
  * swing-decision and bat-tracking panels over the same slice.
+ *
+ * With a comparison range set, the tiles also read slice A — the same
+ * filters on other dates — and show the main slice's change from it. Plots
+ * and tables stay on the main slice.
  */
 
 /** What the Hitting module needs beyond the pitches: the season's
@@ -54,6 +68,32 @@ export interface Hitting {
 }
 
 const NAMED_TYPES: ReadonlySet<string> = new Set(Object.keys(PITCH_SLOTS));
+
+/** The denominators a tile's figure can rest on, as the sample note names them. */
+const SAMPLES = {
+  pitches: "PITCHES",
+  swings: "SWINGS",
+  zoneSwings: "ZONE SWINGS",
+  outOfZone: "OUT-OF-ZONE",
+  bbe: "BBE",
+  pa: "PA",
+} as const;
+
+/** A headline tile: the summary figure it reads, how that figure prints,
+ *  which way is good news for this role (0 = neither), and its sample. */
+interface Tile {
+  label: string;
+  key: keyof MetricSummary;
+  kind: "num" | "pct" | "rate";
+  unit?: string;
+  sub: string;
+  better: 1 | -1 | 0;
+  sample: keyof typeof SAMPLES;
+}
+
+/** "2026-04-01 → 2026-06-30", open ends written as the season's own. */
+const span = (from: string | null, to: string | null, extent: { min: string; max: string } | null) =>
+  `${from ?? extent?.min ?? "START"} → ${to ?? extent?.max ?? "END"}`;
 
 function Card({
   title,
@@ -108,6 +148,14 @@ export default function DashboardClient({
     [data.pitches, filters]
   );
   const summary = useMemo(() => summarize(filtered), [filtered]);
+  /* Slice A, only while comparing. */
+  const base = useMemo(
+    () =>
+      comparing(filters)
+        ? summarize(applyFilters(data.pitches, baselineOf(filters), NAMED_TYPES))
+        : null,
+    [data.pitches, filters]
+  );
   /* Movement as a hitter sees it, both hands at once: lefties mirrored, so
      the chart and the table's H-BRK read every pitch as a righty's. */
   const moved = useMemo(
@@ -146,6 +194,42 @@ export default function DashboardClient({
       max: dates.reduce((a, b) => (a > b ? a : b)),
     };
   }, [data.pitches]);
+
+  const tiles: Tile[] =
+    role === "batter"
+      ? [
+          { label: "xwOBA", key: "xwoba", kind: "rate", better: 1, sample: "pa", sub: `${summary.pitches.toLocaleString()} PITCHES SEEN` },
+          { label: "CHASE RATE", key: "chaseRate", kind: "pct", better: -1, sample: "outOfZone", sub: "SWINGS / OUT-OF-ZONE" },
+          { label: "Z-CONTACT", key: "zContactRate", kind: "pct", better: 1, sample: "zoneSwings", sub: "CONTACT / IN-ZONE SWINGS" },
+          { label: "BARREL RATE", key: "barrelRate", kind: "pct", better: 1, sample: "bbe", sub: "BARRELS / BATTED BALLS" },
+          { label: "HARD-HIT RATE", key: "hardHitRate", kind: "pct", better: 1, sample: "bbe", sub: "95+ MPH / BATTED BALLS" },
+          { label: "AVG EXIT VELO", key: "avgExitVelo", kind: "num", better: 1, sample: "bbe", unit: "MPH", sub: `LA ${fmt.num(summary.avgLaunchAngle)}° · ${bbe}` },
+        ]
+      : [
+          { label: "AVG VELO", key: "avgVelo", kind: "num", better: 1, sample: "pitches", unit: "MPH", sub: `${summary.pitches.toLocaleString()} PITCHES` },
+          { label: "WHIFF RATE", key: "whiffRate", kind: "pct", better: 1, sample: "swings", sub: "WHIFFS / SWINGS" },
+          { label: "CSW RATE", key: "cswRate", kind: "pct", better: 1, sample: "pitches", sub: "CALLED + SWINGING STR" },
+          /* Neither more nor fewer strikes is better news on its own. */
+          { label: "ZONE RATE", key: "zoneRate", kind: "pct", better: 0, sample: "pitches", sub: "IN-ZONE / LOCATED" },
+          { label: "AVG EXIT VELO", key: "avgExitVelo", kind: "num", better: -1, sample: "bbe", unit: "MPH", sub: bbe },
+          { label: "AVG LAUNCH ANG", key: "avgLaunchAngle", kind: "num", better: 0, sample: "bbe", unit: "°", sub: bbe },
+        ];
+
+  /** A tile's change from slice A: colored by the role's good-news
+   *  direction, and flagged instead when either slice is thin. */
+  const changeOf = (t: Tile, a: MetricSummary) => {
+    const delta = fmt.delta(summary[t.key], a[t.key], t.kind);
+    const samples: [number, number] = [a[t.sample], summary[t.sample]];
+    return {
+      delta,
+      was: fmt[t.kind](a[t.key]),
+      tone: changeTone(summary[t.key], a[t.key], delta, t.better, samples),
+      note:
+        Math.min(...samples) < MIN_SAMPLE
+          ? `SMALL SAMPLE: ${samples.map((n) => Math.round(n)).join(" / ")} ${SAMPLES[t.sample]}`
+          : undefined,
+    };
+  };
 
   const logColumns: Column<Pitch>[] = [
     { key: "game_date", label: "DATE", sortValue: (r) => r.game_date, render: (r) => r.game_date ?? "—" },
@@ -230,26 +314,28 @@ export default function DashboardClient({
           </div>
         </div>
 
-        {/* Key metrics — all computed from the filtered slice. */}
-        {role === "batter" ? (
-          <div className="grid grid-cols-2 gap-px sm:grid-cols-3 xl:grid-cols-6">
-            <MetricCard label="xwOBA" value={fmt.rate(summary.xwoba)} sub={`${summary.pitches.toLocaleString()} PITCHES SEEN`} />
-            <MetricCard label="CHASE RATE" value={fmt.pct(summary.chaseRate)} sub="SWINGS / OUT-OF-ZONE" />
-            <MetricCard label="Z-CONTACT" value={fmt.pct(summary.zContactRate)} sub="CONTACT / IN-ZONE SWINGS" />
-            <MetricCard label="BARREL RATE" value={fmt.pct(summary.barrelRate)} sub="BARRELS / BATTED BALLS" />
-            <MetricCard label="HARD-HIT RATE" value={fmt.pct(summary.hardHitRate)} sub="95+ MPH / BATTED BALLS" />
-            <MetricCard label="AVG EXIT VELO" value={fmt.num(summary.avgExitVelo)} unit="MPH" sub={`LA ${fmt.num(summary.avgLaunchAngle)}° · ${bbe}`} />
-          </div>
-        ) : (
-        <div className="grid grid-cols-2 gap-px sm:grid-cols-3 xl:grid-cols-6">
-          <MetricCard label="AVG VELO" value={fmt.num(summary.avgVelo)} unit="MPH" sub={`${summary.pitches.toLocaleString()} PITCHES`} />
-          <MetricCard label="WHIFF RATE" value={fmt.pct(summary.whiffRate)} sub="WHIFFS / SWINGS" />
-          <MetricCard label="CSW RATE" value={fmt.pct(summary.cswRate)} sub="CALLED + SWINGING STR" />
-          <MetricCard label="ZONE RATE" value={fmt.pct(summary.zoneRate)} sub="IN-ZONE / LOCATED" />
-          <MetricCard label="AVG EXIT VELO" value={fmt.num(summary.avgExitVelo)} unit="MPH" sub={bbe} />
-          <MetricCard label="AVG LAUNCH ANG" value={fmt.num(summary.avgLaunchAngle)} unit="°" sub={bbe} />
-        </div>
+        {/* Key metrics — all computed from the filtered slice, each with its
+            change from slice A while comparing. */}
+        {base && (
+          <p className="border border-line bg-surface px-3 py-2 text-[11px] text-ink-3">
+            <span className="font-bold text-ink">COMPARING</span>{" "}
+            B {span(filters.dateFrom, filters.dateTo, dateExtent)} ({summary.pitches.toLocaleString()} PITCHES)
+            {" "}FROM A {span(filters.vsFrom, filters.vsTo, dateExtent)} ({base.pitches.toLocaleString()} PITCHES).
+            {" "}TILES SHOW B AND ITS CHANGE FROM A.
+          </p>
         )}
+        <div className="grid grid-cols-2 gap-px sm:grid-cols-3 xl:grid-cols-6">
+          {tiles.map((t) => (
+            <MetricCard
+              key={t.key}
+              label={t.label}
+              value={fmt[t.kind](summary[t.key])}
+              unit={t.unit}
+              sub={t.sub}
+              change={base ? changeOf(t, base) : undefined}
+            />
+          ))}
+        </div>
 
         <div className="grid gap-3 lg:grid-cols-2">
           <Card

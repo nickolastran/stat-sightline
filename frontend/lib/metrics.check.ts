@@ -9,7 +9,7 @@
 import assert from "node:assert/strict";
 import type { Pitch } from "./api";
 import { pctColor } from "./pitchColors";
-import { arsenalRows, MIN_AB, mirrorLefties, normZ, resultOf, summarize, ZONE, zoneGrid } from "./metrics";
+import { arsenalRows, changeTone, fmt, MIN_AB, MIN_SAMPLE, mirrorLefties, normZ, resultOf, summarize, ZONE, zoneGrid } from "./metrics";
 
 const pitch = (o: Partial<Pitch>): Pitch =>
   ({
@@ -150,5 +150,24 @@ assert.equal(lhp.pfx_x, -0.6, "a lefty's arm-side run lands with the righty's");
 assert.equal(unknown.pfx_x, 0.6, "no hand, no flip");
 const avg = arsenalRows(mirrorLefties([pitch({ p_throws: "R", pfx_x: -0.5 }), pitch({ p_throws: "L", pfx_x: 0.5 })]), new Set(["FF"]));
 assert.equal(avg[0].avgHBreak, -6, "the type average no longer cancels to zero");
+
+/* ── fmt.delta: a tile's change from the comparison range ───────────── */
+
+assert.equal(fmt.delta(0.312, 0.25, "pct"), "+6.2 PTS", "percentage points, not percent");
+assert.equal(fmt.delta(0.301, 0.315, "rate"), "-.014");
+assert.equal(fmt.delta(94.1, 95.35, "num"), "-1.3");
+assert.equal(fmt.delta(94.01, 94.0, "num"), "±0.0", "a change that rounds away has no sign");
+assert.equal(fmt.delta(null, 94, "num"), "—");
+
+/* ── changeTone: good or bad news, by the stat's direction ──────────── */
+
+const big: [number, number] = [MIN_SAMPLE, 500];
+assert.equal(changeTone(0.31, 0.27, "+4.0 PTS", 1, big), "good", "more whiffs, a pitcher's good news");
+assert.equal(changeTone(0.31, 0.27, "+4.0 PTS", -1, big), "bad", "more chases, a hitter's bad news");
+assert.equal(changeTone(88, 90, "-2.0", -1, big), "good", "softer contact allowed");
+assert.equal(changeTone(0.5, 0.48, "+2.0 PTS", 0, big), null, "zone rate has no better direction");
+assert.equal(changeTone(94.01, 94, "±0.0", 1, big), null, "nothing to call on a change that rounds away");
+assert.equal(changeTone(0.31, 0.27, "+4.0 PTS", 1, [MIN_SAMPLE - 1, 500]), null, "too few in one slice");
+assert.equal(changeTone(null, 0.27, "—", 1, big), null);
 
 console.log("metrics.check.ts OK");
