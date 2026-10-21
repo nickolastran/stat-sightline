@@ -216,56 +216,58 @@ export default function SprayChart({
           NO BATTED-BALL DATA ON RECORD
         </p>
       ) : (
-        <div className="flex flex-col items-center gap-3 @lg:flex-row @lg:items-start @lg:justify-center">
-          <svg
-            viewBox="-360 -500 720 590"
-            className="w-full max-w-xl"
-            role="img"
-            aria-label={`${shown.length} hits on ${field.name}`}
-          >
-            <Field park={field} />
-            {shown.map((h, i) => (
-              <circle
-                key={i}
-                cx={h.x}
-                cy={-h.y}
-                r={6}
-                fill={COLOR[h.kind]}
-                stroke="#16150f"
-                strokeOpacity={0.55}
-                strokeWidth={1}
-              >
-                <title>
-                  {[LABEL[h.kind], h.date, h.feet !== null && `${h.feet} FT`]
-                    .filter(Boolean)
-                    .join(" · ")}
-                </title>
-              </circle>
-            ))}
-            <Dims park={field} />
-          </svg>
-          <div className="space-y-2">
-            <ul className="space-y-1.5">
+        <div className="mx-auto w-full max-w-xl space-y-2">
+          <div className="relative">
+            <svg
+              viewBox="-360 -500 720 590"
+              className="w-full"
+              role="img"
+              aria-label={`${shown.length} hits on ${field.name}`}
+            >
+              <Field park={field} />
+              {shown.map((h, i) => (
+                <circle
+                  key={i}
+                  cx={h.x}
+                  cy={-h.y}
+                  r={6}
+                  fill={COLOR[h.kind]}
+                  stroke="#16150f"
+                  strokeOpacity={0.55}
+                  strokeWidth={1}
+                >
+                  <title>
+                    {[LABEL[h.kind], h.date, h.feet !== null && `${h.feet} FT`]
+                      .filter(Boolean)
+                      .join(" · ")}
+                  </title>
+                </circle>
+              ))}
+              <Dims park={field} />
+            </svg>
+            {/* Bottom right, beside the right-field line: foul ground, where
+                no hit on the chart ever lands. */}
+            <ul className="pointer-events-none absolute bottom-0 right-0 leading-3">
               {KINDS.map((k) => (
                 <li
                   key={k.kind}
-                  className="flex items-center gap-2 text-[10px] tracking-[0.2em] text-ink-2"
+                  className="flex items-center gap-1 whitespace-nowrap text-[9px] text-ink-2"
                 >
                   <span
-                    className="h-2.5 w-2.5 border border-ink/50"
+                    className="h-2 w-2 border border-ink/50"
                     style={{ background: k.color, borderRadius: "50%" }}
                   />
-                  <span className="w-20">{k.label}</span>
+                  <span className="w-12">{k.label}</span>
                   <span className="tabular-nums text-ink">
                     {shown.filter((h) => h.kind === k.kind).length}
                   </span>
                 </li>
               ))}
             </ul>
-            <p className="max-w-[12rem] text-[10px] text-ink-3">
-              Drawn on {field.name}. Regular season, Statcast-tracked hits.
-            </p>
           </div>
+          <p className="text-[10px] text-ink-3">
+            Drawn on {field.name}. Regular season, Statcast-tracked hits.
+          </p>
         </div>
       )}
     </Panel>
