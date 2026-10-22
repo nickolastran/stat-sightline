@@ -1,1 +1,218 @@
-{}
+{
+ "694819": [
+  {
+   "avg_ev": 88.4,
+   "batter": 622761,
+   "hard_hit_pct": 50.0,
+   "mix": [
+    {
+     "pct": 75.0,
+     "pitch_type": "FF"
+    },
+    {
+     "pct": 25.0,
+     "pitch_type": "FC"
+    }
+   ],
+   "pa": 2,
+   "pitches": 8,
+   "whiff_pct": 25.0,
+   "xwoba": 0.337
+  },
+  {
+   "avg_ev": 82.8,
+   "batter": 689414,
+   "hard_hit_pct": 0.0,
+   "mix": [
+    {
+     "pct": 60.0,
+     "pitch_type": "FF"
+    },
+    {
+     "pct": 20.0,
+     "pitch_type": "CU"
+    },
+    {
+     "pct": 20.0,
+     "pitch_type": "FC"
+    }
+   ],
+   "pa": 2,
+   "pitches": 5,
+   "whiff_pct": 25.0,
+   "xwoba": 0.403
+  },
+  {
+   "avg_ev": 68.0,
+   "batter": 802415,
+   "hard_hit_pct": 0.0,
+   "mix": [
+    {
+     "pct": 75.0,
+     "pitch_type": "FF"
+    },
+    {
+     "pct": 16.7,
+     "pitch_type": "SL"
+    },
+    {
+     "pct": 8.3,
+     "pitch_type": "CU"
+    }
+   ],
+   "pa": 3,
+   "pitches": 12,
+   "whiff_pct": 50.0,
+   "xwoba": 0.336
+  },
+  {
+   "avg_ev": 92.6,
+   "batter": 663743,
+   "hard_hit_pct": 66.7,
+   "mix": [
+    {
+     "pct": 60.0,
+     "pitch_type": "FF"
+    },
+    {
+     "pct": 20.0,
+     "pitch_type": "SL"
+    },
+    {
+     "pct": 20.0,
+     "pitch_type": "CU"
+    }
+   ],
+   "pa": 3,
+   "pitches": 15,
+   "whiff_pct": 10.0,
+   "xwoba": 0.195
+  },
+  {
+   "avg_ev": null,
+   "batter": 656775,
+   "hard_hit_pct": null,
+   "mix": [
+    {
+     "pct": 71.4,
+     "pitch_type": "FF"
+    },
+    {
+     "pct": 14.3,
+     "pitch_type": "CH"
+    },
+    {
+     "pct": 7.1,
+     "pitch_type": "CU"
+    }
+   ],
+   "pa": 3,
+   "pitches": 14,
+   "whiff_pct": 33.3,
+   "xwoba": 0.0
+  },
+  {
+   "avg_ev": 77.8,
+   "batter": 691406,
+   "hard_hit_pct": 0.0,
+   "mix": [
+    {
+     "pct": 62.5,
+     "pitch_type": "SL"
+    },
+    {
+     "pct": 37.5,
+     "pitch_type": "FF"
+    }
+   ],
+   "pa": 3,
+   "pitches": 8,
+   "whiff_pct": 60.0,
+   "xwoba": 0.09
+  },
+  {
+   "avg_ev": 98.1,
+   "batter": 666018,
+   "hard_hit_pct": 100.0,
+   "mix": [
+    {
+     "pct": 42.9,
+     "pitch_type": "SL"
+    },
+    {
+     "pct": 42.9,
+     "pitch_type": "FF"
+    },
+    {
+     "pct": 14.3,
+     "pitch_type": "CH"
+    }
+   ],
+   "pa": 3,
+   "pitches": 14,
+   "whiff_pct": 0.0,
+   "xwoba": 0.437
+  },
+  {
+   "avg_ev": 78.0,
+   "batter": 650490,
+   "hard_hit_pct": 50.0,
+   "mix": [
+    {
+     "pct": 90.0,
+     "pitch_type": "FF"
+    },
+    {
+     "pct": 10.0,
+     "pitch_type": "SL"
+    }
+   ],
+   "pa": 3,
+   "pitches": 10,
+   "whiff_pct": 42.9,
+   "xwoba": 0.511
+  },
+  {
+   "avg_ev": null,
+   "batter": 680700,
+   "hard_hit_pct": null,
+   "mix": [
+    {
+     "pct": 66.7,
+     "pitch_type": "FF"
+    },
+    {
+     "pct": 22.2,
+     "pitch_type": "SL"
+    },
+    {
+     "pct": 11.1,
+     "pitch_type": "CH"
+    }
+   ],
+   "pa": 2,
+   "pitches": 9,
+   "whiff_pct": 50.0,
+   "xwoba": 0.714
+  },
+  {
+   "avg_ev": 86.3,
+   "batter": 810938,
+   "hard_hit_pct": 33.3,
+   "mix": [
+    {
+     "pct": 55.6,
+     "pitch_type": "SL"
+    },
+    {
+     "pct": 44.4,
+     "pitch_type": "FF"
+    }
+   ],
+   "pa": 3,
+   "pitches": 9,
+   "whiff_pct": 0.0,
+   "xwoba": 0.248
+  }
+ ]
+}
