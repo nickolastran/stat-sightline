@@ -127,6 +127,9 @@ export default async function LeagueBar() {
         <Link href="/pitcher/top" className={TAB}>
           MODULES
         </Link>
+        <Link href="/free-agents" className={TAB}>
+          FREE AGENTS
+        </Link>
         <StatsMenu current={seasonOf(today)} />
         <MyTeamLink className={TAB} />
         <MoreMenu playoffs={!live} />

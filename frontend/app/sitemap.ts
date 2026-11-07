@@ -22,6 +22,7 @@ const STATIC = [
   "/minors",
   "/draft",
   "/salaries",
+  "/free-agents",
   "/award",
   "/compare",
   "/compare/teams",
