@@ -41,5 +41,14 @@ assert.equal(signed.toAbbr, "BAL");
 assert.equal(signed.type, "MiLB");
 assert.equal(signed.age, null);
 assert.equal(signed.salary, 5_000_000);
+assert.equal(signed.note, "");
+
+const claimed = toFreeAgent(
+  { player: { id: 2 }, notes: "Claimed off waivers." },
+  undefined,
+  abbr,
+  null,
+);
+assert.equal(claimed.note, "Claimed Off Waivers");
 
 console.log("freeAgents: ok");

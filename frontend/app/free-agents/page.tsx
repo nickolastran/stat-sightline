@@ -26,7 +26,7 @@ async function Body({ season }: { season: number }) {
           NO FREE AGENTS LISTED YET
         </p>
       );
-    return <FreeAgentBoard agents={agents} />;
+    return <FreeAgentBoard agents={agents} season={season} />;
   } catch {
     return (
       <p className="border border-line bg-bg px-3 py-6 text-center text-xs text-ink-3">

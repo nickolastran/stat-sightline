@@ -3,6 +3,8 @@
 import { useMemo, useState } from "react";
 import DataTable, { type Column } from "@/components/ui/DataTable";
 import FilterSelect, { FILTER_CONTROL } from "@/components/ui/FilterSelect";
+import MetricCard from "@/components/ui/MetricCard";
+import SegmentedControl from "@/components/ui/SegmentedControl";
 import PlayerLink from "@/components/mlb/PlayerLink";
 import TeamLink from "@/components/mlb/TeamLink";
 import { money } from "@/lib/draft";
@@ -16,13 +18,51 @@ import type { Salary } from "@/lib/salaries";
  * The rank is the one the season was ranked in, not the row's place in the
  * filtered list: a club's best-paid player is the league's 14th best-paid,
  * and that is the number worth printing.
+ *
+ * PAYROLLS is the same rows summed by club. The file lists only salaries
+ * Baseball-Reference prints — no pre-arbitration minimums — so a payroll here
+ * is the listed money, short of a club's full number.
  */
 
 const BLANK = { team: "", position: "", name: "" };
 type Filters = typeof BLANK;
 
+interface Payroll {
+  rank: number;
+  team: string;
+  teamId: number | null;
+  total: number;
+  players: number;
+  top: Salary;
+}
+
+/** Rows summed by club, biggest first. */
+function payrolls(rows: Salary[]): Payroll[] {
+  const by = new Map<string, Salary[]>();
+  for (const s of rows) by.set(s.team, [...(by.get(s.team) ?? []), s]);
+  return [...by.values()]
+    .map((list) => ({
+      team: list[0].team,
+      teamId: list[0].teamId,
+      total: list.reduce((sum, s) => sum + (s.salary ?? 0), 0),
+      players: list.length,
+      /* Rows arrive ranked, so the first is the club's best-paid. */
+      top: list[0],
+    }))
+    .sort((a, b) => b.total - a.total)
+    .map((p, i) => ({ ...p, rank: i + 1 }));
+}
+
+const median = (xs: number[]): number | null => {
+  if (xs.length === 0) return null;
+  const s = [...xs].sort((a, b) => a - b);
+  const m = s.length >> 1;
+  return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
+};
+
 export default function SalaryBoard({ salaries }: { salaries: Salary[] }) {
   const [f, setF] = useState<Filters>(BLANK);
+  const [view, setView] = useState<"players" | "payrolls">("players");
   const set = <K extends keyof Filters>(key: K, value: Filters[K]) =>
     setF((prev) => ({ ...prev, [key]: value }));
   const dirty = Object.values(f).some(Boolean);
@@ -42,8 +82,95 @@ export default function SalaryBoard({ salaries }: { salaries: Salary[] }) {
         (!name || s.name.toLowerCase().includes(name)),
     );
   }, [salaries, f]);
+  /* Every club, whatever TEAM says — a payroll board of one club isn't one. */
+  const clubs = useMemo(
+    () =>
+      payrolls(
+        salaries.filter((s) => !f.position || s.position === f.position),
+      ),
+    [salaries, f.position],
+  );
 
-  const total = rows.reduce((sum, s) => sum + (s.salary ?? 0), 0);
+  const paid = rows.flatMap((s) => (s.salary === null ? [] : [s.salary]));
+  const total = paid.reduce((sum, v) => sum + v, 0);
+  const most = clubs[0]?.total ?? 0;
+
+  const clubCols: Column<Payroll>[] = [
+    {
+      key: "rank",
+      label: "RANK",
+      align: "right",
+      width: "5rem",
+      sortValue: (p) => p.rank,
+      render: (p) => <span className="text-ink-3">{p.rank}</span>,
+    },
+    {
+      key: "team",
+      label: "TEAM",
+      width: "9rem",
+      sortValue: (p) => p.team,
+      render: (p) => <TeamLink id={p.teamId} name={p.team} text={p.team} />,
+    },
+    {
+      key: "total",
+      label: "PAYROLL",
+      width: "18rem",
+      sortValue: (p) => p.total,
+      /* The bar is against the biggest payroll on the board, so the gap
+         between the top and the bottom reads at a glance. */
+      render: (p) => (
+        <div className="flex items-center gap-2">
+          <span className="w-20 shrink-0 text-right tabular-nums">{money(p.total)}</span>
+          <span className="h-1.5 flex-1 bg-surface-2">
+            <span
+              className="block h-full bg-accent"
+              style={{ width: `${most ? (p.total / most) * 100 : 0}%` }}
+            />
+          </span>
+        </div>
+      ),
+    },
+    {
+      key: "players",
+      label: "PLAYERS",
+      align: "right",
+      width: "6rem",
+      sortValue: (p) => p.players,
+      /* Down to the club's own rows, on the players view. */
+      render: (p) => (
+        <button
+          type="button"
+          onClick={() => {
+            setF({ ...BLANK, position: f.position, team: p.team });
+            setView("players");
+          }}
+          className="text-accent hover:underline"
+        >
+          {p.players}
+        </button>
+      ),
+    },
+    {
+      key: "avg",
+      label: "AVERAGE",
+      align: "right",
+      width: "7rem",
+      sortValue: (p) => p.total / p.players,
+      render: (p) => money(Math.round(p.total / p.players)),
+    },
+    {
+      key: "top",
+      label: "HIGHEST PAID",
+      width: "16rem",
+      sortValue: (p) => p.top.salary,
+      render: (p) => (
+        <span className="flex items-center gap-2">
+          <PlayerLink id={p.top.id}>{p.top.name}</PlayerLink>
+          <span className="text-ink-3 tabular-nums">{money(p.top.salary)}</span>
+        </span>
+      ),
+    },
+  ];
 
   const cols: Column<Salary>[] = [
     {
@@ -60,9 +187,7 @@ export default function SalaryBoard({ salaries }: { salaries: Salary[] }) {
       width: "13rem",
       sortValue: (s) => s.name,
       render: (s) => (
-        <PlayerLink id={s.id} headshot={false}>
-          {s.name}
-        </PlayerLink>
+        <PlayerLink id={s.id}>{s.name}</PlayerLink>
       ),
     },
     {
@@ -92,22 +217,42 @@ export default function SalaryBoard({ salaries }: { salaries: Salary[] }) {
     },
   ];
 
+  const players = view === "players";
   return (
     <div className="space-y-3">
-      <div className="flex flex-wrap items-center gap-1.5">
-        <FilterSelect label="TEAM" value={f.team} options={options.teams} onChange={(v) => set("team", v)} />
-        <FilterSelect label="POSITION" value={f.position} options={options.positions} onChange={(v) => set("position", v)} />
-        <input
-          type="search"
-          aria-label="Name"
-          placeholder="NAME"
-          value={f.name}
-          onChange={(e) => set("name", e.target.value)}
-          className={`${FILTER_CONTROL} w-36 ${f.name ? "border-accent" : ""}`}
+      <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
+        <MetricCard label="TOTAL" value={money(total)} sub={f.team || "ALL CLUBS"} />
+        <MetricCard label="PLAYERS" value={String(rows.length)} sub="WITH A LISTED SALARY" />
+        <MetricCard
+          label="AVERAGE"
+          value={money(paid.length ? Math.round(total / paid.length) : null)}
         />
-        <span className="text-[10px] tracking-[0.2em] text-ink-3">
-          {rows.length} PLAYERS — {money(total)}
-        </span>
+        <MetricCard label="MEDIAN" value={money(median(paid))} />
+      </div>
+      <div className="flex flex-wrap items-center gap-1.5">
+        <SegmentedControl
+          ariaLabel="View"
+          value={view}
+          onChange={setView}
+          options={[
+            { value: "players", label: "PLAYERS" },
+            { value: "payrolls", label: "PAYROLLS" },
+          ]}
+        />
+        {players && (
+          <FilterSelect label="TEAM" value={f.team} options={options.teams} onChange={(v) => set("team", v)} />
+        )}
+        <FilterSelect label="POSITION" value={f.position} options={options.positions} onChange={(v) => set("position", v)} />
+        {players && (
+          <input
+            type="search"
+            aria-label="Name"
+            placeholder="NAME"
+            value={f.name}
+            onChange={(e) => set("name", e.target.value)}
+            className={`${FILTER_CONTROL} w-36 ${f.name ? "border-accent" : ""}`}
+          />
+        )}
         <button
           type="button"
           onClick={() => setF(BLANK)}
@@ -119,16 +264,26 @@ export default function SalaryBoard({ salaries }: { salaries: Salary[] }) {
           RESET
         </button>
       </div>
-      <DataTable<Salary>
-        columns={cols}
-        rows={rows}
-        rowKey={(s, i) => `${s.id ?? s.name}-${i}`}
-        pageSize={50}
-        paginate
-        /* The page scrolls, not the table. */
-        maxHeight="none"
-        emptyLabel="NO SALARIES MATCH THESE FILTERS"
-      />
+      {players ? (
+        <DataTable<Salary>
+          columns={cols}
+          rows={rows}
+          rowKey={(s, i) => `${s.id ?? s.name}-${i}`}
+          pageSize={50}
+          paginate
+          /* The page scrolls, not the table. */
+          maxHeight="none"
+          emptyLabel="NO SALARIES MATCH THESE FILTERS"
+        />
+      ) : (
+        <DataTable<Payroll>
+          columns={clubCols}
+          rows={clubs}
+          rowKey={(p) => p.team}
+          maxHeight="none"
+          emptyLabel="NO PAYROLLS MATCH THESE FILTERS"
+        />
+      )}
     </div>
   );
 }

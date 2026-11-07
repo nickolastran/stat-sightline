@@ -8,7 +8,7 @@
  * says the player made in that season (see lib/salaries.ts) — blank until
  * that file is filled.
  */
-import { getClubs, mlb } from "@/lib/mlb";
+import { getClubs, mlb, titleCase } from "@/lib/mlb";
 import { getSalaries } from "@/lib/salaries";
 
 export interface FreeAgent {
@@ -27,7 +27,7 @@ export interface FreeAgent {
   toName: string;
   /** "MLB", or "MiLB" for a minor-league free agent. */
   type: "MLB" | "MiLB";
-  /** MLB's own note: "Club Option Declined", "One-Year Contract"… */
+  /** MLB's own note, evened out: "Club Option Declined", "Claimed Off Waivers"… */
   note: string;
   declared: string;
   salary: number | null;
@@ -42,7 +42,8 @@ export function toFreeAgent(
 ): FreeAgent {
   const fromId = fa.originalTeam?.id ?? null;
   const toId = fa.newTeam?.id ?? null;
-  const note: string = fa.notes ?? "";
+  const raw: string = fa.notes ?? "";
+  const milb = /minor league free agent/i.test(raw);
   return {
     id: fa.player?.id ?? 0,
     name: fa.player?.fullName ?? "—",
@@ -58,8 +59,10 @@ export function toFreeAgent(
     toId,
     toAbbr: abbr(toId),
     toName: fa.newTeam?.name ?? "",
-    type: /minor league free agent/i.test(note) ? "MiLB" : "MLB",
-    note,
+    type: milb ? "MiLB" : "MLB",
+    /* MLB types its notes by hand — "Claimed off waivers." and "Claimed Off
+       Waivers" are one note — and the minor-league one is the TYPE column. */
+    note: milb ? "" : titleCase(raw.trim().replace(/\.$/, "")),
     declared: fa.dateDeclared ?? "",
     salary,
   };

@@ -42,9 +42,11 @@ const ArrowButton = ({
   </button>
 );
 
-export default function ScoreboardBar() {
+/** `start`: the day to open on when it isn't today — the World Series' last
+ *  game, held on the rail from the final out to the end of the year. */
+export default function ScoreboardBar({ start }: { start?: string | null }) {
   const [today, setToday] = useState(todayPT);
-  const [date, setDate] = useState(today);
+  const [date, setDate] = useState(start || today);
   const [games, setGames] = useState<Game[] | null>(null); // null = loading
   const [error, setError] = useState(false);
   const [arrows, setArrows] = useState({ prev: false, next: false });
