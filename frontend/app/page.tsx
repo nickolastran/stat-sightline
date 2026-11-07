@@ -7,11 +7,11 @@ import SprayChart from "@/components/mlb/SprayChart";
 import ZonePlot, { type ZonePlotMode } from "@/components/dashboard/ZonePlot";
 import Panel from "@/components/ui/Panel";
 import { Skeleton, SkeletonPanel } from "@/components/ui/Skeleton";
-import { searchPitchers, type Pitcher } from "@/lib/api";
+import { searchPitchers, type Pitcher, type Role } from "@/lib/api";
 import { getTopPerformers, type TopCard, type TopLeader } from "@/lib/advanced";
 import { getHomePark, getSprayHits, seasonHitPitches } from "@/lib/spray";
 import { getStrikeouts } from "@/lib/statcast";
-import { seasonOf, todayPT } from "@/lib/mlb";
+import { playerHeadshot, seasonOf, todayPT } from "@/lib/mlb";
 
 /* The pitch-level modules, with the codes the module sidebar gives them. */
 const FEATURES: {
@@ -59,31 +59,46 @@ const FEATURES: {
 ];
 
 /*
- * Quick-entry chips seeded with the highest-workload pitchers. Streamed on
- * its own so the hero paints without waiting on the warehouse, and the page
- * still renders if the API is down (search reports its own error state).
+ * Quick-entry chips seeded with the highest-workload pitchers and the hitters
+ * who've seen the most pitches. Streamed on their own so the hero paints
+ * without waiting on the warehouse, and the page still renders if the API is
+ * down (search reports its own error state).
  */
-async function TopPitcherChips() {
-  let topPitchers: Pitcher[] = [];
+async function TopPlayerChips({ role, label }: { role: Role; label: string }) {
+  let players: Pitcher[] = [];
   try {
-    topPitchers = await searchPitchers("", 5, 3600);
+    players = await searchPitchers("", 5, 3600, role);
   } catch {
     /* API offline — hero renders without chips */
   }
-  if (topPitchers.length === 0) return null;
+  if (players.length === 0) return null;
 
+  const base = role === "pitcher" ? "/pitcher" : "/hitter";
   return (
-    <div className="no-scrollbar mt-3 flex items-center gap-1.5 overflow-x-auto text-xs">
-      <span className="shrink-0 text-ink-3">HIGH-WORKLOAD:</span>
-      {topPitchers.map((p) => (
-        <Link
-          key={p.player_id}
-          href={`/pitcher/${p.player_id}`}
-          className="shrink-0 whitespace-nowrap border border-line px-1.5 py-1 text-ink-2 hover:border-accent hover:text-ink"
-        >
-          {p.full_name ?? `#${p.player_id}`}
-        </Link>
-      ))}
+    <div className="mt-3 flex items-baseline gap-1.5 text-xs">
+      <span className="min-w-36 shrink-0 whitespace-nowrap text-ink-3">
+        {label}:
+      </span>
+      {/* One row: chips that would wrap are clipped whole, so a narrow
+          column shows fewer players rather than a cut-off name. 26px is one
+          chip (16px line + py-1 + border). */}
+      <div className="flex h-[26px] flex-wrap gap-1.5 overflow-hidden">
+        {players.map((p) => (
+          <Link
+            key={p.player_id}
+            href={`${base}/${p.player_id}`}
+            className="flex shrink-0 items-center gap-1.5 whitespace-nowrap border border-line px-1.5 py-1 text-ink-2 hover:border-accent hover:text-ink"
+          >
+            {/* Background, not <img>: see PlayerLink. */}
+            <span
+              aria-hidden
+              style={{ backgroundImage: `url(${playerHeadshot(p.player_id)})` }}
+              className="h-4 w-4 shrink-0 bg-contain bg-center bg-no-repeat"
+            />
+            {p.full_name ?? `#${p.player_id}`}
+          </Link>
+        ))}
+      </div>
     </div>
   );
 }
@@ -132,7 +147,11 @@ function RailSkeleton({ cards }: { cards: number }) {
         <SkeletonPanel key={i} delay={i * 0.1}>
           <div className="space-y-2">
             {Array.from({ length: 5 }, (_, r) => (
-              <Skeleton key={r} className="h-3 w-full" delay={i * 0.1 + r * 0.05} />
+              <Skeleton
+                key={r}
+                className="h-3 w-full"
+                delay={i * 0.1 + r * 0.05}
+              />
             ))}
           </div>
         </SkeletonPanel>
@@ -245,7 +264,11 @@ async function SprayTrend({ pick }: { pick: Pick }) {
   if (hits.length === 0) return null;
   return (
     <Trend pick={pick}>
-      <SprayChart hits={hits} park={park} title={`${name} · ${SEASON()} Hits`} />
+      <SprayChart
+        hits={hits}
+        park={park}
+        title={`${name} · ${SEASON()} Hits`}
+      />
     </Trend>
   );
 }
@@ -262,7 +285,9 @@ async function ZoneTrend({
 }) {
   const { id, name } = pick.leader;
   const pitches = await (
-    what === "Hits" ? seasonHitPitches(id, SEASON()) : getStrikeouts(id, SEASON())
+    what === "Hits"
+      ? seasonHitPitches(id, SEASON())
+      : getStrikeouts(id, SEASON())
   ).catch(() => []);
   if (pitches.length === 0) return null;
   return (
@@ -270,10 +295,12 @@ async function ZoneTrend({
       <Panel title={`${name} · ${SEASON()} ${what}`}>
         <ZonePlot pitches={pitches} mode={mode} />
         <p className="mt-2 text-[10px] leading-4 text-ink-3">
-          Where the pitch {what === "Hits" ? "behind each" : "that ended each"} of{" "}
-          {pitches.length} {what.toLowerCase()} crossed the plate, from the{" "}
+          Where the pitch {what === "Hits" ? "behind each" : "that ended each"}{" "}
+          of {pitches.length} {what.toLowerCase()} crossed the plate, from the{" "}
           catcher&apos;s view. The box is the strike zone;{" "}
-          {mode === "heat" ? "darker means more of them." : "dots are colored by pitch type."}
+          {mode === "heat"
+            ? "darker means more of them."
+            : "dots are colored by pitch type."}
         </p>
       </Panel>
     </Trend>
@@ -304,7 +331,10 @@ export default function LandingPage() {
           <div className="mt-6 max-w-2xl">
             <PlayerSearch role="player" placeholder="SEARCH PLAYER" autoFocus />
             <Suspense fallback={null}>
-              <TopPitcherChips />
+              <TopPlayerChips role="pitcher" label="HIGH-WORKLOAD" />
+            </Suspense>
+            <Suspense fallback={null}>
+              <TopPlayerChips role="batter" label="MOST PITCHES SEEN" />
             </Suspense>
           </div>
         </div>
