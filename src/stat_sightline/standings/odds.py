@@ -136,7 +136,10 @@ def build_field(season: int, games: pd.DataFrame, bundle: dict) -> Field:
 
     # Every pairing scored once, for the postseason games that have no date on
     # the schedule — 900 rows, against a per-series call inside every draw.
-    today = pd.Timestamp(today_et())
+    # Capped at the day after the last game played: in season that is today,
+    # but once games stop, an uncapped `rest` grows daily and the odds (and a
+    # snapshot commit) drift every morning of the offseason.
+    today = min(pd.Timestamp(today_et()), form["date"].max() + pd.Timedelta(days=1))
     grid, cells = [], []
     for i, home in enumerate(ids):
         for j, away in enumerate(ids):
