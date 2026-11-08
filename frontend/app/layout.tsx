@@ -6,6 +6,7 @@ import LeagueBar from "@/components/mlb/LeagueBar";
 import ScoreboardSlot from "@/components/mlb/ScoreboardSlot";
 import SiteFooter from "@/components/SiteFooter";
 import { SITE_URL } from "@/lib/site";
+import { todayPT, worldSeriesOver } from "@/lib/mlb";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -28,13 +29,15 @@ export const metadata: Metadata = {
   twitter: { card: "summary_large_image" },
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   /* Headshots and logos come off MLB's CDN on nearly every page; opening the
      connections up front takes them off the critical path. */
   preconnect("https://img.mlbstatic.com");
   preconnect("https://www.mlbstatic.com");
+  /* The same cached read the league bar makes for its SCORES tab. */
+  const wsFinal = await worldSeriesOver(todayPT()).catch(() => null);
   return (
     <html lang="en" data-scroll-behavior="smooth">
       {/* A column, so the footer sits at the bottom of a short page rather
@@ -61,7 +64,7 @@ export default function RootLayout({
           </nav>
         </header>
         <LeagueBar />
-        <ScoreboardSlot />
+        <ScoreboardSlot start={wsFinal} />
         {/* The page owns its own centred, max-width container. It needs a
             plain block to live in: as a direct flex item its `mx-auto` would
             absorb the free space instead of the box stretching, collapsing

@@ -1,7 +1,5 @@
 /* The day's games: schedule rows, scoreboard, and the status of each. */
-import {
-  mlb,
-} from "./core";
+import { mlb, seasonOf } from "./core";
 
 
 /* ── Schedule / scoreboard ──────────────────────────────────────────── */
@@ -135,29 +133,41 @@ export async function getSchedule(date: string): Promise<Game[]> {
   return (data.dates?.[0]?.games ?? []).map(toGame);
 }
 
+/** Every date the season's postseason has a game on, in order — one cached
+ *  read behind the three questions below. MLB drops an if-necessary game from
+ *  the schedule once it isn't needed, so the last date is the last game. */
+async function postseasonDates(season: number): Promise<string[]> {
+  const data = await mlb(
+    `/schedule?sportId=1&season=${season}&gameType=F,D,L,W&fields=dates,date`,
+    3600,
+  );
+  return (data.dates ?? []).map((d: { date: string }) => d.date);
+}
+
 /**
  * The day a season's postseason throws its first pitch, YYYY-MM-DD, or null
  * before one is scheduled. Off the schedule rather than the season's own
  * `postSeasonStartDate`, which MLB sets a day early to leave room for a
  * tiebreaker nobody plays.
  */
-export async function postseasonStart(season: number): Promise<string | null> {
-  const data = await mlb(
-    `/schedule?sportId=1&season=${season}&gameType=F,D,L,W&fields=dates,date`,
-    3600,
-  );
-  return data.dates?.[0]?.date ?? null;
-}
+export const postseasonStart = async (season: number): Promise<string | null> =>
+  (await postseasonDates(season))[0] ?? null;
 
 /** Whether `date` falls within the season's postseason, first game to last
- *  scheduled — the same read as postseasonStart, so the one cache entry. */
+ *  scheduled. */
 export async function inPostseason(season: number, date: string): Promise<boolean> {
-  const data = await mlb(
-    `/schedule?sportId=1&season=${season}&gameType=F,D,L,W&fields=dates,date`,
-    3600,
-  );
-  const dates: { date: string }[] = data.dates ?? [];
-  return dates.length > 0 && dates[0].date <= date && date <= dates[dates.length - 1].date;
+  const dates = await postseasonDates(season);
+  return dates.length > 0 && dates[0] <= date && date <= dates[dates.length - 1];
+}
+
+/**
+ * The date of the World Series' last game once `date` is past it, else null.
+ * Read within `date`'s own season, so it lets go on January 1st — the stretch
+ * between is the offseason the site has no games for.
+ */
+export async function worldSeriesOver(date: string): Promise<string | null> {
+  const last = (await postseasonDates(seasonOf(date))).at(-1);
+  return last && last < date ? last : null;
 }
 
 /**

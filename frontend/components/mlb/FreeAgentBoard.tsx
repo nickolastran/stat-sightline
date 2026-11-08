@@ -3,6 +3,8 @@
 import { useMemo, useState } from "react";
 import DataTable, { type Column } from "@/components/ui/DataTable";
 import FilterSelect, { FILTER_CONTROL } from "@/components/ui/FilterSelect";
+import MetricCard from "@/components/ui/MetricCard";
+import SegmentedControl from "@/components/ui/SegmentedControl";
 import PlayerLink from "@/components/mlb/PlayerLink";
 import TeamLink from "@/components/mlb/TeamLink";
 import { money } from "@/lib/draft";
@@ -12,6 +14,10 @@ import type { FreeAgent } from "@/lib/freeAgents";
  * The free-agent class, filtered in the browser like the injury board.
  * Opens on available MLB free agents — the minor-league ones are most of the
  * list and few people are looking for them.
+ *
+ * Status and type are the two questions everyone asks first, so they are
+ * buttons with their counts on them rather than selects; the counts follow
+ * every other filter, so they answer "how many Yankees are still out there".
  */
 
 const BLANK = {
@@ -23,7 +29,40 @@ const BLANK = {
 };
 type Filters = typeof BLANK;
 
-export default function FreeAgentBoard({ agents }: { agents: FreeAgent[] }) {
+/** The MLB class at a glance — the minor-league free agents left out. */
+function Summary({ agents, season }: { agents: FreeAgent[]; season: number }) {
+  const mlbClass = agents.filter((a) => a.type === "MLB");
+  const open = mlbClass.filter((a) => a.toId === null);
+  const top = open.reduce<FreeAgent | null>(
+    (best, a) => ((a.salary ?? -1) > (best?.salary ?? -1) ? a : best),
+    null,
+  );
+  const qo = mlbClass.filter((a) => /qualifying offer/i.test(a.note)).length;
+  return (
+    <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
+      <MetricCard label="AVAILABLE" value={String(open.length)} sub="MLB FREE AGENTS" />
+      <MetricCard
+        label="SIGNED"
+        value={String(mlbClass.length - open.length)}
+        sub={`OF ${mlbClass.length} MLB FREE AGENTS`}
+      />
+      <MetricCard
+        label="TOP AVAILABLE"
+        value={top?.salary ? money(top.salary) : "—"}
+        sub={top?.salary ? `${top.name.toUpperCase()} · ${season} SALARY` : "NO SALARY DATA"}
+      />
+      <MetricCard label="QUALIFYING OFFERS" value={String(qo)} sub="EXTENDED" />
+    </div>
+  );
+}
+
+export default function FreeAgentBoard({
+  agents,
+  season,
+}: {
+  agents: FreeAgent[];
+  season: number;
+}) {
   const [f, setF] = useState<Filters>(BLANK);
   const set = <K extends keyof Filters>(key: K, value: Filters[K]) =>
     setF((prev) => ({ ...prev, [key]: value }));
@@ -40,17 +79,22 @@ export default function FreeAgentBoard({ agents }: { agents: FreeAgent[] }) {
     };
   }, [agents]);
 
-  const rows = useMemo(() => {
+  const status = (a: FreeAgent) => (a.toId === null ? "AVAILABLE" : "SIGNED");
+  /* Everything but status and type, so each button can count its own. */
+  const base = useMemo(() => {
     const name = f.name.trim().toLowerCase();
     return agents.filter(
       (a) =>
-        (!f.status || (f.status === "AVAILABLE") === (a.toId === null)) &&
-        (!f.type || a.type === f.type) &&
         (!f.team || a.fromAbbr === f.team) &&
         (!f.position || a.position === f.position) &&
         (!name || a.name.toLowerCase().includes(name)),
     );
-  }, [agents, f]);
+  }, [agents, f.team, f.position, f.name]);
+  const count = (keep: (a: FreeAgent) => boolean) =>
+    base.filter(keep).length;
+  const rows = base.filter(
+    (a) => (!f.status || status(a) === f.status) && (!f.type || a.type === f.type),
+  );
 
   /* No salary file yet is no salary column, rather than a column of dashes. */
   const paid = agents.some((a) => a.salary !== null);
@@ -103,7 +147,7 @@ export default function FreeAgentBoard({ agents }: { agents: FreeAgent[] }) {
       ? [
           {
             key: "salary",
-            label: "PREV SALARY",
+            label: `${season} SALARY`,
             align: "right",
             width: "8rem",
             sortValue: (a: FreeAgent) => a.salary,
@@ -149,24 +193,35 @@ export default function FreeAgentBoard({ agents }: { agents: FreeAgent[] }) {
       align: "right",
       width: "6rem",
       sortValue: (a) => a.declared,
-      render: (a) => a.declared.slice(5) || "—",
+      render: (a) => (a.declared ? a.declared.slice(5).replace("-", "/") : "—"),
     },
   ];
 
   return (
     <div className="space-y-3">
+      <Summary agents={agents} season={season} />
       <div className="flex flex-wrap items-center gap-1.5">
-        <FilterSelect
-          label="STATUS"
+        <SegmentedControl
+          ariaLabel="Status"
           value={f.status}
-          options={["AVAILABLE", "SIGNED"]}
           onChange={(v) => set("status", v)}
+          options={["AVAILABLE", "SIGNED", ""].map((v) => ({
+            value: v,
+            label: `${v || "ALL"} ${count(
+              (a) => (!v || status(a) === v) && (!f.type || a.type === f.type),
+            )}`,
+          }))}
         />
-        <FilterSelect
-          label="TYPE"
+        <SegmentedControl
+          ariaLabel="Type"
           value={f.type}
-          options={["MLB", "MiLB"]}
           onChange={(v) => set("type", v)}
+          options={["MLB", "MiLB", ""].map((v) => ({
+            value: v,
+            label: `${v || "ALL"} ${count(
+              (a) => (!v || a.type === v) && (!f.status || status(a) === f.status),
+            )}`,
+          }))}
         />
         <FilterSelect
           label="PREV TEAM"
@@ -188,9 +243,6 @@ export default function FreeAgentBoard({ agents }: { agents: FreeAgent[] }) {
           onChange={(e) => set("name", e.target.value)}
           className={`${FILTER_CONTROL} w-36 ${f.name ? "border-accent" : ""}`}
         />
-        <span className="text-[10px] tracking-[0.2em] text-ink-3">
-          {rows.length} PLAYERS
-        </span>
         <button
           type="button"
           onClick={() => setF(BLANK)}

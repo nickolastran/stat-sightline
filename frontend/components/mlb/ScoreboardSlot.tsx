@@ -13,8 +13,8 @@ import ScoreboardBar from "@/components/mlb/ScoreboardBar";
  * The route check lives here rather than inside ScoreboardBar so that
  * component stays route-agnostic and reusable.
  */
-export default function ScoreboardSlot() {
+export default function ScoreboardSlot({ start }: { start?: string | null }) {
   const pathname = usePathname();
   if (pathname !== "/") return null;
-  return <ScoreboardBar />;
+  return <ScoreboardBar start={start} />;
 }

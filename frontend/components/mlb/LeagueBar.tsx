@@ -2,7 +2,7 @@ import Link from "next/link";
 import StatsMenu from "@/components/mlb/StatsMenu";
 import MyTeamLink from "@/components/mlb/MyTeamLink";
 import { LEAGUE_SECTIONS } from "@/lib/leagueSections";
-import { inPostseason, seasonOf, todayPT } from "@/lib/mlb";
+import { inPostseason, seasonOf, todayPT, worldSeriesOver } from "@/lib/mlb";
 
 /*
  * League bar — the dashboard's reference sections, and the places you bring
@@ -14,7 +14,8 @@ import { inPostseason, seasonOf, todayPT } from "@/lib/mlb";
  * neither is a `/league/` route, because from a reader's side they are the
  * same kind of thing: one strip of everywhere the site goes. PLAYOFFS leads
  * the row while the postseason is on, and waits in the grid the rest of the
- * year. The two that
+ * year. From the World Series' last out to New Year's, the three day-of-games
+ * sections fold into one SCORES tab. The two that
  * aren't a league-wide board at all — a pair of players or clubs held up
  * against each other, and the season's hardware — sit behind the grid at the
  * end instead, out of the run of sections without being any harder to reach.
@@ -34,6 +35,46 @@ import { inPostseason, seasonOf, todayPT } from "@/lib/mlb";
 /** One tab, so the ones at the end can't drift from the sections' chrome. */
 const TAB =
   "flex h-7 shrink-0 items-center border border-line px-2 text-[10px] tracking-wider text-ink-2 hover:border-accent hover:text-ink";
+
+/** The three day-of-games sections, folded under one tab once the World
+ *  Series is over — a winter of empty slates doesn't earn three tabs. */
+const SCORES = new Set(["gamefeed", "scoreboard", "probables"]);
+
+/*
+ * SCORES, the offseason's one tab for them: the same hover box as
+ * STATISTICS. The feed and the scoreboard open on the World Series' last
+ * day rather than on an empty today.
+ */
+function ScoresMenu({ final }: { final: string }) {
+  return (
+    <div className="group relative shrink-0">
+      <Link
+        href={`/league/scoreboard?date=${final}`}
+        className="flex h-7 items-center gap-1 border border-line px-2 text-[10px] tracking-wider text-ink-2 group-focus-within:border-accent group-focus-within:text-ink group-hover:border-accent group-hover:text-ink"
+      >
+        SCORES
+        <span aria-hidden className="text-[8px] leading-none">▼</span>
+      </Link>
+      <div className="invisible absolute top-full left-0 z-50 -translate-y-1 border border-line bg-bg p-3 opacity-0 shadow-lg transition group-focus-within:visible group-focus-within:translate-y-0 group-focus-within:opacity-100 group-hover:visible group-hover:translate-y-0 group-hover:opacity-100">
+        <div className="space-y-1.5">
+          {[
+            { href: `/league/gamefeed?date=${final}`, label: "GAME FEED" },
+            { href: `/league/scoreboard?date=${final}`, label: "SCOREBOARD" },
+            { href: "/league/probables", label: "PROBABLE PITCHERS" },
+          ].map((l) => (
+            <Link
+              key={l.label}
+              href={l.href}
+              className="block whitespace-nowrap text-[11px] tracking-[0.2em] text-accent hover:underline"
+            >
+              {l.label}
+            </Link>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 /*
  * The grid at the end, and the box that drops out of it.
@@ -108,7 +149,10 @@ function MoreMenu({ playoffs }: { playoffs: boolean }) {
 
 export default async function LeagueBar() {
   const today = todayPT();
-  const live = await inPostseason(seasonOf(today), today).catch(() => false);
+  const [live, final] = await Promise.all([
+    inPostseason(seasonOf(today), today).catch(() => false),
+    worldSeriesOver(today).catch(() => null),
+  ]);
   return (
     <div className="sticky top-12 z-30 border-b border-line bg-bg">
       <div className="no-scrollbar flex items-center gap-px overflow-x-auto px-4 py-1.5 lg:flex-wrap lg:overflow-x-visible">
@@ -117,7 +161,10 @@ export default async function LeagueBar() {
             PLAYOFFS
           </Link>
         )}
-        {LEAGUE_SECTIONS.filter((s) => !("inBar" in s) || s.inBar).map((s) => (
+        {final && <ScoresMenu final={final} />}
+        {LEAGUE_SECTIONS.filter(
+          (s) => (!("inBar" in s) || s.inBar) && !(final && SCORES.has(s.id)),
+        ).map((s) => (
           <Link key={s.id} href={`/league/${s.id}`} className={TAB}>
             {s.tab}
           </Link>
