@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 /*
  * Site footer — attribution and provenance, on every page rather than only the
  * landing one it used to live on. The year is read at render, so it follows the
@@ -38,6 +40,15 @@ export default function SiteFooter() {
       <span>© {new Date().getFullYear()} NICKOLAS TRAN · STAT//SIGHTLINE</span>
       <span className="flex flex-wrap items-center gap-x-4 gap-y-2">
         <span>DATA: MLB STATCAST. NOT AFFILIATED WITH MLB.</span>
+        {[
+          { href: "/privacy", label: "PRIVACY" },
+          { href: "/terms", label: "TERMS" },
+          { href: "/changelog", label: "CHANGELOG" },
+        ].map((l) => (
+          <Link key={l.href} href={l.href} className="hover:text-ink hover:underline">
+            {l.label}
+          </Link>
+        ))}
         {LINKS.map((l) => (
           <a
             key={l.href}
