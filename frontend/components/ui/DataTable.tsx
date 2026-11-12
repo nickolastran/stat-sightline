@@ -139,7 +139,7 @@ export default function DataTable<T>({
                       <button
                         type="button"
                         onClick={() => toggleSort(c.key)}
-                        className={`w-full ${pad} py-2 text-[10px] tracking-widest ${
+                        className={`w-full ${pad} py-2 text-[11px] tracking-widest ${
                           ALIGN[c.align ?? "left"]
                         } ${active ? "text-ink" : "text-ink-3 hover:text-ink"}`}
                       >
@@ -153,7 +153,7 @@ export default function DataTable<T>({
                       </button>
                     ) : (
                       <span
-                        className={`block ${pad} py-2 text-[10px] tracking-widest text-ink-3`}
+                        className={`block ${pad} py-2 text-[11px] tracking-widest text-ink-3`}
                       >
                         {c.label}
                       </span>
@@ -199,7 +199,7 @@ export default function DataTable<T>({
         </table>
       </div>
       {paginate ? (
-        <div className="flex items-center justify-between gap-2 border-x border-b border-line px-3 py-1.5 text-[10px] tracking-wider text-ink-3">
+        <div className="flex items-center justify-between gap-2 border-x border-b border-line px-3 py-1.5 text-[11px] tracking-wider text-ink-3">
           <button
             type="button"
             onClick={() => setPage(current - 1)}
@@ -219,7 +219,7 @@ export default function DataTable<T>({
                 const n = Number(e.target.value);
                 if (Number.isFinite(n)) setPage(Math.min(Math.max(n, 1), pages));
               }}
-              className="w-12 border border-line bg-bg px-1 py-0.5 text-center text-[10px] tabular-nums text-ink hover:border-accent focus:border-accent focus:outline-none"
+              className="w-12 border border-line bg-bg px-1 py-0.5 text-center text-[11px] tabular-nums text-ink hover:border-accent focus:border-accent focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent"
             />
             OF {pages}
           </label>
@@ -236,7 +236,7 @@ export default function DataTable<T>({
         /* Nothing to say once the count is off and every row is on screen —
            then the bar itself goes rather than sitting empty under the table. */
         (showCount || visible < sorted.length) && (
-          <div className="flex items-center justify-between gap-2 border-x border-b border-line px-3 py-1.5 text-[10px] tracking-wider text-ink-3">
+          <div className="flex items-center justify-between gap-2 border-x border-b border-line px-3 py-1.5 text-[11px] tracking-wider text-ink-3">
             {showCount && (
               <span>
                 {Math.min(visible, sorted.length).toLocaleString()} /{" "}

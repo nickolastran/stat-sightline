@@ -32,7 +32,7 @@ export default function SeasonSelect(props: Props) {
   const years = yearsOf(props);
 
   return (
-    <label className="flex items-center gap-1.5 text-[10px] tracking-[0.2em] text-ink-3">
+    <label className="flex items-center gap-1.5 text-[11px] tracking-[0.2em] text-ink-3">
       SEASON
       <select
         value={value}
@@ -40,7 +40,7 @@ export default function SeasonSelect(props: Props) {
         onChange={(e) =>
           startTransition(() => setParam("season", e.target.value))
         }
-        className={`border border-line bg-bg px-1.5 py-0.5 text-[10px] tracking-normal tabular-nums text-ink hover:border-accent ${
+        className={`border border-line bg-bg px-1.5 py-0.5 text-[11px] tracking-normal tabular-nums text-ink hover:border-accent ${
           pending ? "opacity-50" : ""
         }`}
       >

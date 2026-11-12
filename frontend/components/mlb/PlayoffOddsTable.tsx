@@ -110,7 +110,7 @@ const shade = (p: number): string => {
 };
 
 const TH =
-  "border-b border-line bg-surface px-2 py-1.5 text-right text-[10px] font-normal tracking-widest text-ink-3";
+  "border-b border-line bg-surface px-2 py-1.5 text-right text-[11px] font-normal tracking-widest text-ink-3";
 
 function DivisionOdds({ name, teams }: { name: string; teams: TeamOdds[] }) {
   const cols = [...RESULTS, ...PROJECTIONS];
@@ -226,7 +226,7 @@ export default function PlayoffOddsTable({
           />
         ))}
       </div>
-      <p className="text-[10px] leading-relaxed tracking-wider text-ink-3">
+      <p className="text-[11px] leading-relaxed tracking-wider text-ink-3">
         {simulations.toLocaleString()} simulated seasons
         {asOf ? `, through ${asOf}` : ""}. Every remaining game is drawn at the
         model&apos;s own probability for it and the bracket is played out, so a
@@ -305,7 +305,7 @@ export function TitleOdds({
                   <td className="px-2 py-1.5 text-right tabular-nums text-ink-2">
                     {r.team.wins}-{r.team.losses}
                   </td>
-                  <td className="px-2 py-1.5 whitespace-nowrap text-[10px] tracking-wider text-ink-3">
+                  <td className="px-2 py-1.5 whitespace-nowrap text-[11px] tracking-wider text-ink-3">
                     {clubLine(series, r.team.id)}
                   </td>
                   {showPre && (
@@ -322,7 +322,7 @@ export function TitleOdds({
           </tbody>
         </table>
       </div>
-      <p className="text-[10px] leading-relaxed tracking-wider text-ink-3">
+      <p className="text-[11px] leading-relaxed tracking-wider text-ink-3">
         {postseason
           ? `${simulations.toLocaleString()} playings of the bracket from where every series stands${
               asOf ? `, off form through ${asOf}` : ""

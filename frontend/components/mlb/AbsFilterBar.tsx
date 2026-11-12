@@ -76,7 +76,7 @@ export default function AbsFilterBar({
   return (
     <>
     <details open className="mb-3 border border-line bg-bg px-3 py-2 text-xs leading-5 text-ink-2">
-      <summary className="cursor-pointer text-[10px] tracking-[0.2em] text-ink-3">
+      <summary className="cursor-pointer text-[11px] tracking-[0.2em] text-ink-3">
         HOW TO READ THIS BOARD
       </summary>
       <div className="mt-2 space-y-2">

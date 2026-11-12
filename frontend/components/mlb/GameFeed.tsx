@@ -12,7 +12,7 @@ import type { FeedBoard, GameFeed as Feed } from "@/lib/gamefeed";
 function BoardRow({ rank, row }: { rank: number; row: FeedBoard["rows"][number] }) {
   return (
     <li className="flex items-center gap-2 border-b border-grid px-3 py-1.5 text-xs last:border-b-0">
-      <span className="w-4 text-right text-[10px] text-ink-3 tabular-nums">
+      <span className="w-4 text-right text-[11px] text-ink-3 tabular-nums">
         {rank}
       </span>
       <span className="min-w-0 flex-1 truncate text-ink-2">
@@ -28,7 +28,7 @@ function BoardRow({ rank, row }: { rank: number; row: FeedBoard["rows"][number] 
 function Board({ board }: { board: FeedBoard }) {
   return (
     <div className="self-start border border-line bg-bg">
-      <h3 className="border-b border-line px-3 py-1.5 text-[10px] tracking-[0.2em] text-ink-2">
+      <h3 className="border-b border-line px-3 py-1.5 text-[11px] tracking-[0.2em] text-ink-2">
         {board.label}
       </h3>
       {board.rows.length === 0 ? (

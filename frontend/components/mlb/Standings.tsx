@@ -281,7 +281,7 @@ function StandingsTable({
 
   return (
     <div className="border border-line bg-bg">
-      <h3 className="border-b border-line px-3 py-1.5 text-[10px] tracking-[0.2em] text-ink-2">
+      <h3 className="border-b border-line px-3 py-1.5 text-[11px] tracking-[0.2em] text-ink-2">
         {group.name}
       </h3>
       <div className="overflow-x-auto">
@@ -304,14 +304,14 @@ function StandingsTable({
             <tr>
               <th
                 scope="col"
-                className="border-b border-line bg-surface px-3 py-1.5 text-left text-[10px] tracking-widest font-normal text-ink-3"
+                className="border-b border-line bg-surface px-3 py-1.5 text-left text-[11px] tracking-widest font-normal text-ink-3"
               >
                 TEAM
               </th>
               {scope !== "division" && (
                 <th
                   scope="col"
-                  className="border-b border-line bg-surface px-2 py-1.5 text-left text-[10px] tracking-widest font-normal text-ink-3"
+                  className="border-b border-line bg-surface px-2 py-1.5 text-left text-[11px] tracking-widest font-normal text-ink-3"
                 >
                   DIV
                 </th>
@@ -344,7 +344,7 @@ function StandingsTable({
                   </span>
                 </td>
                 {scope !== "division" && (
-                  <td className="whitespace-nowrap px-2 py-1.5 text-[10px] tracking-wider text-ink-3">
+                  <td className="whitespace-nowrap px-2 py-1.5 text-[11px] tracking-wider text-ink-3">
                     {t.division}
                   </td>
                 )}
@@ -376,7 +376,7 @@ function ModelNote({ model, asOf }: { model: StandingsProjection["model"]; asOf:
   if (model.accuracy == null) return null;
   const pct = (v: number) => `${(v * 100).toFixed(1)}%`;
   return (
-    <p className="text-[10px] leading-relaxed text-ink-3">
+    <p className="text-[11px] leading-relaxed text-ink-3">
       PROJECTION · {pct(model.accuracy)} ACCURACY ON {model.holdout_season} HOLDOUT
       {model.home_baseline != null && ` (ALWAYS-HOME ${pct(model.home_baseline)})`}
       {model.log_loss != null && ` · LOG LOSS ${model.log_loss.toFixed(3)}`}

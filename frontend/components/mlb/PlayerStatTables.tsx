@@ -76,7 +76,7 @@ function LeaderTiles({
         const top = b.leaders[0];
         return (
           <div key={b.key} className="border border-line bg-bg p-2">
-            <p className="text-[10px] tracking-[0.2em] text-ink-3">{b.label}</p>
+            <p className="text-[11px] tracking-[0.2em] text-ink-3">{b.label}</p>
             <div className="mt-1.5 min-w-0 text-[11px] text-ink-2">
               <PlayerLink id={top.id}>{top.name}</PlayerLink>
             </div>
@@ -139,7 +139,7 @@ export default function PlayerStatTables({
           {/* The position rides with the name the way a box score prints it;
               a fielder who moved around carries a star (see mergeFielding). */}
           {r.position && (
-            <span className="shrink-0 text-[10px] tracking-wider text-ink-3">
+            <span className="shrink-0 text-[11px] tracking-wider text-ink-3">
               {r.position}
             </span>
           )}
@@ -175,7 +175,7 @@ export default function PlayerStatTables({
         emptyLabel="NO LINES FOR THIS SEASON"
       />
       {moved.length > 0 && (
-        <ul className="mt-3 space-y-1 border border-line bg-bg px-3 py-2.5 text-[10px] text-ink-3">
+        <ul className="mt-3 space-y-1 border border-line bg-bg px-3 py-2.5 text-[11px] text-ink-3">
           {moved.map((t) => (
             <li key={t.id} className="flex gap-2">
               <span className="shrink-0 text-ink">*</span>

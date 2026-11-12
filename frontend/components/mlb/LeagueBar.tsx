@@ -25,7 +25,9 @@ import { inPostseason, seasonOf, todayPT, worldSeriesOver } from "@/lib/mlb";
  * themselves, and an absolutely-positioned box inside an `overflow-x`
  * ancestor is clipped by it — so the overflow is dropped at the size where
  * those boxes can actually be opened. Below it there is no hover to open one
- * with, and each is a plain link through to its first page.
+ * with: STATISTICS is a plain link through to its first page, SCORES splits
+ * back into its tabs, and the grid — opened by a tap — hangs its box off the
+ * viewport (`fixed`) instead, where the strip can't clip it.
  *
  * The grid's box is where both comparisons are reached from — the pages
  * themselves no longer cross-link, so the bar is the one place that switch
@@ -34,11 +36,17 @@ import { inPostseason, seasonOf, todayPT, worldSeriesOver } from "@/lib/mlb";
 
 /** One tab, so the ones at the end can't drift from the sections' chrome. */
 const TAB =
-  "flex h-7 shrink-0 items-center border border-line px-2 text-[10px] tracking-wider text-ink-2 hover:border-accent hover:text-ink";
+  "flex h-9 shrink-0 items-center border border-line px-2 lg:h-7 text-[11px] tracking-wider text-ink-2 hover:border-accent hover:text-ink";
 
 /** The three day-of-games sections, folded under one tab once the World
  *  Series is over — a winter of empty slates doesn't earn three tabs. */
 const SCORES = new Set(["gamefeed", "scoreboard", "probables"]);
+
+const SCORE_LINKS = (final: string) => [
+  { href: `/league/gamefeed?date=${final}`, label: "GAME FEED" },
+  { href: `/league/scoreboard?date=${final}`, label: "SCOREBOARD" },
+  { href: "/league/probables", label: "PROBABLES" },
+];
 
 /*
  * SCORES, the offseason's one tab for them: the same hover box as
@@ -47,25 +55,21 @@ const SCORES = new Set(["gamefeed", "scoreboard", "probables"]);
  */
 function ScoresMenu({ final }: { final: string }) {
   return (
-    <div className="group relative shrink-0">
+    <div className="group relative hidden shrink-0 lg:block">
       <Link
         href={`/league/scoreboard?date=${final}`}
-        className="flex h-7 items-center gap-1 border border-line px-2 text-[10px] tracking-wider text-ink-2 group-focus-within:border-accent group-focus-within:text-ink group-hover:border-accent group-hover:text-ink"
+        className="flex h-9 items-center gap-1 border border-line px-2 lg:h-7 text-[11px] tracking-wider text-ink-2 group-focus-within:border-accent group-focus-within:text-ink group-hover:border-accent group-hover:text-ink"
       >
         SCORES
         <span aria-hidden className="text-[8px] leading-none">▼</span>
       </Link>
       <div className="invisible absolute top-full left-0 z-50 -translate-y-1 border border-line bg-bg p-3 opacity-0 shadow-lg transition group-focus-within:visible group-focus-within:translate-y-0 group-focus-within:opacity-100 group-hover:visible group-hover:translate-y-0 group-hover:opacity-100">
         <div className="space-y-1.5">
-          {[
-            { href: `/league/gamefeed?date=${final}`, label: "GAME FEED" },
-            { href: `/league/scoreboard?date=${final}`, label: "SCOREBOARD" },
-            { href: "/league/probables", label: "PROBABLE PITCHERS" },
-          ].map((l) => (
+          {SCORE_LINKS(final).map((l) => (
             <Link
               key={l.label}
               href={l.href}
-              className="block whitespace-nowrap text-[11px] tracking-[0.2em] text-accent hover:underline"
+              className="block whitespace-nowrap text-[11px] tracking-[0.2em] text-ink hover:text-accent hover:underline"
             >
               {l.label}
             </Link>
@@ -109,7 +113,7 @@ function MoreMenu({ playoffs }: { playoffs: boolean }) {
       />
       <label
         htmlFor="more-menu"
-        className="relative z-50 flex h-7 cursor-pointer items-center px-2 text-ink-2 peer-checked:text-accent peer-focus-visible:text-accent group-hover:text-accent"
+        className="relative z-50 flex h-9 cursor-pointer items-center px-3 lg:h-7 lg:px-2 text-ink-2 peer-checked:text-accent peer-focus-visible:text-accent group-hover:text-accent"
       >
         <svg aria-hidden viewBox="0 0 10 10" className="h-3.5 w-3.5">
           {[0, 4, 8].map((y) =>
@@ -121,7 +125,7 @@ function MoreMenu({ playoffs }: { playoffs: boolean }) {
       </label>
       {/* `invisible` rather than `hidden`, so the links inside stay in the tab
           order and focus-within can open the box for a keyboard reader. */}
-      <div className="invisible absolute top-full right-0 z-50 -translate-y-1 border border-line bg-bg p-3 opacity-0 shadow-lg transition peer-checked:visible peer-checked:translate-y-0 peer-checked:opacity-100 group-focus-within:visible group-focus-within:translate-y-0 group-focus-within:opacity-100 group-hover:visible group-hover:translate-y-0 group-hover:opacity-100">
+      <div className="invisible absolute top-full right-0 z-50 max-lg:fixed max-lg:top-24 max-lg:right-4 -translate-y-1 border border-line bg-bg p-3 opacity-0 shadow-lg transition peer-checked:visible peer-checked:translate-y-0 peer-checked:opacity-100 group-focus-within:visible group-focus-within:translate-y-0 group-focus-within:opacity-100 group-hover:visible group-hover:translate-y-0 group-hover:opacity-100">
         <div className="space-y-1.5">
           {[
             ...(playoffs ? [{ href: "/playoffs", label: "PLAYOFFS" }] : []),
@@ -136,7 +140,7 @@ function MoreMenu({ playoffs }: { playoffs: boolean }) {
             <Link
               key={l.href}
               href={l.href}
-              className="block whitespace-nowrap text-[11px] tracking-[0.2em] text-accent hover:underline"
+              className="block whitespace-nowrap text-[11px] tracking-[0.2em] text-ink hover:text-accent hover:underline"
             >
               {l.label}
             </Link>
@@ -161,7 +165,18 @@ export default async function LeagueBar() {
             PLAYOFFS
           </Link>
         )}
-        {final && <ScoresMenu final={final} />}
+        {final && (
+          <>
+            <ScoresMenu final={final} />
+            {/* No hover on a phone to open the box with, so its three links
+                are tabs of their own there — the strip scrolls anyway. */}
+            {SCORE_LINKS(final).map((l) => (
+              <Link key={l.label} href={l.href} className={`${TAB} lg:hidden`}>
+                {l.label}
+              </Link>
+            ))}
+          </>
+        )}
         {LEAGUE_SECTIONS.filter(
           (s) => (!("inBar" in s) || s.inBar) && !(final && SCORES.has(s.id)),
         ).map((s) => (

@@ -31,7 +31,7 @@ export default function ParamSelect({
   const [pending, startTransition] = useTransition();
 
   return (
-    <label className="flex items-center gap-1.5 text-[10px] tracking-[0.2em] text-ink-3">
+    <label className="flex items-center gap-1.5 text-[11px] tracking-[0.2em] text-ink-3">
       {label}
       <select
         value={value}
@@ -41,7 +41,7 @@ export default function ParamSelect({
             ? onChange(e.target.value)
             : startTransition(() => setParam(param, e.target.value))
         }
-        className={`border border-line bg-bg px-1.5 py-0.5 text-[10px] tracking-normal text-ink hover:border-accent ${
+        className={`border border-line bg-bg px-1.5 py-0.5 text-[11px] tracking-normal text-ink hover:border-accent ${
           pending ? "opacity-50" : ""
         }`}
       >

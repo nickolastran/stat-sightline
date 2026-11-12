@@ -99,7 +99,7 @@ export default function PlayerSearch({
           onKeyDown={onKeyDown}
           onFocus={() => results.length && setOpen(true)}
           placeholder={placeholder}
-          className={`w-full border border-line bg-surface px-3 tracking-wide text-ink placeholder:text-ink-3 focus:border-accent focus:outline-none ${heroSizing}`}
+          className={`w-full border border-line bg-surface px-3 tracking-wide text-ink placeholder:text-ink-3 focus:border-accent focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent ${heroSizing}`}
         />
       </div>
       {error && (

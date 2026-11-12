@@ -116,7 +116,7 @@ export default function MovementPlot({
         )}
       </svg>
 
-      <div className="flex flex-wrap gap-x-4 gap-y-1 border-t border-grid px-1 pt-2 text-[10px] text-ink-2">
+      <div className="flex flex-wrap gap-x-4 gap-y-1 border-t border-grid px-1 pt-2 text-[11px] text-ink-2">
         {avgs.map((r) => {
           const slot = r.code === "OTH" ? slotFor(null) : PITCH_SLOTS[r.code];
           return (

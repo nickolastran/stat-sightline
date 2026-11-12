@@ -100,7 +100,7 @@ export default function Calendar({
             ‹
           </NavButton>
         </div>
-        <span className="text-[10px] tracking-[0.2em] text-ink-2">
+        <span className="text-[11px] tracking-[0.2em] text-ink-2">
           {MONTHS[cursor.m]} {cursor.y}
         </span>
         <div className="flex gap-px">
@@ -125,7 +125,7 @@ export default function Calendar({
           <span
             key={i}
             aria-hidden
-            className="py-1 text-center text-[9px] tracking-wider text-ink-3"
+            className="py-1 text-center text-[11px] tracking-wider text-ink-3"
           >
             {d}
           </span>
@@ -168,7 +168,7 @@ export default function Calendar({
       <button
         type="button"
         onClick={() => onSelect(today)}
-        className="mt-2 w-full border border-line py-1 text-[10px] tracking-[0.2em] text-ink-2 hover:border-accent hover:text-ink"
+        className="mt-2 w-full border border-line py-1 text-[11px] tracking-[0.2em] text-ink-2 hover:border-accent hover:text-ink"
       >
         TODAY
       </button>

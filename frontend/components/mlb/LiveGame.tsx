@@ -66,7 +66,7 @@ function Dots({
   tone: keyof typeof DOT;
 }) {
   return (
-    <p className="flex items-center gap-1.5 text-[10px] tracking-[0.2em] text-ink-3">
+    <p className="flex items-center gap-1.5 text-[11px] tracking-[0.2em] text-ink-3">
       {label}
       <span className="flex gap-1" aria-hidden>
         {Array.from({ length: of }, (_, i) => (
@@ -329,7 +329,7 @@ function Bases({ bases }: { bases: LiveGameProps["live"]["bases"] }) {
           (runner, i) =>
             runner && (
               <span key={i} className="mr-3 inline-block whitespace-nowrap">
-                <span className="mr-1 text-[10px] tracking-wider">{label[i]}</span>
+                <span className="mr-1 text-[11px] tracking-wider">{label[i]}</span>
                 <span className="text-ink-2">
                   <PlayerLink id={runner.id} headshot={false}>
                     {runner.name}
@@ -388,17 +388,17 @@ function AtBatPanel({
           },
         ].map((s) => (
           <div key={s.role} className="min-w-0">
-            <p className="text-[10px] tracking-[0.25em] text-ink-3">{s.role}</p>
+            <p className="text-[11px] tracking-[0.25em] text-ink-3">{s.role}</p>
             <p className="truncate text-sm text-ink">
               <PlayerLink id={s.who?.id}>{s.who?.name ?? "—"}</PlayerLink>
               {s.hand && (
-                <span className="ml-1.5 text-[10px] text-ink-3">{s.hand}</span>
+                <span className="ml-1.5 text-[11px] text-ink-3">{s.hand}</span>
               )}
             </p>
-            <p className="text-[10px] tabular-nums text-ink-2">{s.line}</p>
+            <p className="text-[11px] tabular-nums text-ink-2">{s.line}</p>
           </div>
         ))}
-        <div className="text-right text-[10px] tracking-wider text-ink-3">
+        <div className="text-right text-[11px] tracking-wider text-ink-3">
           {arm && <p className="tabular-nums">PITCH COUNT {arm.pitches}</p>}
           {live.onDeck && (
             <p>
@@ -436,7 +436,7 @@ function AtBatPanel({
               className="flex items-center gap-2 border border-line bg-bg px-2 py-1.5 text-xs"
             >
               <span
-                className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-bold text-bg ${
+                className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[11px] font-bold text-bg ${
                   p.outcome === "ball"
                     ? "bg-good"
                     : p.outcome === "strike"
@@ -450,7 +450,7 @@ function AtBatPanel({
                 <span className="block truncate text-ink">
                   {p.call.toUpperCase()}
                 </span>
-                <span className="block truncate text-[10px] text-ink-3">
+                <span className="block truncate text-[11px] text-ink-3">
                   {p.name}
                 </span>
               </span>
@@ -503,11 +503,11 @@ export function Situation({
         },
       ].map((s) => (
         <div key={s.role} className="min-w-0">
-          <p className="text-[10px] tracking-[0.25em] text-ink-3">{s.role}</p>
+          <p className="text-[11px] tracking-[0.25em] text-ink-3">{s.role}</p>
           <p className="truncate text-sm text-ink">
             <PlayerLink id={s.who?.id}>{s.who?.name ?? "—"}</PlayerLink>
           </p>
-          <p className="text-[10px] tabular-nums text-ink-2">{s.line}</p>
+          <p className="text-[11px] tabular-nums text-ink-2">{s.line}</p>
         </div>
       ))}
       <div className="space-y-1">
@@ -523,7 +523,7 @@ export function Situation({
 /** The line under a play that was something rarer than its description says. */
 function Tag({ text }: { text: string | null }) {
   return text ? (
-    <span className="mt-0.5 block text-[10px] tracking-widest text-accent">
+    <span className="mt-0.5 block text-[11px] tracking-widest text-accent">
       {text}
     </span>
   ) : null;
@@ -546,7 +546,7 @@ export function ScoringSummary({ plays }: { plays: PlayProb[] }) {
               key={`${p.inning}-${p.half}-${i}`}
               className="flex gap-2 border border-line bg-bg px-2 py-1.5 text-[11px]"
             >
-              <span className="w-14 shrink-0 text-[10px] tracking-wider text-ink-3">
+              <span className="w-14 shrink-0 text-[11px] tracking-wider text-ink-3">
                 {p.half === "top" ? "TOP" : "BOT"} {p.inning}
               </span>
               <span className="min-w-0 flex-1 text-ink-2">
@@ -601,7 +601,7 @@ export function PlayByPlay({
         <div className="space-y-2">
           {[...halves].reverse().map((h) => (
             <div key={`${h.inning}-${h.half}`} className="border border-line">
-              <p className="flex items-center justify-between gap-2 border-b border-line bg-bg px-2 py-1.5 text-[10px] tracking-widest text-ink-3">
+              <p className="flex items-center justify-between gap-2 border-b border-line bg-bg px-2 py-1.5 text-[11px] tracking-widest text-ink-3">
                 <span>
                   {h.half === "top" ? "TOP" : "BOT"} {h.inning} ·{" "}
                   <span className="text-ink-2">

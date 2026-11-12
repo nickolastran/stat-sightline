@@ -39,7 +39,7 @@ export default function AwardIndexPage() {
               <li key={a.id}>
                 <Link
                   href={`/award/${a.id}`}
-                  className="block py-0.5 text-[12px] tracking-wide text-accent hover:underline"
+                  className="block py-0.5 text-[12px] tracking-wide text-ink underline decoration-line decoration-dotted underline-offset-2 hover:text-accent hover:decoration-accent"
                 >
                   {a.label} Winners
                 </Link>
@@ -54,7 +54,7 @@ export default function AwardIndexPage() {
               <Link
                 key={season}
                 href={`/award/${season}`}
-                className="text-[13px] tabular-nums text-accent hover:underline"
+                className="text-[13px] tabular-nums text-ink underline decoration-line decoration-dotted underline-offset-2 hover:text-accent hover:decoration-accent"
               >
                 {season}
               </Link>
@@ -62,7 +62,7 @@ export default function AwardIndexPage() {
           </div>
         </Panel>
 
-        <p className="border border-line bg-bg px-3 py-2 text-[10px] leading-5 text-ink-3">
+        <p className="border border-line bg-bg px-3 py-2 text-[11px] leading-5 text-ink-3">
           A season above is the whole ballot — every player who drew a vote in
           the eight the BBWAA polls, with the line he polled on. The awards
           nobody votes on have winners only, which is all MLB&apos;s feed

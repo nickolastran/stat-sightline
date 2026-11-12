@@ -37,7 +37,7 @@ function Section({
 }) {
   return (
     <section className="border-b border-grid px-3 py-3">
-      <h3 className="mb-2 text-[10px] tracking-[0.25em] text-ink-3">{title}</h3>
+      <h3 className="mb-2 text-[11px] tracking-[0.25em] text-ink-3">{title}</h3>
       {children}
     </section>
   );
@@ -84,11 +84,11 @@ export default function FilterPanel({
   return (
     <div aria-label="Filters">
       <div className="flex items-center justify-between border-b border-line px-3 py-2">
-        <h2 className="text-[10px] tracking-[0.25em] text-ink-3">FILTERS</h2>
+        <h2 className="text-[11px] tracking-[0.25em] text-ink-3">FILTERS</h2>
         <button
           type="button"
           onClick={onReset}
-          className="border border-line px-1.5 py-0.5 text-[10px] text-ink-3 hover:border-accent hover:text-ink"
+          className="border border-line px-1.5 py-0.5 text-[11px] text-ink-3 hover:border-accent hover:text-ink"
         >
           RESET
         </button>
@@ -132,7 +132,7 @@ export default function FilterPanel({
             min={dateExtent?.min}
             max={dateExtent?.max}
             onChange={(e) => onChange({ dateFrom: e.target.value || null })}
-            className="border border-line bg-surface px-2 py-1 text-[11px] text-ink-2 focus:border-accent focus:outline-none"
+            className="border border-line bg-surface px-2 py-1 text-[11px] text-ink-2 focus:border-accent focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent"
           />
           <input
             type="date"
@@ -141,7 +141,7 @@ export default function FilterPanel({
             min={dateExtent?.min}
             max={dateExtent?.max}
             onChange={(e) => onChange({ dateTo: e.target.value || null })}
-            className="border border-line bg-surface px-2 py-1 text-[11px] text-ink-2 focus:border-accent focus:outline-none"
+            className="border border-line bg-surface px-2 py-1 text-[11px] text-ink-2 focus:border-accent focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent"
           />
         </div>
       </Section>
@@ -169,7 +169,7 @@ export default function FilterPanel({
             </button>
           )}
         </div>
-        <label className="mb-2 flex items-center justify-between gap-2 text-[10px] text-ink-3">
+        <label className="mb-2 flex items-center justify-between gap-2 text-[11px] text-ink-3">
           SPLIT AT
           <input
             type="date"
@@ -178,7 +178,7 @@ export default function FilterPanel({
             min={dateExtent?.min}
             max={dateExtent?.max}
             onChange={(e) => e.target.value && onChange(splitAt(e.target.value))}
-            className="border border-line bg-surface px-2 py-1 text-[11px] text-ink-2 focus:border-accent focus:outline-none"
+            className="border border-line bg-surface px-2 py-1 text-[11px] text-ink-2 focus:border-accent focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent"
           />
         </label>
         <div className="grid grid-cols-2 gap-px">
@@ -189,7 +189,7 @@ export default function FilterPanel({
             min={dateExtent?.min}
             max={dateExtent?.max}
             onChange={(e) => onChange({ vsFrom: e.target.value || null })}
-            className="border border-line bg-surface px-2 py-1 text-[11px] text-ink-2 focus:border-accent focus:outline-none"
+            className="border border-line bg-surface px-2 py-1 text-[11px] text-ink-2 focus:border-accent focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent"
           />
           <input
             type="date"
@@ -198,7 +198,7 @@ export default function FilterPanel({
             min={dateExtent?.min}
             max={dateExtent?.max}
             onChange={(e) => onChange({ vsTo: e.target.value || null })}
-            className="border border-line bg-surface px-2 py-1 text-[11px] text-ink-2 focus:border-accent focus:outline-none"
+            className="border border-line bg-surface px-2 py-1 text-[11px] text-ink-2 focus:border-accent focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent"
           />
         </div>
       </Section>
@@ -237,7 +237,7 @@ export default function FilterPanel({
       </Section>
 
       <Section title="COUNT">
-        <p className="mb-1 text-[10px] text-ink-3">BALLS</p>
+        <p className="mb-1 text-[11px] text-ink-3">BALLS</p>
         <SegmentedControl<number | null>
           ariaLabel="Balls"
           value={filters.balls}
@@ -247,7 +247,7 @@ export default function FilterPanel({
             ...[0, 1, 2, 3].map((n) => ({ value: n, label: String(n) })),
           ]}
         />
-        <p className="mt-2 mb-1 text-[10px] text-ink-3">STRIKES</p>
+        <p className="mt-2 mb-1 text-[11px] text-ink-3">STRIKES</p>
         <SegmentedControl<number | null>
           ariaLabel="Strikes"
           value={filters.strikes}
@@ -262,7 +262,7 @@ export default function FilterPanel({
       <Section title="SITUATION">
         {/* A pitcher's slice splits on who's batting, a batter's on who's
             throwing. */}
-        <p className="mb-1 text-[10px] text-ink-3">
+        <p className="mb-1 text-[11px] text-ink-3">
           {role === "pitcher" ? "BATTER SIDE" : "PITCHER HAND"}
         </p>
         <SegmentedControl<"L" | "R" | null>
@@ -301,7 +301,7 @@ export default function FilterPanel({
         </div>
       </Section>
 
-      <div className="px-3 py-3 text-[10px] tracking-wider text-ink-3">
+      <div className="px-3 py-3 text-[11px] tracking-wider text-ink-3">
         SLICE:{" "}
         <span className="font-bold text-ink tabular-nums">
           {sliceCount.toLocaleString()}

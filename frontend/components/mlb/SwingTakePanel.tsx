@@ -88,7 +88,7 @@ export default function SwingTakePanel({ pitches }: { pitches: Pitch[] }) {
   if (rows.all.pitches === 0)
     return <p className="text-xs text-ink-3">NO RUN VALUES ON THESE PITCHES</p>;
 
-  const th = "border-b border-line bg-surface px-2 py-2 text-[10px] font-normal tracking-widest text-ink-3";
+  const th = "border-b border-line bg-surface px-2 py-2 text-[11px] font-normal tracking-widest text-ink-3";
   const cell = (v: number) => (
     <span style={{ color: Math.abs(v) >= 1 ? pctColor(shade(v * 2)) : undefined }}>{signed(v)}</span>
   );
@@ -130,7 +130,7 @@ export default function SwingTakePanel({ pitches }: { pitches: Pitch[] }) {
             </tbody>
           </table>
         </div>
-        <p className="text-[10px] leading-4 tracking-wider text-ink-3">
+        <p className="text-[11px] leading-4 tracking-wider text-ink-3">
           RUNS ARE THE HITTER&apos;S: + IS RUNS GAINED. CHASE AND WASTE ARE WON BY TAKING;
           HEART IS WON BY SWINGING. RINGS FOLLOW SAVANT&apos;S ATTACK ZONES.
         </p>

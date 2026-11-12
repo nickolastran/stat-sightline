@@ -504,7 +504,7 @@ export default function PlayoffBracket({
           )}
         </svg>
       </div>
-      <p className="text-[10px] leading-relaxed tracking-wider text-ink-3">
+      <p className="text-[11px] leading-relaxed tracking-wider text-ink-3">
         {seeded
           ? "The postseason field."
           : "Projected seeding — the field as the standings have it today, not a result."}{" "}
@@ -514,7 +514,7 @@ export default function PlayoffBracket({
         reseed: the 1 seed draws the 4/5 winner and the 2 seed the 3/6 winner.
         {ws.size > 0 && " The figure under each club is its odds of winning the World Series."}
       </p>
-      <div className="flex flex-wrap gap-x-4 gap-y-1 text-[10px] tracking-wider text-ink-3">
+      <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] tracking-wider text-ink-3">
         {field.map((f) => (
           <span key={f.leagueId}>
             {f.league.toUpperCase()}:{" "}

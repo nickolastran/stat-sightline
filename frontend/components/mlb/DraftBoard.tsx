@@ -199,7 +199,7 @@ export default function DraftBoard({
         <span className="block leading-tight">
           {p.height || "—"}
           {p.weight ? ` ${p.weight}lbs` : ""}
-          <span className="block text-[10px] text-ink-3">DOB {dob(p.born)}</span>
+          <span className="block text-[11px] text-ink-3">DOB {dob(p.born)}</span>
         </span>
       ),
     },
@@ -212,7 +212,7 @@ export default function DraftBoard({
       render: (p) => (
         <span className="block leading-tight">
           {money(p.bonus)}
-          <span className="block text-[10px] text-ink-3">
+          <span className="block text-[11px] text-ink-3">
             {p.pickValue === null ? "—" : `SLOT ${money(p.pickValue)}`}
           </span>
         </span>

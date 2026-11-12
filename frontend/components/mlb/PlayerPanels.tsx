@@ -138,7 +138,7 @@ function AwardMarks({ awards }: { awards: PlayerAward[] }) {
               : `/award/${a.id}/${a.season}`
           }
           title={a.label}
-          className="text-accent hover:underline"
+          className="text-ink underline decoration-line decoration-dotted underline-offset-2 hover:text-accent hover:decoration-accent"
         >
           {a.short}
           {i < awards.length - 1 && ","}
@@ -504,7 +504,7 @@ export function CareerPanel({ sections }: { sections: CareerSection[] }) {
           </Fragment>
         );
       })}
-      <p className="border border-line bg-bg px-3 py-2 text-[10px] text-ink-3">
+      <p className="border border-line bg-bg px-3 py-2 text-[11px] text-ink-3">
         <span className="font-bold text-ink">BOLD</span> season figures led the
         league. <span className="font-bold italic text-ink">BOLD ITALIC</span>{" "}
         led all major leagues.
@@ -529,7 +529,7 @@ const dateText = (iso: string) =>
 function Fact({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div className="border border-line bg-bg px-3 py-2">
-      <dt className="text-[10px] tracking-[0.2em] text-ink-3">{label}</dt>
+      <dt className="text-[11px] tracking-[0.2em] text-ink-3">{label}</dt>
       <dd className="mt-1 text-xs text-ink">{value}</dd>
     </div>
   );
@@ -614,7 +614,7 @@ export function BioPanel({
                   <p className="truncate text-xs text-ink">
                     <TeamLink id={s.teamId} name={s.team} logo={false} />
                   </p>
-                  <p className="mt-0.5 text-[10px] tracking-[0.15em] text-ink-3">
+                  <p className="mt-0.5 text-[11px] tracking-[0.15em] text-ink-3">
                     {s.from === s.to ? s.from : `${s.from}–${s.to}`} ·{" "}
                     {s.seasons} SEASON{s.seasons === 1 ? "" : "S"}
                   </p>
@@ -644,7 +644,7 @@ export function BioPanel({
                 </p>
                 {/* Each year is the way into that year's award — who else
                     won it, and what they did to. */}
-                <p className="mt-1 flex flex-wrap gap-x-2 text-[10px] tabular-nums tracking-[0.15em]">
+                <p className="mt-1 flex flex-wrap gap-x-2 text-[11px] tabular-nums tracking-[0.15em]">
                   {a.seasons.map((s) => (
                     <Link
                       key={s}
@@ -694,7 +694,7 @@ function Result({
     return (
       <Link
         href={`/game/${gamePk}`}
-        className="whitespace-nowrap text-[10px] tracking-widest text-crit hover:underline"
+        className="whitespace-nowrap text-[11px] tracking-widest text-crit hover:underline"
       >
         <span className="mr-1 inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-crit align-middle" />
         LIVE
@@ -800,7 +800,7 @@ export function GameLogPanel({
                     </td>
                     <td className="px-3 py-1.5 whitespace-nowrap">
                       <span className="flex items-center gap-1.5">
-                        <span className="w-4 shrink-0 text-right text-[10px] text-ink-3">
+                        <span className="w-4 shrink-0 text-right text-[11px] text-ink-3">
                           {r.home ? "vs" : "@"}
                         </span>
                         {r.opp ? (
@@ -835,7 +835,7 @@ export function GameLogPanel({
               {totals.map((t) => (
                 <Row key={t.label} className="bg-surface">
                   <td
-                    className="px-3 py-1.5 text-[10px] tracking-widest whitespace-nowrap text-ink"
+                    className="px-3 py-1.5 text-[11px] tracking-widest whitespace-nowrap text-ink"
                     colSpan={3}
                   >
                     {t.label}
@@ -884,7 +884,7 @@ function SeeAll({ href }: { href: string }) {
   return (
     <Link
       href={href}
-      className="text-[10px] tracking-wider text-ink-3 hover:text-accent"
+      className="text-[11px] tracking-wider text-ink-3 hover:text-accent"
     >
       See All →
     </Link>
@@ -1059,7 +1059,7 @@ export function RecentGamesPanel({
             </td>
             <td className="px-3 py-1.5 whitespace-nowrap">
               <span className="flex items-center gap-1.5">
-                <span className="w-4 shrink-0 text-right text-[10px] text-ink-3">
+                <span className="w-4 shrink-0 text-right text-[11px] text-ink-3">
                   {r.home ? "vs" : "@"}
                 </span>
                 {r.opp ? (

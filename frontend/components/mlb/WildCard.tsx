@@ -30,7 +30,7 @@ const COLS = [
 ];
 
 const TH =
-  "border-b border-line bg-surface px-2 py-1.5 text-center text-[10px] tracking-widest font-normal text-ink-3";
+  "border-b border-line bg-surface px-2 py-1.5 text-center text-[11px] tracking-widest font-normal text-ink-3";
 const TD = "whitespace-nowrap px-2 py-1.5 text-center tabular-nums";
 
 export default function WildCard({
@@ -64,7 +64,7 @@ export default function WildCard({
       {left}
       {groups.map((g) => (
         <div key={g.id} className="border border-line bg-bg">
-          <h3 className="border-b border-line px-3 py-1.5 text-[10px] tracking-[0.2em] text-ink-2">
+          <h3 className="border-b border-line px-3 py-1.5 text-[11px] tracking-[0.2em] text-ink-2">
             {g.name} WILD CARD
           </h3>
           <div className="overflow-x-auto">
@@ -100,14 +100,14 @@ export default function WildCard({
                         : "border-grid"
                     }`}
                   >
-                    <td className="px-2 py-1.5 text-[10px] tabular-nums text-ink-3">
+                    <td className="px-2 py-1.5 text-[11px] tabular-nums text-ink-3">
                       {t.wcRank}
                     </td>
                     <td className="px-3 py-1.5">
                       <span className="flex items-center gap-1">
                         <ClinchMark row={t} phase={phase} />
                         <TeamLink id={t.id} name={t.name} className="min-w-0" />
-                        <span className="shrink-0 text-[10px] tracking-wider text-ink-3">
+                        <span className="shrink-0 text-[11px] tracking-wider text-ink-3">
                           {t.division}
                         </span>
                       </span>
@@ -127,7 +127,7 @@ export default function WildCard({
         </div>
       ))}
 
-      <p className="text-[10px] leading-relaxed text-ink-3">
+      <p className="text-[11px] leading-relaxed text-ink-3">
         DIVISION LEADERS ARE EXCLUDED · THE RULE MARKS THE LAST OF {WC_BERTHS}{" "}
         WILD CARD BERTHS
       </p>

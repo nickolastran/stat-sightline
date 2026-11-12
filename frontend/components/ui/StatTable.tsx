@@ -65,7 +65,7 @@ export function Table({
                     key={i}
                     scope="colgroup"
                     colSpan={g.span}
-                    className="sticky top-0 z-10 border-b border-line border-r border-grid bg-surface px-1 py-1 text-center text-[10px] tracking-widest text-ink last:border-r-0"
+                    className="sticky top-0 z-10 border-b border-line border-r border-grid bg-surface px-1 py-1 text-center text-[11px] tracking-widest text-ink last:border-r-0"
                   >
                     {g.label}
                   </th>
@@ -77,7 +77,7 @@ export function Table({
                 <th
                   key={i}
                   scope="col"
-                  className={`sticky ${groups ? "top-[25px]" : "top-0"} z-10 border-b border-line bg-surface text-[10px] ${
+                  className={`sticky ${groups ? "top-[25px]" : "top-0"} z-10 border-b border-line bg-surface text-[11px] ${
                     /* A dense table's heads carry the weight — twenty-odd
                        columns need a line the eye can come back to. */
                     dense ? "font-bold text-ink" : "font-normal text-ink-3"
@@ -153,7 +153,7 @@ export function SectionHead({
       <th
         scope="colgroup"
         colSpan={lead}
-        className="px-3 py-2 text-left text-[10px] tracking-widest text-ink"
+        className="px-3 py-2 text-left text-[11px] tracking-widest text-ink"
       >
         {label}
       </th>
@@ -162,7 +162,7 @@ export function SectionHead({
           key={c.key}
           scope="col"
           title={c.title}
-          className="px-3 py-2 text-right text-[10px] font-normal tracking-widest text-ink"
+          className="px-3 py-2 text-right text-[11px] font-normal tracking-widest text-ink"
         >
           {c.label}
         </th>

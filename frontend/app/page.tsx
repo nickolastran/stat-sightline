@@ -130,7 +130,7 @@ const draw = cache(async (): Promise<TopCard[]> => {
 
 function RailHeading({ label }: { label: string }) {
   return (
-    <p className="text-[10px] tracking-[0.25em] text-ink-3">
+    <p className="text-[11px] tracking-[0.25em] text-ink-3">
       {SEASON()} {label}
     </p>
   );
@@ -240,7 +240,7 @@ async function RightRail() {
 function Trend({ pick, children }: { pick: Pick; children: React.ReactNode }) {
   return (
     <div className="space-y-1">
-      <p className="text-[10px] tracking-[0.25em] text-ink-3">
+      <p className="text-[11px] tracking-[0.25em] text-ink-3">
         #{pick.leader.rank} {pick.card.label}
       </p>
       <Link
@@ -294,7 +294,7 @@ async function ZoneTrend({
     <Trend pick={pick}>
       <Panel title={`${name} · ${SEASON()} ${what}`}>
         <ZonePlot pitches={pitches} mode={mode} />
-        <p className="mt-2 text-[10px] leading-4 text-ink-3">
+        <p className="mt-2 text-[11px] leading-4 text-ink-3">
           Where the pitch {what === "Hits" ? "behind each" : "that ended each"}{" "}
           of {pitches.length} {what.toLowerCase()} crossed the plate, from the{" "}
           catcher&apos;s view. The box is the strike zone;{" "}
@@ -352,7 +352,7 @@ export default function LandingPage() {
                   <Link href={f.href} className="hover:text-accent">
                     {f.title} →
                   </Link>
-                  <span className="border border-line px-1.5 py-0.5 text-[10px] font-normal tracking-widest text-ink-2">
+                  <span className="border border-line px-1.5 py-0.5 text-[11px] font-normal tracking-widest text-ink-2">
                     {f.code}
                   </span>
                 </h3>

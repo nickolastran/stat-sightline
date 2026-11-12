@@ -159,7 +159,7 @@ export default async function MatchupPage({
               <div className="overflow-x-auto border border-line">
                 <table className="w-full border-collapse text-xs">
                   <thead>
-                    <tr className="border-b border-line text-[10px] tracking-widest text-ink-3">
+                    <tr className="border-b border-line text-[11px] tracking-widest text-ink-3">
                       <th scope="col" className="px-3 py-2 text-left font-normal">PITCH</th>
                       <th scope="col" className="px-3 py-2 text-right font-normal">USE%</th>
                       <th scope="col" className="px-3 py-2 text-right font-normal" title="Hitter's xwOBA against the pitch">BATTER</th>
@@ -194,7 +194,7 @@ export default async function MatchupPage({
                   </tbody>
                 </table>
               </div>
-              <p className="mt-2 text-[10px] leading-4 text-ink-3">
+              <p className="mt-2 text-[11px] leading-4 text-ink-3">
                 xwOBA, {season}. Each side&apos;s figure on a pitch is pulled
                 toward the league&apos;s with {`${REGRESS_PA} PAs`} of average; the
                 two edges over the league are added, then weighted by the

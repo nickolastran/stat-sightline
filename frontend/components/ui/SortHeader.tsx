@@ -45,7 +45,7 @@ export default function SortHeader({
         type="button"
         onClick={() => onSort(sortKey)}
         title={title ?? label}
-        className={`w-full px-2.5 py-1.5 text-[10px] tracking-widest ${
+        className={`w-full px-2.5 py-1.5 text-[11px] tracking-widest ${
           ALIGN[align]
         } ${active ? "text-ink" : "text-ink-3 hover:text-ink"}`}
       >

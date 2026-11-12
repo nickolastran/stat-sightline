@@ -71,7 +71,7 @@ export default function QueryTable({
           type="button"
           onClick={download}
           disabled={rows.length === 0}
-          className="border border-line px-2 py-0.5 text-[10px] tracking-[0.2em] text-ink-3 hover:border-accent hover:text-ink disabled:opacity-50"
+          className="border border-line px-2 py-0.5 text-[11px] tracking-[0.2em] text-ink-3 hover:border-accent hover:text-ink disabled:opacity-50"
         >
           DOWNLOAD CSV
         </button>

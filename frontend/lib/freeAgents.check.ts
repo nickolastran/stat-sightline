@@ -50,5 +50,34 @@ const claimed = toFreeAgent(
   null,
 );
 assert.equal(claimed.note, "Claimed Off Waivers");
+assert.equal(claimed.war, null);
+assert.equal(claimed.line, "");
+
+/* Traded mid-season: the split without a team is the season total. */
+const traded = toFreeAgent(
+  { player: { id: 3 } },
+  {
+    primaryPosition: { type: "Pitcher" },
+    stats: [
+      {
+        type: { displayName: "season" },
+        group: { displayName: "pitching" },
+        splits: [
+          { stat: { era: "7.11", inningsPitched: "19.0" } },
+          { team: { id: 109 }, stat: { era: "6.28", inningsPitched: "14.1" } },
+        ],
+      },
+      {
+        type: { displayName: "sabermetrics" },
+        group: { displayName: "pitching" },
+        splits: [{ stat: { war: -0.653463 } }, { team: { id: 109 }, stat: { war: -0.15 } }],
+      },
+    ],
+  },
+  abbr,
+  null,
+);
+assert.equal(traded.war, -0.7);
+assert.equal(traded.line, "7.11 ERA · 19.0 IP");
 
 console.log("freeAgents: ok");

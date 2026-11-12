@@ -105,7 +105,7 @@ const text = (r: number | null) => (r === null ? "—" : `${r.toFixed(1)}%`);
 function StatBox({ title, line }: { title: string; line: Line | null }) {
   return (
     <div className="border border-line bg-bg">
-      <p className="border-b border-line bg-surface px-2 py-1 text-[10px] tracking-widest text-ink-3">
+      <p className="border-b border-line bg-surface px-2 py-1 text-[11px] tracking-widest text-ink-3">
         {title}
       </p>
       {/* An unannounced starter, or one who has never faced them, keeps the
@@ -118,7 +118,7 @@ function StatBox({ title, line }: { title: string; line: Line | null }) {
             style={line ? c.heat?.(line) : undefined}
             className="border-l border-grid px-1 py-1.5 text-center first:border-l-0"
           >
-            <p className="text-[9px] tracking-wider text-ink-3">{c.label}</p>
+            <p className="text-[11px] tracking-wider text-ink-3">{c.label}</p>
             <p className="text-xs tabular-nums text-ink">
               {line ? c.read(line) : "—"}
             </p>
@@ -250,7 +250,7 @@ export default async function ProbablePitchers({ games }: { games: Game[] }) {
                 </span>
               ))}
             </p>
-            <p className="mt-1 flex items-center justify-center gap-2 text-[10px] tracking-widest text-ink-3">
+            <p className="mt-1 flex items-center justify-center gap-2 text-[11px] tracking-widest text-ink-3">
               <GameStatus game={g} />
               {g.venue && <span className="truncate">· {g.venue}</span>}
             </p>

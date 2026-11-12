@@ -194,12 +194,12 @@ export default function SprayChart({
       title={title ?? `${pick === "career" ? "Career" : pick} Hits Spray Chart`}
       right={
         seasons.length > 1 && (
-          <label className="flex items-center gap-1.5 text-[10px] tracking-[0.2em] text-ink-3">
+          <label className="flex items-center gap-1.5 text-[11px] tracking-[0.2em] text-ink-3">
             SEASON
             <select
               value={pick}
               onChange={(e) => setPick(e.target.value)}
-              className="border border-line bg-bg px-1.5 py-0.5 text-[10px] tracking-normal text-ink hover:border-accent"
+              className="border border-line bg-bg px-1.5 py-0.5 text-[11px] tracking-normal text-ink hover:border-accent"
             >
               <option value="career">CAREER</option>
               {seasons.map((s) => (
@@ -252,7 +252,7 @@ export default function SprayChart({
               {KINDS.map((k) => (
                 <li
                   key={k.kind}
-                  className="flex items-center gap-1 whitespace-nowrap text-[9px] text-ink-2"
+                  className="flex items-center gap-1 whitespace-nowrap text-[11px] text-ink-2"
                 >
                   <span
                     className="h-2 w-2 border border-ink/50"
@@ -266,7 +266,7 @@ export default function SprayChart({
               ))}
             </ul>
           </div>
-          <p className="text-[10px] text-ink-3">
+          <p className="text-[11px] text-ink-3">
             Drawn on {field.name}. Regular season, Statcast-tracked hits.
           </p>
         </div>

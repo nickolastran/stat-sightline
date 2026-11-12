@@ -96,7 +96,7 @@ export function CompareHeadline({
                 <th
                   scope="colgroup"
                   colSpan={cols.length}
-                  className="px-3 py-1.5 text-center text-[10px] tracking-widest text-ink"
+                  className="px-3 py-1.5 text-center text-[11px] tracking-widest text-ink"
                 >
                   {s.band.toUpperCase()}
                 </th>
@@ -252,13 +252,13 @@ export function CompareStatPicker({
     <details className="group relative w-fit">
       <summary className="flex cursor-pointer list-none items-center gap-3 border border-line bg-surface px-3 py-2 text-xs tracking-wider text-ink hover:border-accent">
         STATS
-        <span className="text-[10px] text-ink-3">{selected.length} SHOWN</span>
+        <span className="text-[11px] text-ink-3">{selected.length} SHOWN</span>
         <span className="text-ink-3 transition-transform group-open:rotate-180">▾</span>
       </summary>
       <div className="absolute z-30 mt-px max-h-[70vh] w-80 overflow-y-auto border border-line bg-surface shadow-lg">
         {sections.map((sec) => (
           <section key={sec.title}>
-            <h3 className="sticky top-0 border-y border-line bg-surface-2 px-3 py-1.5 text-[10px] font-bold tracking-widest text-ink">
+            <h3 className="sticky top-0 border-y border-line bg-surface-2 px-3 py-1.5 text-[11px] font-bold tracking-widest text-ink">
               {sec.title.toUpperCase()}
             </h3>
             <ul className="grid grid-cols-2 gap-x-3 gap-y-1.5 px-3 py-2">
@@ -281,7 +281,7 @@ export function CompareStatPicker({
             </ul>
           </section>
         ))}
-        <div className="sticky bottom-0 flex border-t border-line bg-surface text-[10px] tracking-widest">
+        <div className="sticky bottom-0 flex border-t border-line bg-surface text-[11px] tracking-widest">
           <button
             type="button"
             onClick={() => setDraft(defaults)}

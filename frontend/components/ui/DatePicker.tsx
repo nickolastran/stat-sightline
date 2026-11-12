@@ -69,7 +69,7 @@ export default function DatePicker({
         aria-expanded={open}
         disabled={disabled}
         onClick={() => setOpen((o) => !o)}
-        className={`flex h-7 items-center gap-1.5 border px-2 text-[10px] tracking-wider ${
+        className={`flex h-7 items-center gap-1.5 border px-2 text-[11px] tracking-wider ${
           open
             ? "border-accent bg-accent/15 text-ink"
             : "border-line text-ink-2 hover:border-accent hover:text-ink"

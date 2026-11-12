@@ -34,7 +34,7 @@ const ICONS: Record<(typeof LINKS)[number]["icon"], React.ReactNode> = {
 
 export default function SiteFooter() {
   return (
-    <footer className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2 border-t border-line px-6 py-4 text-[10px] tracking-wider text-ink-3 sm:px-10">
+    <footer className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2 border-t border-line px-6 py-4 text-[11px] tracking-wider text-ink-3 sm:px-10">
       <span>© {new Date().getFullYear()} NICKOLAS TRAN · STAT//SIGHTLINE</span>
       <span className="flex flex-wrap items-center gap-x-4 gap-y-2">
         <span>DATA: MLB STATCAST. NOT AFFILIATED WITH MLB.</span>

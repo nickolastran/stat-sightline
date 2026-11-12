@@ -127,7 +127,7 @@ function Identity({
           </h1>
           <FavoriteStar id={t.id} name={t.name} />
         </div>
-        <p className="mt-1 truncate text-[10px] tracking-[0.2em] text-ink-3">
+        <p className="mt-1 truncate text-[11px] tracking-[0.2em] text-ink-3">
           {[`${season} SEASON`, ...facts].join(" · ")}
         </p>
       </div>

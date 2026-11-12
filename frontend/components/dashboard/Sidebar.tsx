@@ -28,7 +28,7 @@ export default function Sidebar({ active, pitcher, batter }: Props) {
 
   return (
     <nav aria-label="Modules" className="border-b border-line">
-      <h2 className="border-b border-line px-3 py-2 text-[10px] tracking-[0.25em] text-ink-3">
+      <h2 className="border-b border-line px-3 py-2 text-[11px] tracking-[0.25em] text-ink-3">
         MODULES
       </h2>
       <ul>
@@ -44,7 +44,7 @@ export default function Sidebar({ active, pitcher, batter }: Props) {
               }`}
             >
               <span>{m.label}</span>
-              <span className="text-[10px] font-normal text-ink-3">{m.code}</span>
+              <span className="text-[11px] font-normal text-ink-3">{m.code}</span>
             </Link>
           </li>
         ))}

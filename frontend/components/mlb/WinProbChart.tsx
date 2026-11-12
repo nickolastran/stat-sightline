@@ -85,7 +85,7 @@ export default function WinProbChart({
         {roundPart(game, shown, round, shownAt)}
       </p>
       <div className="flex gap-2">
-        <div className="flex w-10 shrink-0 flex-col justify-between text-[10px] tracking-wider text-ink-3">
+        <div className="flex w-10 shrink-0 flex-col justify-between text-[11px] tracking-wider text-ink-3">
           <span>{game.away.abbr}</span>
           <span>EVEN</span>
           <span>{game.home.abbr}</span>
@@ -147,7 +147,7 @@ export default function WinProbChart({
           )}
         </svg>
         {/* Certainty at both ends, a coin flip in the middle. */}
-        <div className="flex w-7 shrink-0 flex-col justify-between text-right text-[10px] tabular-nums text-ink-3">
+        <div className="flex w-7 shrink-0 flex-col justify-between text-right text-[11px] tabular-nums text-ink-3">
           <span>100</span>
           <span>50</span>
           <span>100</span>
@@ -156,7 +156,7 @@ export default function WinProbChart({
       {/* Whole play, however long — with a floor deep enough that the panel
           doesn't jump as the pointer runs along the chart. */}
       <p className="min-h-[4.25rem] border border-line bg-bg px-2 py-1.5 text-[11px] text-ink-2">
-        <span className="mr-2 text-[10px] tracking-wider text-ink-3">
+        <span className="mr-2 text-[11px] tracking-wider text-ink-3">
           {shown.half === "top" ? "TOP" : "BOT"} {shown.inning} ·{" "}
           {game.away.abbr} {shown.awayScore}-{shown.homeScore} {game.home.abbr} ·{" "}
           <span className="text-ink-2">

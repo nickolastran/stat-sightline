@@ -67,7 +67,7 @@ export default async function AskPage({
 
         {data && (
           <div className="mt-2 flex items-center justify-between gap-2">
-            <p className="text-[10px] tracking-wider text-ink-3">
+            <p className="text-[11px] tracking-wider text-ink-3">
               {data.data_through && `DATA THROUGH ${data.data_through}`}
             </p>
             <CopyLink />
@@ -83,7 +83,7 @@ export default async function AskPage({
           {data && <AskResult data={data} />}
           {!data && !failure && (
             <div className="border border-line bg-surface p-6">
-              <h2 className="text-[10px] tracking-[0.25em] text-ink-3">
+              <h2 className="text-[11px] tracking-[0.25em] text-ink-3">
                 TRY ONE OF THESE
               </h2>
               <ul className="mt-4 flex flex-wrap gap-2">
@@ -98,7 +98,7 @@ export default async function AskPage({
                   </li>
                 ))}
               </ul>
-              <p className="mt-6 text-[10px] leading-5 tracking-wider text-ink-3">
+              <p className="mt-6 text-[11px] leading-5 tracking-wider text-ink-3">
                 UNDERSTOOD: HR · HITS · SINGLES/DOUBLES/TRIPLES · XBH · RBI ·
                 STRIKEOUTS · WALKS · BATTING AVERAGE, FILTERED BY BALLPARK,
                 OPPONENT, HOME/ROAD, SEASON, MONTH, LAST N DAYS, AND OPPOSING

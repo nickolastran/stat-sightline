@@ -67,7 +67,7 @@ function StarterName({ s }: { s: Starter | null }) {
       className={s.announced ? "font-bold text-ink hover:text-accent" : "text-ink-2 hover:text-accent"}
     >
       {s.name}
-      {!s.announced && <span className="ml-1 text-[9px] text-ink-3">PROJ</span>}
+      {!s.announced && <span className="ml-1 text-[11px] text-ink-3">PROJ</span>}
     </Link>
   );
 }
@@ -234,7 +234,7 @@ export default async function WorldSeriesForecast({
           <h3 className="border-b border-line bg-surface-2 px-3 py-1.5 text-[11px] tracking-[0.2em]">TALE OF THE TAPE</h3>
           <table className="w-full text-xs tabular-nums">
             <thead>
-              <tr className="border-b border-line text-[10px] tracking-widest text-ink-3">
+              <tr className="border-b border-line text-[11px] tracking-widest text-ink-3">
                 <th className="px-3 py-1.5 text-left font-normal" />
                 <th className="px-3 py-1.5 text-right font-normal">{ws.home.abbr}</th>
                 <th className="px-3 py-1.5 text-right font-normal">{ws.away.abbr}</th>
@@ -243,7 +243,7 @@ export default async function WorldSeriesForecast({
             <tbody>
               {tape.map(([label, cell]) => (
                 <tr key={label} className="border-b border-grid last:border-b-0">
-                  <td className="px-3 py-1.5 text-[10px] tracking-widest text-ink-3">{label}</td>
+                  <td className="px-3 py-1.5 text-[11px] tracking-widest text-ink-3">{label}</td>
                   <td className="px-3 py-1.5 text-right text-ink">{cell(H)}</td>
                   <td className="px-3 py-1.5 text-right text-ink">{cell(A)}</td>
                 </tr>
@@ -261,14 +261,14 @@ export default async function WorldSeriesForecast({
             { label: pre ? nowLabel : null, call: { outcomes, likeliest }, bar: "bg-accent" },
           ].map(({ label, call, bar }) => (
             <div key={label ?? "now"} className="p-2 pb-0 last:pb-2">
-              {label && <p className="mb-1 text-[10px] tracking-[0.2em] text-ink-3">{label}</p>}
+              {label && <p className="mb-1 text-[11px] tracking-[0.2em] text-ink-3">{label}</p>}
               <div className="grid grid-cols-4 gap-px sm:grid-cols-8">
                 {call.outcomes.map((o) => {
                   /* The outcome that came true, ringed on the pre-series row. */
                   const happened = label === "BEFORE GAME 1" && nowLabel === "FINAL" && o.who === likeliest.who && o.k === likeliest.k;
                   return (
                     <div key={`${o.who}${o.k}`} className={`border p-2 ${happened ? "border-accent" : "border-line"}`}>
-                      <p className="text-[10px] tracking-wider text-ink-3">
+                      <p className="text-[11px] tracking-wider text-ink-3">
                         {o.who} IN {o.k}
                         {happened && <span className="ml-1 font-bold text-accent">✓</span>}
                       </p>
@@ -290,7 +290,7 @@ export default async function WorldSeriesForecast({
         <div className="overflow-x-auto">
           <table className="w-full text-xs tabular-nums">
             <thead>
-              <tr className="border-b border-line text-[10px] tracking-widest text-ink-3">
+              <tr className="border-b border-line text-[11px] tracking-widest text-ink-3">
                 <th className="px-3 py-1.5 text-left font-normal">GAME</th>
                 <th className="px-3 py-1.5 text-left font-normal">AWAY SP</th>
                 <th className="px-3 py-1.5 text-left font-normal">HOME SP</th>
@@ -311,7 +311,7 @@ export default async function WorldSeriesForecast({
                     <Link href={`/game/${g.pk}`} className="text-ink hover:text-accent">
                       G{i + 1} · {g.away.abbr} @ {g.home.abbr}
                     </Link>
-                    <span className="ml-2 text-[10px] text-ink-3">{gameDay(g.startTime).toUpperCase()}</span>
+                    <span className="ml-2 text-[11px] text-ink-3">{gameDay(g.startTime).toUpperCase()}</span>
                   </td>
                   <td className="px-3 py-1.5 whitespace-nowrap"><StarterName s={aSP} /></td>
                   <td className="px-3 py-1.5 whitespace-nowrap"><StarterName s={hSP} /></td>
@@ -332,7 +332,7 @@ export default async function WorldSeriesForecast({
         </div>
       </section>
 
-      <p className="text-[10px] leading-4 text-ink-3">
+      <p className="text-[11px] leading-4 text-ink-3">
         Each game starts from the clubs&apos; Pythagorean records (season runs
         scored and allowed), regressed toward .500 by {`${REGRESS_GAMES} games`},
         by log5, with home field. The starters then swing

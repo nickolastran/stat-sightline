@@ -234,7 +234,7 @@ export default function CustomFilterBar({
           type="button"
           aria-pressed={draft.rookies}
           onClick={() => set("rookies", !draft.rookies)}
-          className={`border px-2 py-0.5 text-[10px] tracking-[0.2em] ${
+          className={`border px-2 py-0.5 text-[11px] tracking-[0.2em] ${
             draft.rookies
               ? "border-accent bg-accent font-bold text-white"
               : "border-line text-ink-3 hover:border-accent hover:text-ink"
@@ -249,7 +249,7 @@ export default function CustomFilterBar({
         {query.cols.length > 0 && (
           <a
             href={csvHref(query, season)}
-            className="ml-auto border border-line px-2 py-0.5 text-[10px] tracking-[0.2em] text-ink-3 hover:border-accent hover:text-ink"
+            className="ml-auto border border-line px-2 py-0.5 text-[11px] tracking-[0.2em] text-ink-3 hover:border-accent hover:text-ink"
           >
             DOWNLOAD CSV
           </a>
@@ -257,7 +257,7 @@ export default function CustomFilterBar({
       </div>
 
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border border-line bg-bg px-3 py-2">
-        <span className="text-[10px] tracking-[0.2em] text-ink-3">COLUMNS</span>
+        <span className="text-[11px] tracking-[0.2em] text-ink-3">COLUMNS</span>
         {bands(catalogue).map((band) => {
           const keys = band.options.map((c) => c.key);
           const mine = new Set(keys);
@@ -283,13 +283,13 @@ export default function CustomFilterBar({
           );
         })}
         <span className="ml-auto flex items-center gap-3">
-          <span className="text-[10px] tracking-wider text-ink-3 tabular-nums">
+          <span className="text-[11px] tracking-wider text-ink-3 tabular-nums">
             {draft.cols.length} OF {catalogue.length} CHOSEN
           </span>
           <button
             type="submit"
             disabled={!pending}
-            className={`border px-3 py-1 text-[10px] tracking-[0.2em] ${
+            className={`border px-3 py-1 text-[11px] tracking-[0.2em] ${
               pending
                 ? "border-accent bg-accent font-bold text-white hover:opacity-90"
                 : "border-line text-ink-3"

@@ -121,7 +121,7 @@ export default function StatLeaders({
                 <th
                   key={h}
                   scope="col"
-                  className={`sticky top-0 z-10 border-b border-line bg-surface px-3 py-2 text-[10px] font-normal tracking-widest text-ink-3 ${
+                  className={`sticky top-0 z-10 border-b border-line bg-surface px-3 py-2 text-[11px] font-normal tracking-widest text-ink-3 ${
                     i === 1 ? "text-left" : "text-right"
                   }`}
                 >
@@ -154,7 +154,7 @@ export default function StatLeaders({
                       /* The highlight rides on the button, not the cell: a
                          tint is not opaque, and the rows scrolling under a
                          sticky heading show straight through one. */
-                      className={`w-full px-3 py-2 text-right text-[10px] tracking-widest ${
+                      className={`w-full px-3 py-2 text-right text-[11px] tracking-widest ${
                         active
                           ? "bg-accent/15 text-ink"
                           : "text-ink-3 hover:text-ink"
@@ -211,13 +211,13 @@ export default function StatLeaders({
                       {r.name}
                     </PlayerLink>
                     {r.teamId !== null && (
-                      <span className="text-[10px] tracking-wider text-ink-3">
+                      <span className="text-[11px] tracking-wider text-ink-3">
                         <TeamLink id={r.teamId} name={r.team} logo={false} />
                       </span>
                     )}
                   </span>
                 </td>
-                <td className="px-3 py-1.5 text-right text-[10px] tracking-wider text-ink-3">
+                <td className="px-3 py-1.5 text-right text-[11px] tracking-wider text-ink-3">
                   {r.position || "—"}
                 </td>
                 {columns.map((c) => (
@@ -241,12 +241,12 @@ export default function StatLeaders({
           type="button"
           onClick={showAll}
           disabled={loading}
-          className="block w-full py-1 text-center text-[10px] tracking-[0.2em] text-accent hover:underline disabled:opacity-50"
+          className="block w-full py-1 text-center text-[11px] tracking-[0.2em] text-ink-2 hover:text-accent hover:underline disabled:opacity-50"
         >
           {loading ? "LOADING…" : "SHOW ALL"}
         </button>
       )}
-      <p className="text-[10px] tracking-wider text-ink-3">{note}</p>
+      <p className="text-[11px] tracking-wider text-ink-3">{note}</p>
     </div>
   );
 }

@@ -30,8 +30,8 @@ export const metadata: Metadata = {
 };
 
 const field =
-  "w-full border border-line bg-surface px-2 py-1 text-[11px] text-ink-2 focus:border-accent focus:outline-none";
-const label = "mb-1 block text-[10px] tracking-[0.2em] text-ink-3";
+  "w-full border border-line bg-surface px-2 py-1 text-[11px] text-ink-2 focus:border-accent focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent";
+const label = "mb-1 block text-[11px] tracking-[0.2em] text-ink-3";
 
 /** The slice in a line, for the board's header: "SL · 2 STRIKES · VS. LHB". */
 function describe(f: FilterState): string {
@@ -95,8 +95,8 @@ export default async function QueryPage({
         <Sidebar active="Q-01" />
         <form method="get" action="/query" aria-label="Query" className="space-y-3 px-3 py-3">
           <div className="flex items-center justify-between">
-            <h2 className="text-[10px] tracking-[0.25em] text-ink-3">QUERY</h2>
-            <Link href="/query" className="border border-line px-1.5 py-0.5 text-[10px] text-ink-3 hover:border-accent hover:text-ink">
+            <h2 className="text-[11px] tracking-[0.25em] text-ink-3">QUERY</h2>
+            <Link href="/query" className="border border-line px-1.5 py-0.5 text-[11px] text-ink-3 hover:border-accent hover:text-ink">
               RESET
             </Link>
           </div>
@@ -116,12 +116,12 @@ export default async function QueryPage({
           <label className="block">
             <span className={label}>MINIMUM SAMPLE</span>
             <input type="number" name="min" min={0} defaultValue={q.min} className={field} />
-            <span className="mt-1 block text-[10px] text-ink-3">
+            <span className="mt-1 block text-[11px] text-ink-3">
               IN THE STAT&apos;S OWN UNIT — {sample} FOR {q.stat.label}
             </span>
           </label>
 
-          <h3 className="border-t border-grid pt-3 text-[10px] tracking-[0.25em] text-ink-3">PITCHES</h3>
+          <h3 className="border-t border-grid pt-3 text-[11px] tracking-[0.25em] text-ink-3">PITCHES</h3>
           <div className="grid grid-cols-2 gap-2">
             <label className="block">
               <span className={label}>FROM</span>
@@ -147,7 +147,7 @@ export default async function QueryPage({
               <input type="checkbox" name="late" value="1" defaultChecked={f.lateInnings} /> 7TH+
             </label>
           </div>
-          <button type="submit" className="w-full border border-accent bg-accent px-3 py-1.5 text-[10px] font-bold tracking-[0.2em] text-white hover:opacity-90">
+          <button type="submit" className="w-full border border-accent bg-accent px-3 py-1.5 text-[11px] font-bold tracking-[0.2em] text-white hover:opacity-90">
             RUN QUERY
           </button>
         </form>

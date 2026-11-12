@@ -45,7 +45,7 @@ export default function AskBox({
         value={q}
         onChange={(e) => setQ(e.target.value)}
         placeholder="HOW MANY HOME RUNS DID JUDGE HIT AT FENWAY PARK"
-        className="h-12 w-full border border-line bg-surface px-3 text-sm tracking-wide text-ink placeholder:text-ink-3 focus:border-accent focus:outline-none"
+        className="h-12 w-full border border-line bg-surface px-3 text-sm tracking-wide text-ink placeholder:text-ink-3 focus:border-accent focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent"
       />
       <button
         type="submit"
