@@ -37,7 +37,7 @@ export default function Error({
             TIME. IT IS MOST OFTEN MOMENTARY; TRY AGAIN.
           </p>
           {error.digest && (
-            <p className="mt-2 text-[10px] tracking-wider text-ink-3">
+            <p className="mt-2 text-[11px] tracking-wider text-ink-3">
               REF {error.digest}
             </p>
           )}

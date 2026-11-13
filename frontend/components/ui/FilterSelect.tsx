@@ -10,7 +10,7 @@
 
 /** The chrome every control in such a bar shares — selects, inputs, buttons. */
 export const FILTER_CONTROL =
-  "h-7 border border-line bg-bg px-2 text-[10px] tracking-wider text-ink placeholder:text-ink-3 hover:border-accent focus:border-accent focus:outline-none";
+  "h-9 lg:h-7 border border-line bg-bg px-2 text-[11px] tracking-wider text-ink placeholder:text-ink-3 hover:border-accent focus:border-accent focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent";
 
 export default function FilterSelect({
   label,

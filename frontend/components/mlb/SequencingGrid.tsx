@@ -39,7 +39,7 @@ export default function SequencingGrid({
   }, [pitches, codes, view, side]);
 
   const th =
-    "border-b border-line bg-surface px-2 py-2 text-[10px] font-normal tracking-widest text-ink-3";
+    "border-b border-line bg-surface px-2 py-2 text-[11px] font-normal tracking-widest text-ink-3";
 
   return (
     <div className="space-y-2">
@@ -132,7 +132,7 @@ export default function SequencingGrid({
           </tbody>
         </table>
       </div>
-      <p className="text-[10px] tracking-wider text-ink-3">
+      <p className="text-[11px] tracking-wider text-ink-3">
         EACH ROW IS 100% — THE ODDS ON THE NEXT PITCH. BOLD IS THE LIKELIEST.
         FADED ROWS HAVE FEWER THAN {THIN} PITCHES.
       </p>

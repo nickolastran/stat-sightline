@@ -158,7 +158,7 @@ export function SchedulePanel({
                       <th
                         key={j}
                         scope="col"
-                        className={`border-y border-line bg-surface px-3 py-2 text-[10px] font-normal tracking-widest text-ink-3 ${headAlign(
+                        className={`border-y border-line bg-surface px-3 py-2 text-[11px] font-normal tracking-widest text-ink-3 ${headAlign(
                           SCHEDULE_ALIGN,
                           j
                         )}`}
@@ -192,7 +192,7 @@ export function SchedulePanel({
                 >
                   <Link href={`/game/${g.pk}`} className="hover:text-accent">
                     {gameStatus(g).tone === "live" ? (
-                      <span className="whitespace-nowrap text-[10px] tracking-widest text-crit">
+                      <span className="whitespace-nowrap text-[11px] tracking-widest text-crit">
                         <span className="mr-1 inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-crit align-middle" />
                         LIVE
                       </span>
@@ -383,7 +383,7 @@ export function RosterPanel({ groups }: { groups: RosterGroup[] }) {
   return (
     <Panel
       title="Active Roster"
-      right={<span className="text-[10px] text-ink-3">{total} PLAYERS</span>}
+      right={<span className="text-[11px] text-ink-3">{total} PLAYERS</span>}
     >
       {total === 0 ? (
         <p className="border border-line bg-bg px-3 py-6 text-center text-xs text-ink-3">
@@ -393,7 +393,7 @@ export function RosterPanel({ groups }: { groups: RosterGroup[] }) {
         <div className="space-y-3">
           {groups.map((g) => (
             <div key={g.label}>
-              <h3 className="mb-1 text-[10px] tracking-[0.2em] text-ink-2">
+              <h3 className="mb-1 text-[11px] tracking-[0.2em] text-ink-2">
                 {g.label} · {g.players.length}
               </h3>
               <Table
@@ -422,7 +422,7 @@ export function RosterPanel({ groups }: { groups: RosterGroup[] }) {
                         )}
                       </span>
                     </td>
-                    <td className="px-3 py-1.5 text-center text-[10px] tracking-wider text-ink-3">
+                    <td className="px-3 py-1.5 text-center text-[11px] tracking-wider text-ink-3">
                       {p.pos || "—"}
                     </td>
                     <td className="px-3 py-1.5 text-center">{p.throws}</td>
@@ -493,7 +493,7 @@ export function InjuriesPanel({ players }: { players: InjuryEntry[] }) {
             <tr>
               <td
                 colSpan={3}
-                className="border-y border-line bg-surface px-3 py-1.5 text-[10px] tracking-[0.2em] text-ink-2"
+                className="border-y border-line bg-surface px-3 py-1.5 text-[11px] tracking-[0.2em] text-ink-2"
               >
                 {day.date ? dayOf(`${day.date}T12:00:00Z`) : "BEFORE THIS SEASON"}
               </td>
@@ -503,7 +503,7 @@ export function InjuriesPanel({ players }: { players: InjuryEntry[] }) {
                 <td className="px-3 py-1.5">
                   <span className="flex items-center gap-2">
                     <PlayerLink id={p.id}>{p.name}</PlayerLink>
-                    <span className="text-[10px] tracking-wider text-ink-3">
+                    <span className="text-[11px] tracking-wider text-ink-3">
                       {p.pos}
                     </span>
                   </span>
@@ -513,7 +513,7 @@ export function InjuriesPanel({ players }: { players: InjuryEntry[] }) {
                     <span
                       className={`h-1.5 w-1.5 shrink-0 ${IL_DOT[p.statusCode] ?? "bg-ink-3"}`}
                     />
-                    <span className="text-[10px] tracking-wider">{ilLabel(p)}</span>
+                    <span className="text-[11px] tracking-wider">{ilLabel(p)}</span>
                   </span>
                 </td>
                 {/* MLB's own wording of the move, which names the injury — the

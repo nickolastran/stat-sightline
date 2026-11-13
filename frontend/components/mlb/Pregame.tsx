@@ -118,14 +118,14 @@ function ProbableRow({ side, p }: { side: GameSide; p: PlayerSummary | null }) {
   return (
     <tr className="border-b border-grid last:border-b-0 hover:bg-surface-2">
       <td className="px-2 py-1.5 whitespace-nowrap">
-        <span className="mr-1.5 text-[10px] tracking-wider text-ink-3">
+        <span className="mr-1.5 text-[11px] tracking-wider text-ink-3">
           {side.abbr}
         </span>
         <PlayerLink id={side.probable?.id}>
           {side.probable?.name ?? "TBA"}
         </PlayerLink>
         {p && (
-          <span className="ml-1.5 text-[10px] text-ink-3">
+          <span className="ml-1.5 text-[11px] text-ink-3">
             {p.throws}HP{p.number && ` #${p.number}`}
           </span>
         )}
@@ -260,7 +260,7 @@ export default async function Pregame({ game }: { game: Game }) {
               <>
                 <Donut game={game} odds={odds} />
                 {round !== null && (
-                  <p className="mt-1 text-center text-[10px] tracking-wider text-ink-3 tabular-nums">
+                  <p className="mt-1 text-center text-[11px] tracking-wider text-ink-3 tabular-nums">
                     TO TAKE THE {game.series!.split(" G")[0]} · {game.away.abbr}{" "}
                     {(100 - round).toFixed(0)}% · {game.home.abbr} {round.toFixed(0)}%
                   </p>
@@ -309,7 +309,7 @@ export default async function Pregame({ game }: { game: Game }) {
               ],
             ].map(([label, value]) => (
               <div key={String(label)} className="flex gap-2">
-                <dt className="w-24 shrink-0 text-[10px] tracking-[0.2em] text-ink-3">
+                <dt className="w-24 shrink-0 text-[11px] tracking-[0.2em] text-ink-3">
                   {label}
                 </dt>
                 <dd className="min-w-0 flex-1 text-ink-2">{value}</dd>
@@ -327,7 +327,7 @@ export default async function Pregame({ game }: { game: Game }) {
                 <tr>
                   <th
                     scope="col"
-                    className="border-b border-line px-2 py-1.5 text-left text-[10px] font-normal tracking-widest text-ink-3"
+                    className="border-b border-line px-2 py-1.5 text-left text-[11px] font-normal tracking-widest text-ink-3"
                   >
                     PITCHER
                   </th>
@@ -335,7 +335,7 @@ export default async function Pregame({ game }: { game: Game }) {
                     <th
                       key={c}
                       scope="col"
-                      className="border-b border-line px-2 py-1.5 text-right text-[10px] font-normal tracking-widest text-ink-3"
+                      className="border-b border-line px-2 py-1.5 text-right text-[11px] font-normal tracking-widest text-ink-3"
                     >
                       {c}
                     </th>

@@ -43,11 +43,11 @@ export default function SiteSearch() {
         onKeyDown={t.onKeyDown}
         onFocus={() => t.results.length && t.setOpen(true)}
         placeholder="SEARCH PLAYER / TEAM"
-        className="h-7 w-36 border border-line bg-surface px-2 text-[10px] tracking-wider text-ink placeholder:text-ink-3 focus:border-accent focus:outline-none sm:w-56"
+        className="h-7 w-36 border border-line bg-surface px-2 text-[11px] tracking-wider text-ink placeholder:text-ink-3 focus:border-accent focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent sm:w-56"
       />
 
       {t.error && (
-        <p className="absolute right-0 z-30 mt-px border border-crit bg-surface px-2 py-1 text-[10px] text-crit">
+        <p className="absolute right-0 z-30 mt-px border border-crit bg-surface px-2 py-1 text-[11px] text-crit">
           {t.error}
         </p>
       )}
@@ -58,7 +58,7 @@ export default function SiteSearch() {
           className="absolute right-0 z-30 mt-px max-h-80 w-72 overflow-y-auto border border-line bg-surface"
         >
           {t.results.length === 0 && (
-            <li className="px-3 py-2 text-[10px] tracking-wider text-ink-3">
+            <li className="px-3 py-2 text-[11px] tracking-wider text-ink-3">
               NO MATCH
             </li>
           )}
@@ -93,12 +93,12 @@ export default function SiteSearch() {
                 <span className="min-w-0 flex-1">
                   <span className="block truncate">{hit.name}</span>
                   {hit.detail && (
-                    <span className="block truncate text-[10px] text-ink-3">
+                    <span className="block truncate text-[11px] text-ink-3">
                       {hit.detail}
                     </span>
                   )}
                 </span>
-                <span className="shrink-0 text-[9px] tracking-widest text-ink-3">
+                <span className="shrink-0 text-[11px] tracking-widest text-ink-3">
                   {hit.kind === "team" ? "TEAM" : "PLAYER"}
                 </span>
               </button>

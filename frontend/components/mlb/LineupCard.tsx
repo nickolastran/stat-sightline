@@ -112,7 +112,7 @@ export default function LineupCard({
                   <th
                     key={h}
                     scope="col"
-                    className={`border-b border-line bg-surface px-2 py-2 text-[10px] font-normal tracking-widest text-ink-3 ${
+                    className={`border-b border-line bg-surface px-2 py-2 text-[11px] font-normal tracking-widest text-ink-3 ${
                       i === 1 ? "text-left" : "text-right"
                     }`}
                   >
@@ -124,7 +124,7 @@ export default function LineupCard({
                     key={c.key}
                     scope="col"
                     title={c.title}
-                    className="border-b border-line bg-surface px-2 py-2 text-right text-[10px] font-normal tracking-widest text-ink-3"
+                    className="border-b border-line bg-surface px-2 py-2 text-right text-[11px] font-normal tracking-widest text-ink-3"
                   >
                     {c.label}
                   </th>
@@ -145,7 +145,7 @@ export default function LineupCard({
                     <td className="px-2 py-1.5 whitespace-nowrap">
                       <PlayerLink id={s.id}>{s.name}</PlayerLink>
                     </td>
-                    <td className="px-2 py-1.5 text-right text-[10px] tracking-wider text-ink-3">
+                    <td className="px-2 py-1.5 text-right text-[11px] tracking-wider text-ink-3">
                       {s.pos}
                     </td>
                     {cols.map((c) => (

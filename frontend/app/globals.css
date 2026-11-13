@@ -10,7 +10,7 @@
   --color-surface-2: #e9e6dc; /* hover / raised */
   --color-ink: #16150f; /* primary */
   --color-ink-2: #45433b; /* secondary */
-  --color-ink-3: #78756b; /* muted: axis, labels, captions */
+  --color-ink-3: #6b685e; /* muted: axis, labels, captions */
   --color-grid: #ddd9cd; /* hairline gridlines */
   --color-line: rgba(0, 0, 0, 0.14); /* hairline borders */
   --color-accent: #2668c9; /* categorical slot 1 (blue) doubles as UI accent */

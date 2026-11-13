@@ -16,7 +16,7 @@ interface Props {
 export default function MetricCard({ label, value, unit, sub, change }: Props) {
   return (
     <div className="border border-line bg-surface p-3">
-      <p className="text-[10px] tracking-[0.2em] text-ink-3">{label}</p>
+      <p className="text-[11px] tracking-[0.2em] text-ink-3">{label}</p>
       <p className="mt-2 text-2xl font-bold leading-none text-ink">
         {value}
         {unit && (
@@ -36,7 +36,7 @@ export default function MetricCard({ label, value, unit, sub, change }: Props) {
           {change.note && <span className="ml-1 text-ink-3">· {change.note}</span>}
         </p>
       )}
-      {sub && <p className="mt-2 text-[10px] text-ink-3">{sub}</p>}
+      {sub && <p className="mt-2 text-[11px] text-ink-3">{sub}</p>}
     </div>
   );
 }

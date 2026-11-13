@@ -158,10 +158,10 @@ export default function AskResult({ data }: { data: AskResponse }) {
       {/* ── the answer ─────────────────────────────────────────────── */}
       <section className="border border-line bg-surface">
         <header className="flex flex-wrap items-baseline justify-between gap-2 border-b border-line px-4 py-2">
-          <h2 className="text-[10px] tracking-[0.25em] text-ink-3">
+          <h2 className="text-[11px] tracking-[0.25em] text-ink-3">
             {answer.subject.toUpperCase()} — {answer.label.toUpperCase()}
           </h2>
-          <span className="text-[10px] tracking-wider text-ink-3">
+          <span className="text-[11px] tracking-wider text-ink-3">
             {answer.timeframe.toUpperCase()}
           </span>
         </header>
@@ -177,7 +177,7 @@ export default function AskResult({ data }: { data: AskResponse }) {
                 answer.subject
               )}
             </p>
-            <p className="mt-1 text-[10px] tracking-widest text-ink-3">
+            <p className="mt-1 text-[11px] tracking-widest text-ink-3">
               {answer.label.toUpperCase()}
               {answer.rank && ` · ${answer.rank.toUpperCase()}`}
             </p>
@@ -187,7 +187,7 @@ export default function AskResult({ data }: { data: AskResponse }) {
               {answer.filters.map((f) => (
                 <li
                   key={f}
-                  className="border border-line px-2 py-0.5 text-[10px] tracking-wider text-ink-2"
+                  className="border border-line px-2 py-0.5 text-[11px] tracking-wider text-ink-2"
                 >
                   {f.toUpperCase()}
                 </li>
@@ -196,7 +196,7 @@ export default function AskResult({ data }: { data: AskResponse }) {
           )}
         </div>
         {data.notes.length > 0 && (
-          <ul className="space-y-1 border-t border-line px-4 py-2 text-[10px] text-ink-3">
+          <ul className="space-y-1 border-t border-line px-4 py-2 text-[11px] text-ink-3">
             {data.notes.map((n) => (
               <li key={n}>— {n}</li>
             ))}
@@ -283,7 +283,7 @@ export default function AskResult({ data }: { data: AskResponse }) {
       <Panel
         title={`GAME LOG — ${answer.subject.toUpperCase()}`}
         right={
-          <span className="text-[10px] tracking-wider text-ink-3">
+          <span className="text-[11px] tracking-wider text-ink-3">
             {data.truncated ? "FIRST 200, NEWEST FIRST" : "NEWEST FIRST"}
           </span>
         }

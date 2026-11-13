@@ -160,7 +160,7 @@ export default function RollingChart({
     <Panel title={title} right={controls}>
       <div className="space-y-2">
         {solo && shown ? (
-          <p className="text-[10px] tracking-wider text-ink-3">
+          <p className="text-[11px] tracking-wider text-ink-3">
             LAST {n} {win.unit} THRU {shown.date} ·{" "}
             {role === "batter" && <>{shown.pa} PA · </>}
             <span className="text-xs tabular-nums text-ink">
@@ -183,7 +183,7 @@ export default function RollingChart({
           </p>
         ) : (
           /* The legend: each player's swatch, name, window and season. */
-          <p className="flex flex-wrap gap-x-3 gap-y-1 text-[10px] tracking-wider text-ink-3">
+          <p className="flex flex-wrap gap-x-3 gap-y-1 text-[11px] tracking-wider text-ink-3">
             <span>
               LAST {n} {win.unit} THRU {win.unit} {unit}
             </span>
@@ -209,7 +209,7 @@ export default function RollingChart({
           </p>
         )}
         <div className="flex gap-2">
-          <div className="flex w-10 shrink-0 flex-col justify-between text-right text-[10px] tabular-nums text-ink-3">
+          <div className="flex w-10 shrink-0 flex-col justify-between text-right text-[11px] tabular-nums text-ink-3">
             <span>{rollText(metric, hi + pad)}</span>
             <span>{rollText(metric, lo - pad)}</span>
           </div>
@@ -281,7 +281,7 @@ export default function RollingChart({
             )}
           </svg>
         </div>
-        <div className="flex justify-between pl-12 text-[10px] tabular-nums text-ink-3">
+        <div className="flex justify-between pl-12 text-[11px] tabular-nums text-ink-3">
           {solo ? (
             <>
               <span>{lines[0].points[0].date}</span>

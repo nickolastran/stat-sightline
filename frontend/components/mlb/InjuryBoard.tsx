@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
+import { useUrlFilters } from "@/lib/useUrlFilters";
 import DataTable, { type Column } from "@/components/ui/DataTable";
 import FilterSelect, { FILTER_CONTROL } from "@/components/ui/FilterSelect";
 import PlayerLink from "@/components/mlb/PlayerLink";
@@ -21,9 +22,9 @@ const since = (iso: string) =>
   /^\d{4}-\d{2}-\d{2}/.test(iso) ? `${iso.slice(5, 7)}/${iso.slice(8, 10)}` : "—";
 
 export default function InjuryBoard({ injuries }: { injuries: Injury[] }) {
-  const [f, setF] = useState<Filters>(BLANK);
+  const [f, setF] = useUrlFilters(BLANK);
   const set = <K extends keyof Filters>(key: K, value: Filters[K]) =>
-    setF((prev) => ({ ...prev, [key]: value }));
+    setF({ ...f, [key]: value });
   const dirty = Object.values(f).some(Boolean);
 
   const options = useMemo(() => {
@@ -123,7 +124,7 @@ export default function InjuryBoard({ injuries }: { injuries: Injury[] }) {
           onChange={(e) => set("name", e.target.value)}
           className={`${FILTER_CONTROL} w-36 ${f.name ? "border-accent" : ""}`}
         />
-        <span className="text-[10px] tracking-[0.2em] text-ink-3">
+        <span className="text-[11px] tracking-[0.2em] text-ink-3">
           {rows.length} ON THE IL
         </span>
         <button

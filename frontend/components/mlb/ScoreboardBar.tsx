@@ -36,7 +36,7 @@ const ArrowButton = ({
     aria-label={label}
     disabled={disabled}
     onClick={onClick}
-    className="h-7 w-7 border border-line text-ink-2 enabled:hover:border-accent enabled:hover:text-ink disabled:text-ink-3 disabled:opacity-40"
+    className="h-9 w-9 border border-line text-ink-2 lg:h-7 lg:w-7 enabled:hover:border-accent enabled:hover:text-ink disabled:text-ink-3 disabled:opacity-40"
   >
     {children}
   </button>
@@ -127,7 +127,7 @@ export default function ScoreboardBar({ start }: { start?: string | null }) {
     <div className="border-b border-line bg-bg">
       {/* ── Strip header ─────────────────────────────────────── */}
       <div className="flex items-center gap-2 px-4 py-1.5">
-        <span className="hidden shrink-0 text-[10px] tracking-[0.25em] text-ink-3 sm:inline">
+        <span className="hidden shrink-0 text-[11px] tracking-[0.25em] text-ink-3 sm:inline">
           SCOREBOARD
         </span>
 

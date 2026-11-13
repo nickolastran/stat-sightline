@@ -25,7 +25,7 @@ export default function TeamStatCard({
   return (
     <div className="border border-line bg-surface">
       <header className="flex flex-wrap items-center justify-between gap-2 border-b border-line px-3 py-2">
-        <h2 className="text-[10px] tracking-wider text-ink-3">
+        <h2 className="text-[11px] tracking-wider text-ink-3">
           {season} Team Stats
         </h2>
         <SegmentedControl<"hitting" | "pitching">
@@ -44,13 +44,13 @@ export default function TeamStatCard({
             key={s.key}
             className="border-b border-r border-grid px-3 py-3 text-center last:border-r-0 even:border-r-0"
           >
-            <dt className="text-[10px] tracking-[0.15em] text-ink-3">
+            <dt className="text-[11px] tracking-[0.15em] text-ink-3">
               {s.label}
             </dt>
             <dd className="mt-1.5 text-2xl font-bold leading-none tabular-nums text-ink">
               {teamStatText(s.value)}
             </dd>
-            <p className="mt-1.5 text-[10px] tracking-wider text-ink-3">
+            <p className="mt-1.5 text-[11px] tracking-wider text-ink-3">
               {s.rank === null ? "—" : ordinal(s.rank)}
             </p>
           </div>
@@ -58,7 +58,7 @@ export default function TeamStatCard({
       </dl>
       <Link
         href={`/league/teams?season=${season}`}
-        className="block px-3 py-2 text-center text-[10px] tracking-wider text-ink-2 hover:text-accent"
+        className="block px-3 py-2 text-center text-[11px] tracking-wider text-ink-2 hover:text-accent"
       >
         FULL TEAM STATS →
       </Link>

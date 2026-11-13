@@ -29,7 +29,7 @@ export default function ResultTable({
   return (
     <div className="overflow-x-auto border border-line">
       <table className="w-full border-collapse text-xs">
-        <caption className="border-b border-line px-2 py-1.5 text-left text-[10px] tracking-[0.25em] text-ink-3">
+        <caption className="border-b border-line px-2 py-1.5 text-left text-[11px] tracking-[0.25em] text-ink-3">
           {caption}
         </caption>
         <thead>
@@ -38,7 +38,7 @@ export default function ResultTable({
               <th
                 key={h}
                 scope="col"
-                className={`border-b border-line px-2 py-1.5 text-[10px] font-normal tracking-widest text-ink-3 ${
+                className={`border-b border-line px-2 py-1.5 text-[11px] font-normal tracking-widest text-ink-3 ${
                   i === 2 ? "text-right" : "text-left"
                 }`}
               >
@@ -72,7 +72,7 @@ export default function ResultTable({
                   {/* The vs/@ sits in a fixed column of its own so the marks
                       below it line up whichever word it is. */}
                   <span className="flex items-center gap-1">
-                    <span className="w-4 shrink-0 text-right text-[10px] text-ink-3">
+                    <span className="w-4 shrink-0 text-right text-[11px] text-ink-3">
                       {at ? "vs" : "@"}
                     </span>
                     <TeamLink id={them.id} name={them.abbr} />

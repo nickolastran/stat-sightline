@@ -413,7 +413,7 @@ export default async function LeagueSectionPage({
               max={probables ? lastProbable : undefined}
             />
           ) : absBoard ? (
-            <span className="text-[10px] text-ink-3">{season}</span>
+            <span className="text-[11px] text-ink-3">{season}</span>
           ) : playerBoard ? (
             <div className="flex flex-wrap items-center gap-3">
               <ParamSelect

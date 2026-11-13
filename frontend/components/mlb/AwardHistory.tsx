@@ -53,7 +53,7 @@ function DecadeYears({
           <Link
             key={s.season}
             href={`/award/${id}/${s.season}`}
-            className="text-[13px] tabular-nums text-accent hover:underline"
+            className="text-[13px] tabular-nums text-ink underline decoration-line decoration-dotted underline-offset-2 hover:text-accent hover:decoration-accent"
           >
             {s.season}
           </Link>
@@ -104,7 +104,7 @@ function DecadeTable({
                 {i === 0 ? (
                   <Link
                     href={`/award/${id}/${s.season}`}
-                    className="font-bold text-accent hover:underline"
+                    className="font-bold text-ink underline decoration-line decoration-dotted underline-offset-2 hover:text-accent hover:decoration-accent"
                   >
                     {s.season}
                   </Link>
@@ -142,7 +142,7 @@ function DecadeTable({
                 {i === 0 && s.ballot ? (
                   <Link
                     href={`/award/${s.season}#${id}`}
-                    className="text-[11px] text-accent hover:underline"
+                    className="text-[11px] text-ink underline decoration-line decoration-dotted underline-offset-2 hover:text-accent hover:decoration-accent"
                   >
                     Voting
                   </Link>
@@ -202,7 +202,7 @@ export default async function AwardHistory({ id }: { id: string }) {
           </div>
         ))}
 
-        <p className="border border-line bg-bg px-3 py-2 text-[10px] leading-5 text-ink-3">
+        <p className="border border-line bg-bg px-3 py-2 text-[11px] leading-5 text-ink-3">
           {history.lines
             ? "Each line is the season the award was won on, his own club's half of it where he was traded mid-year."
             : "This award is given to a whole roster every year, so a decade is its seasons — each one links to that year's winners in full."}{" "}

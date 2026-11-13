@@ -4,6 +4,9 @@
  * season just played: the winter after 2026 is `season=2026`, the class the
  * contract sites call "2027 free agents".
  *
+ * Each man's line from the season just played — WAR, and OPS or ERA — rides
+ * the same people call that brings his age.
+ *
  * MLB carries no money, so the salary column is whatever data/salaries.csv
  * says the player made in that season (see lib/salaries.ts) — blank until
  * that file is filled.
@@ -31,6 +34,37 @@ export interface FreeAgent {
   note: string;
   declared: string;
   salary: number | null;
+  /** Last season's FanGraphs WAR (via MLB), in his own job — null with no line. */
+  war: number | null;
+  /** Last season's line in a few words: ".812 OPS · 512 PA", "3.21 ERA · 64.0 IP". */
+  line: string;
+}
+
+/**
+ * WAR and a short line off a person hydrated with season + sabermetrics
+ * stats. A pitcher is read as a pitcher and everyone else as a hitter; a man
+ * who changed clubs has a split per club and one total without a team, which
+ * is the one wanted.
+ */
+export function seasonLine(person: any): { war: number | null; line: string } {
+  const group = person?.primaryPosition?.type === "Pitcher" ? "pitching" : "hitting";
+  const stat = (type: string) => {
+    const splits: any[] =
+      (person?.stats ?? []).find(
+        (s: any) => s.type?.displayName === type && s.group?.displayName === group,
+      )?.splits ?? [];
+    return (splits.find((x) => !x.team) ?? splits[0])?.stat;
+  };
+  const season = stat("season");
+  const war = stat("sabermetrics")?.war;
+  return {
+    war: typeof war === "number" ? Math.round(war * 10) / 10 : null,
+    line: !season
+      ? ""
+      : group === "pitching"
+        ? `${season.era ?? "—"} ERA · ${season.inningsPitched ?? "0.0"} IP`
+        : `${season.ops ?? "—"} OPS · ${season.plateAppearances ?? 0} PA`,
+  };
 }
 
 /** One `/people/freeAgents` entry, joined to the club, the person and the pay. */
@@ -65,6 +99,7 @@ export function toFreeAgent(
     note: milb ? "" : titleCase(raw.trim().replace(/\.$/, "")),
     declared: fa.dateDeclared ?? "",
     salary,
+    ...seasonLine(person),
   };
 }
 
@@ -73,11 +108,15 @@ export async function getFreeAgents(season: number): Promise<FreeAgent[]> {
   const list: any[] = data.freeAgents ?? [];
   if (list.length === 0) return [];
 
-  /* Age and handedness aren't on the list — one batched people call is. */
+  /* Age, handedness and last season's line aren't on the list — one batched
+     people call is, trimmed to the fields read (~180 KB for a full class). */
   const ids = list.map((f) => f.player?.id).filter(Boolean);
   const [people, clubs, salaries] = await Promise.all([
     mlb(
-      `/people?personIds=${ids.join(",")}&fields=people,id,currentAge,batSide,pitchHand,code,primaryPosition,abbreviation`,
+      `/people?personIds=${ids.join(",")}` +
+        `&hydrate=stats(group=[hitting,pitching],type=[season,sabermetrics],season=${season})` +
+        "&fields=people,id,currentAge,batSide,pitchHand,code,primaryPosition,abbreviation,type," +
+        "stats,displayName,group,splits,team,stat,war,ops,era,inningsPitched,plateAppearances",
       86400,
     ).catch(() => ({ people: [] })),
     getClubs().catch(() => []),

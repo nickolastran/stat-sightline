@@ -68,7 +68,7 @@ function Histogram({
 
   return (
     <figure className="min-w-0 flex-1 space-y-1">
-      <figcaption className="text-[10px] tracking-widest text-ink-3">{title}</figcaption>
+      <figcaption className="text-[11px] tracking-widest text-ink-3">{title}</figcaption>
       <svg viewBox={`0 0 ${W} ${H + 14}`} className="w-full" role="img"
         aria-label={`${title}: his average ${mine.toFixed(1)} ${unit}, league ${league.toFixed(1)}`}
       >
@@ -119,9 +119,9 @@ export default function BatTrackingPanel({
           const diff = player[t.key] - league[t.key];
           return (
             <div key={t.key} className="border border-line bg-bg px-2 py-1.5">
-              <dt className="text-[9px] tracking-widest text-ink-3">{t.label}</dt>
+              <dt className="text-[11px] tracking-widest text-ink-3">{t.label}</dt>
               <dd className="text-sm font-bold tabular-nums text-ink">{t.fmt(player[t.key])}</dd>
-              <dd className="text-[10px] tabular-nums text-ink-3">
+              <dd className="text-[11px] tabular-nums text-ink-3">
                 LG {t.fmt(league[t.key])} · {diff >= 0 ? "▲" : "▼"}
               </dd>
             </div>

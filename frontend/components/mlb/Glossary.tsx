@@ -30,8 +30,8 @@ function Section({
 }) {
   return (
     <section className="space-y-1.5">
-      <h4 className="text-[10px] tracking-[0.2em] text-ink-3">{name}</h4>
-      <dl className="grid grid-cols-[repeat(auto-fill,minmax(16rem,1fr))] gap-x-6 gap-y-1 text-[10px] leading-relaxed">
+      <h4 className="text-[11px] tracking-[0.2em] text-ink-3">{name}</h4>
+      <dl className="grid grid-cols-[repeat(auto-fill,minmax(16rem,1fr))] gap-x-6 gap-y-1 text-[11px] leading-relaxed">
         {entries.map((e) => (
           <div
             key={e.label}

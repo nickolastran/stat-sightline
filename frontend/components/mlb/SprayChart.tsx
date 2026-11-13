@@ -194,12 +194,12 @@ export default function SprayChart({
       title={title ?? `${pick === "career" ? "Career" : pick} Hits Spray Chart`}
       right={
         seasons.length > 1 && (
-          <label className="flex items-center gap-1.5 text-[10px] tracking-[0.2em] text-ink-3">
+          <label className="flex items-center gap-1.5 text-[11px] tracking-[0.2em] text-ink-3">
             SEASON
             <select
               value={pick}
               onChange={(e) => setPick(e.target.value)}
-              className="border border-line bg-bg px-1.5 py-0.5 text-[10px] tracking-normal text-ink hover:border-accent"
+              className="border border-line bg-bg px-1.5 py-0.5 text-[11px] tracking-normal text-ink hover:border-accent"
             >
               <option value="career">CAREER</option>
               {seasons.map((s) => (
@@ -248,25 +248,27 @@ export default function SprayChart({
             </svg>
             {/* Bottom right, beside the right-field line: foul ground, where
                 no hit on the chart ever lands. */}
-            <ul className="pointer-events-none absolute bottom-0 right-0 leading-3">
+            {/* w-max sizes the list to its widest row, so the label column
+                fits "HOME RUN" at any text size and the counts line up. */}
+            <ul className="pointer-events-none absolute bottom-0 right-0 w-max leading-3">
               {KINDS.map((k) => (
                 <li
                   key={k.kind}
-                  className="flex items-center gap-1 whitespace-nowrap text-[9px] text-ink-2"
+                  className="flex items-center gap-1 whitespace-nowrap text-[11px] text-ink-2"
                 >
                   <span
                     className="h-2 w-2 border border-ink/50"
                     style={{ background: k.color, borderRadius: "50%" }}
                   />
-                  <span className="w-12">{k.label}</span>
-                  <span className="tabular-nums text-ink">
+                  <span className="flex-1">{k.label}</span>
+                  <span className="ml-2 tabular-nums text-ink">
                     {shown.filter((h) => h.kind === k.kind).length}
                   </span>
                 </li>
               ))}
             </ul>
           </div>
-          <p className="text-[10px] text-ink-3">
+          <p className="text-[11px] text-ink-3">
             Drawn on {field.name}. Regular season, Statcast-tracked hits.
           </p>
         </div>

@@ -75,7 +75,7 @@ export default function SeriesPanel({
     >
       <div className="space-y-2">
         {scope === "series" && label && (
-          <p className="text-[10px] tracking-wider text-ink-3">{label}</p>
+          <p className="text-[11px] tracking-wider text-ink-3">{label}</p>
         )}
         <ResultTable
           teamId={teamId}
@@ -83,7 +83,7 @@ export default function SeriesPanel({
           caption={`${awayAbbr} AT ${homeAbbr}`}
         />
         {played.length > 0 && (
-          <p className="text-[10px] tracking-wider text-ink-3">
+          <p className="text-[11px] tracking-wider text-ink-3">
             SEASON SERIES — {awayAbbr} {awayWins}, {homeAbbr}{" "}
             {played.length - awayWins}
           </p>

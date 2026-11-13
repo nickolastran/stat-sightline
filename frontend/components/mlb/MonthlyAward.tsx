@@ -151,7 +151,7 @@ export default async function MonthlyAward({ id }: { id: string }) {
           </div>
         ))}
 
-        <p className="border border-line bg-bg px-3 py-2 text-[10px] leading-5 text-ink-3">
+        <p className="border border-line bg-bg px-3 py-2 text-[11px] leading-5 text-ink-3">
           Each line is the month the award was given for, not the season —
           March counted into April and October into September, the way the
           award is. A month MLB publishes no split for leaves the name alone.

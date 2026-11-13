@@ -33,7 +33,7 @@ export default function SegmentedControl<V extends string | number | null>({
   variant = "box",
   className = "",
 }: Props<V>) {
-  const pad = size === "lg" ? "px-4 py-2 text-xs" : "px-2 py-1 text-[11px]";
+  const pad = size === "lg" ? "px-4 py-2 text-xs" : "px-2 py-2 text-[11px] lg:py-1";
   const underline = variant === "underline";
   return (
     <div

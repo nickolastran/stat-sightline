@@ -78,7 +78,7 @@ export default function TeamStats({
               <tr>
                 <th
                   scope="col"
-                  className="sticky left-0 z-10 border-b border-line bg-surface px-3 py-1.5 text-left text-[10px] tracking-widest font-normal text-ink-3"
+                  className="sticky left-0 z-10 border-b border-line bg-surface px-3 py-1.5 text-left text-[11px] tracking-widest font-normal text-ink-3"
                 >
                   TEAM
                 </th>

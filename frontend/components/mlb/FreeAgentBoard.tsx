@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
+import { useUrlFilters } from "@/lib/useUrlFilters";
 import DataTable, { type Column } from "@/components/ui/DataTable";
 import FilterSelect, { FILTER_CONTROL } from "@/components/ui/FilterSelect";
 import MetricCard from "@/components/ui/MetricCard";
@@ -33,8 +34,10 @@ type Filters = typeof BLANK;
 function Summary({ agents, season }: { agents: FreeAgent[]; season: number }) {
   const mlbClass = agents.filter((a) => a.type === "MLB");
   const open = mlbClass.filter((a) => a.toId === null);
+  /* Best by what he did last year, not by what he was paid for it. */
   const top = open.reduce<FreeAgent | null>(
-    (best, a) => ((a.salary ?? -1) > (best?.salary ?? -1) ? a : best),
+    (best, a) =>
+      a.war !== null && a.war > (best?.war ?? -Infinity) ? a : best,
     null,
   );
   const qo = mlbClass.filter((a) => /qualifying offer/i.test(a.note)).length;
@@ -48,8 +51,8 @@ function Summary({ agents, season }: { agents: FreeAgent[]; season: number }) {
       />
       <MetricCard
         label="TOP AVAILABLE"
-        value={top?.salary ? money(top.salary) : "—"}
-        sub={top?.salary ? `${top.name.toUpperCase()} · ${season} SALARY` : "NO SALARY DATA"}
+        value={top ? `${top.war!.toFixed(1)} WAR` : "—"}
+        sub={top ? `${top.name.toUpperCase()} · ${season}` : "NO STATS YET"}
       />
       <MetricCard label="QUALIFYING OFFERS" value={String(qo)} sub="EXTENDED" />
     </div>
@@ -63,9 +66,9 @@ export default function FreeAgentBoard({
   agents: FreeAgent[];
   season: number;
 }) {
-  const [f, setF] = useState<Filters>(BLANK);
+  const [f, setF] = useUrlFilters(BLANK);
   const set = <K extends keyof Filters>(key: K, value: Filters[K]) =>
-    setF((prev) => ({ ...prev, [key]: value }));
+    setF({ ...f, [key]: value });
   const dirty = (Object.keys(BLANK) as (keyof Filters)[]).some(
     (k) => f[k] !== BLANK[k],
   );
@@ -124,6 +127,22 @@ export default function FreeAgentBoard({
       render: (a) => a.age ?? "—",
     },
     {
+      key: "war",
+      label: `${season} WAR`,
+      align: "right",
+      width: "6rem",
+      sortValue: (a) => a.war,
+      render: (a) => (a.war === null ? "—" : a.war.toFixed(1)),
+    },
+    {
+      /* OPS for a hitter and ERA for a pitcher don't sort against each other,
+         so the line is read here and ranked by WAR beside it. */
+      key: "line",
+      label: `${season} LINE`,
+      width: "10rem",
+      render: (a) => <span className="text-ink-2">{a.line || "—"}</span>,
+    },
+    {
       key: "hand",
       label: "B/T",
       align: "center",
@@ -173,7 +192,7 @@ export default function FreeAgentBoard({
         a.toId ? (
           <TeamLink id={a.toId} name={a.toName} text={a.toAbbr} />
         ) : (
-          <span className="text-accent">AVAILABLE</span>
+          <span className="text-ink-3">AVAILABLE</span>
         ),
     },
     {
@@ -260,9 +279,7 @@ export default function FreeAgentBoard({
         columns={cols}
         rows={rows}
         rowKey={(a) => a.id}
-        defaultSort={
-          paid ? { key: "salary", dir: "desc" } : { key: "name", dir: "asc" }
-        }
+        defaultSort={{ key: "war", dir: "desc" }}
         pageSize={50}
         paginate
         maxHeight="none"

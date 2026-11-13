@@ -41,7 +41,7 @@ export default function PostseasonSchedule({ series }: { series: PostSeries[] })
                 aria-label={`Game ${i + 1} — ${g.away.name} at ${g.home.name}`}
                 className="flex flex-col focus-visible:outline-2 focus-visible:outline-accent"
               >
-                <p className="mb-0.5 text-[9px] tracking-[0.15em] text-ink-3">
+                <p className="mb-0.5 text-[11px] tracking-[0.15em] text-ink-3">
                   GAME {i + 1} · {gameDay(g.startTime).toUpperCase()}
                 </p>
                 <GameCard game={g} className="hover:border-accent" />

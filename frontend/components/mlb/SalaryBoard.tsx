@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
+import { useUrlFilters } from "@/lib/useUrlFilters";
 import DataTable, { type Column } from "@/components/ui/DataTable";
 import FilterSelect, { FILTER_CONTROL } from "@/components/ui/FilterSelect";
 import MetricCard from "@/components/ui/MetricCard";
@@ -24,7 +25,8 @@ import type { Salary } from "@/lib/salaries";
  * is the listed money, short of a club's full number.
  */
 
-const BLANK = { team: "", position: "", name: "" };
+/* The view rides in the URL with the filters, but RESET leaves it alone. */
+const BLANK = { view: "players", team: "", position: "", name: "" };
 type Filters = typeof BLANK;
 
 interface Payroll {
@@ -61,11 +63,10 @@ const median = (xs: number[]): number | null => {
 };
 
 export default function SalaryBoard({ salaries }: { salaries: Salary[] }) {
-  const [f, setF] = useState<Filters>(BLANK);
-  const [view, setView] = useState<"players" | "payrolls">("players");
+  const [f, setF] = useUrlFilters(BLANK);
   const set = <K extends keyof Filters>(key: K, value: Filters[K]) =>
-    setF((prev) => ({ ...prev, [key]: value }));
-  const dirty = Object.values(f).some(Boolean);
+    setF({ ...f, [key]: value });
+  const dirty = Boolean(f.team || f.position || f.name);
 
   const options = useMemo(() => {
     const seen = (pick: (s: Salary) => string) =>
@@ -142,9 +143,8 @@ export default function SalaryBoard({ salaries }: { salaries: Salary[] }) {
           type="button"
           onClick={() => {
             setF({ ...BLANK, position: f.position, team: p.team });
-            setView("players");
           }}
-          className="text-accent hover:underline"
+          className="text-ink-2 hover:text-accent hover:underline"
         >
           {p.players}
         </button>
@@ -217,7 +217,7 @@ export default function SalaryBoard({ salaries }: { salaries: Salary[] }) {
     },
   ];
 
-  const players = view === "players";
+  const players = f.view !== "payrolls";
   return (
     <div className="space-y-3">
       <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
@@ -232,8 +232,8 @@ export default function SalaryBoard({ salaries }: { salaries: Salary[] }) {
       <div className="flex flex-wrap items-center gap-1.5">
         <SegmentedControl
           ariaLabel="View"
-          value={view}
-          onChange={setView}
+          value={players ? "players" : "payrolls"}
+          onChange={(v) => set("view", v)}
           options={[
             { value: "players", label: "PLAYERS" },
             { value: "payrolls", label: "PAYROLLS" },
@@ -255,7 +255,7 @@ export default function SalaryBoard({ salaries }: { salaries: Salary[] }) {
         )}
         <button
           type="button"
-          onClick={() => setF(BLANK)}
+          onClick={() => setF({ ...BLANK, view: f.view })}
           disabled={!dirty}
           className={`${FILTER_CONTROL} ml-auto tracking-[0.2em] ${
             dirty ? "text-ink-2 hover:text-ink" : "cursor-default text-ink-3 opacity-50"

@@ -71,7 +71,7 @@ export default function SeasonSeries({
         <Notice what="NO SERIES SCHEDULED" />
       ) : (
         <div className="space-y-2">
-          <p className="text-[10px] tracking-[0.2em] text-ink-3">{lead}</p>
+          <p className="text-[11px] tracking-[0.2em] text-ink-3">{lead}</p>
           <ul className="space-y-px">
             {games.map((g, i) => (
               <li key={g.pk}>
@@ -82,7 +82,7 @@ export default function SeasonSeries({
                     g.pk === game.pk ? "border-accent" : "border-line"
                   }`}
                 >
-                  <p className="flex justify-between gap-2 text-[10px] tracking-wider text-ink-3">
+                  <p className="flex justify-between gap-2 text-[11px] tracking-wider text-ink-3">
                     <span>
                       GAME {i + 1} · {gameDay(g.startTime)}
                     </span>

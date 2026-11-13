@@ -41,7 +41,7 @@ function Section({
     <div>
       <Link
         href={`/stats/${id}`}
-        className="block text-[11px] tracking-[0.2em] text-accent hover:underline"
+        className="block text-[11px] tracking-[0.2em] text-ink hover:text-accent hover:underline"
       >
         {label}
       </Link>
@@ -82,7 +82,7 @@ export default function StatsMenu({ current }: { current: number }) {
     <div className="group relative shrink-0">
       <Link
         href="/stats/player-batting"
-        className="flex h-7 items-center gap-1 border border-line px-2 text-[10px] tracking-wider text-ink-2 group-focus-within:border-accent group-focus-within:text-ink group-hover:border-accent group-hover:text-ink"
+        className="flex h-9 items-center gap-1 border border-line px-2 lg:h-7 text-[11px] tracking-wider text-ink-2 group-focus-within:border-accent group-focus-within:text-ink group-hover:border-accent group-hover:text-ink"
       >
         STATISTICS
         <span aria-hidden className="text-[8px] leading-none">▼</span>
@@ -104,13 +104,13 @@ export default function StatsMenu({ current }: { current: number }) {
           <div className="space-y-1.5 border-t border-line pt-2">
             <Link
               href="/stats/top"
-              className="block text-[11px] tracking-[0.2em] text-accent hover:underline"
+              className="block text-[11px] tracking-[0.2em] text-ink hover:text-accent hover:underline"
             >
               TOP PERFORMERS
             </Link>
             <Link
               href="/stats/custom"
-              className="block text-[11px] tracking-[0.2em] text-accent hover:underline"
+              className="block text-[11px] tracking-[0.2em] text-ink hover:text-accent hover:underline"
             >
               CUSTOM LEADERBOARD
             </Link>

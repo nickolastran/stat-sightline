@@ -24,7 +24,7 @@ export default function GameStatus({
         : "text-accent";
 
   return (
-    <span className={`text-[10px] tracking-widest ${tone} ${className}`}>
+    <span className={`text-[11px] tracking-widest ${tone} ${className}`}>
       {st.tone === "live" && (
         <span className="mr-1 inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-good align-middle" />
       )}

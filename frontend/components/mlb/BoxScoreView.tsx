@@ -100,14 +100,14 @@ function Linescore({ box, game }: { box: BoxScore; game: Game }) {
       <table className="w-full border-collapse text-xs">
         <thead>
           <tr className="border-b border-line">
-            <th scope="col" className="px-2 py-1.5 text-left text-[10px] tracking-widest text-ink-3">
+            <th scope="col" className="px-2 py-1.5 text-left text-[11px] tracking-widest text-ink-3">
               &nbsp;
             </th>
             {nums.map((n) => (
               <th
                 key={n}
                 scope="col"
-                className="w-7 px-1 py-1.5 text-center text-[10px] tabular-nums text-ink-3"
+                className="w-7 px-1 py-1.5 text-center text-[11px] tabular-nums text-ink-3"
               >
                 {n}
               </th>
@@ -116,7 +116,7 @@ function Linescore({ box, game }: { box: BoxScore; game: Game }) {
               <th
                 key={c}
                 scope="col"
-                className="w-8 border-l border-line px-1 py-1.5 text-center text-[10px] tracking-widest text-ink-2"
+                className="w-8 border-l border-line px-1 py-1.5 text-center text-[11px] tracking-widest text-ink-2"
               >
                 {c}
               </th>
@@ -203,19 +203,19 @@ function StatTable({
             <col key={c} className={compact ? "w-10" : "w-14"} />
           ))}
         </colgroup>
-        <caption className="border-b border-line px-2 py-1.5 text-left text-[10px] tracking-[0.25em] text-ink-3">
+        <caption className="border-b border-line px-2 py-1.5 text-left text-[11px] tracking-[0.25em] text-ink-3">
           {caption}
         </caption>
         <thead>
           <tr className="border-b border-line">
-            <th scope="col" className="px-2 py-1 text-left text-[10px] tracking-widest text-ink-3">
+            <th scope="col" className="px-2 py-1 text-left text-[11px] tracking-widest text-ink-3">
               PLAYER
             </th>
             {columns.map((c) => (
               <th
                 key={c}
                 scope="col"
-                className={`${stat} py-1 text-right text-[10px] tracking-widest text-ink-3`}
+                className={`${stat} py-1 text-right text-[11px] tracking-widest text-ink-3`}
               >
                 {c}
               </th>
@@ -271,14 +271,14 @@ function TeamLines({ team, compact }: { team: BoxTeam; compact?: boolean }) {
               {b.sub ? (
                 <span className="text-ink-3">↳ </span>
               ) : (
-                <span className="mr-1.5 text-[10px] tabular-nums text-ink-3">
+                <span className="mr-1.5 text-[11px] tabular-nums text-ink-3">
                   {b.order}
                 </span>
               )}
               <PlayerLink id={b.id} headshot={!compact}>
                 {compact ? shortName(b.name) : b.name}
               </PlayerLink>
-              <span className="ml-1.5 text-[10px] text-ink-3">{b.pos}</span>
+              <span className="ml-1.5 text-[11px] text-ink-3">{b.pos}</span>
             </span>
           ),
           cells: compact ? batMiniCells(b) : batCells(b),
@@ -299,7 +299,7 @@ function TeamLines({ team, compact }: { team: BoxTeam; compact?: boolean }) {
                 decisions(p.decision).map((d) => (
                   <span
                     key={d}
-                    className={`ml-1.5 text-[10px] ${
+                    className={`ml-1.5 text-[11px] ${
                       isBad(d) ? "text-crit" : "text-accent"
                     }`}
                   >
@@ -338,11 +338,11 @@ function PitchingDecisions({ game, box }: { game: Game; box: BoxScore }) {
         const p = armLine(box, who.id);
         return (
           <div key={role} className="min-w-0">
-            <p className="text-[10px] tracking-[0.25em] text-ink-3">{role}</p>
+            <p className="text-[11px] tracking-[0.25em] text-ink-3">{role}</p>
             <p className="truncate text-sm text-ink">
               <PlayerLink id={who.id}>{who.name}</PlayerLink>
             </p>
-            <p className="text-[10px] tabular-nums text-ink-2">
+            <p className="text-[11px] tabular-nums text-ink-2">
               {p
                 ? `${p.ip} IP, ${p.h} H, ${p.er} ER, ${p.k} K, ${p.bb} BB`
                 : "—"}
@@ -399,7 +399,7 @@ export function MiniBox({ box, pk }: { box: BoxScore; pk: number }) {
       <TeamLines team={side === "away" ? box.away : box.home} compact />
       <Link
         href={`/game/${pk}?tab=box`}
-        className="mt-2 block border border-line px-2 py-1.5 text-center text-[10px] tracking-[0.2em] text-ink-3 hover:border-accent hover:text-ink"
+        className="mt-2 block border border-line px-2 py-1.5 text-center text-[11px] tracking-[0.2em] text-ink-3 hover:border-accent hover:text-ink"
       >
         FULL BOX SCORE
       </Link>
@@ -436,7 +436,7 @@ function HeaderSide({ side }: { side: Game["away"] }) {
           {side.abbr !== "—" ? side.abbr : side.name}
         </p>
         {side.wins !== null && (
-          <p className="text-[10px] text-ink-3">
+          <p className="text-[11px] text-ink-3">
             {side.wins}-{side.losses}
           </p>
         )}
@@ -467,21 +467,21 @@ export default function BoxScoreView({
       <div className="flex items-center justify-between gap-3 border-b border-line px-3 py-2">
         <div className="flex min-w-0 flex-1 items-center gap-4">
           <HeaderSide side={game.away} />
-          <span className="text-[10px] text-ink-3">@</span>
+          <span className="text-[11px] text-ink-3">@</span>
           <HeaderSide side={game.home} />
         </div>
         <div className="shrink-0 text-right">
-          <p className={`text-[10px] tracking-widest ${tone}`}>
+          <p className={`text-[11px] tracking-widest ${tone}`}>
             {st.tone === "live" && (
               <span className="mr-1 inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-good align-middle" />
             )}
             {st.text}
           </p>
           {game.series && (
-            <p className="text-[10px] tracking-wider text-ink-2">{game.series}</p>
+            <p className="text-[11px] tracking-wider text-ink-2">{game.series}</p>
           )}
           {game.venue && (
-            <p className="hidden text-[10px] text-ink-3 sm:block">{game.venue}</p>
+            <p className="hidden text-[11px] text-ink-3 sm:block">{game.venue}</p>
           )}
         </div>
       </div>

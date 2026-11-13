@@ -458,7 +458,7 @@ export default function ZonePlot({
       {/* Tooltip — value leads, series key is a colored stroke, never colored text. */}
       {tip && (
         <div
-          className="pointer-events-none absolute z-20 border border-line bg-bg px-2.5 py-2 text-[10px] leading-4 whitespace-nowrap"
+          className="pointer-events-none absolute z-20 border border-line bg-bg px-2.5 py-2 text-[11px] leading-4 whitespace-nowrap"
           style={{
             left: `${(tip.cx / W) * 100}%`,
             top: `${(tip.cy / H) * 100}%`,
@@ -482,7 +482,7 @@ export default function ZonePlot({
 
       {/* Legend: scatter = series identity (color + shape); heat = scale. */}
       {mode === "zones" ? (
-        <div className="flex flex-wrap items-center gap-1.5 border-t border-grid px-1 pt-2 text-[10px] text-ink-3">
+        <div className="flex flex-wrap items-center gap-1.5 border-t border-grid px-1 pt-2 text-[11px] text-ink-3">
           <span className="tabular-nums">COLD .000</span>
           {BA_RAMP.map((c) => (
             <span key={c} className="inline-block h-3 w-5" style={{ background: c }} aria-hidden />
@@ -493,7 +493,7 @@ export default function ZonePlot({
           <span className="ml-auto">BA ALLOWED · MIN {MIN_AB} AB PER ZONE</span>
         </div>
       ) : mode === "scatter" ? (
-        <div className="flex flex-wrap gap-x-4 gap-y-1 border-t border-grid px-1 pt-2 text-[10px] text-ink-2">
+        <div className="flex flex-wrap gap-x-4 gap-y-1 border-t border-grid px-1 pt-2 text-[11px] text-ink-2">
           {series.map(([label, { slot, n }]) => (
             <span key={label} className="flex items-center gap-1.5">
               <svg width={12} height={12} viewBox="-6 -6 12 12" aria-hidden>
@@ -509,7 +509,7 @@ export default function ZonePlot({
           )}
         </div>
       ) : (
-        <div className="flex items-center gap-1.5 border-t border-grid px-1 pt-2 text-[10px] text-ink-3">
+        <div className="flex items-center gap-1.5 border-t border-grid px-1 pt-2 text-[11px] text-ink-3">
           <span>FEWER</span>
           <span className="inline-block h-3 w-4 border border-grid" style={{ background: SURFACE }} aria-hidden />
           {HEAT_RAMP.map((c) => (

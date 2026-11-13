@@ -107,7 +107,7 @@ function Card({
   return (
     <section className="border border-line bg-surface">
       <header className="flex flex-wrap items-center justify-between gap-2 border-b border-line px-3 py-2">
-        <h2 className="text-[10px] tracking-[0.25em] text-ink-3">{title}</h2>
+        <h2 className="text-[11px] tracking-[0.25em] text-ink-3">{title}</h2>
         {controls}
       </header>
       <div className="p-3">{children}</div>

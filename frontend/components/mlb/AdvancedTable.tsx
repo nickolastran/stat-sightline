@@ -141,7 +141,7 @@ export default function AdvancedTable({
                   key={b.label}
                   colSpan={b.span}
                   scope="colgroup"
-                  className={`${HEAD} ${BAND_H} top-0 border-r border-b border-line bg-surface-2 px-3 text-center text-[10px] font-normal tracking-[0.2em] text-ink-2 last:border-r-0`}
+                  className={`${HEAD} ${BAND_H} top-0 border-r border-b border-line bg-surface-2 px-3 text-center text-[11px] font-normal tracking-[0.2em] text-ink-2 last:border-r-0`}
                 >
                   {/* Centred in its band until the band starts leaving, then
                       pinned at the frozen edge: a band a reader is halfway
@@ -162,7 +162,7 @@ export default function AdvancedTable({
                   key={h}
                   scope="col"
                   style={{ left: LEAD_LEFT[i] }}
-                  className={`${FROZEN_HEAD} ${HEAD_TOP} border-b border-line px-3 py-2 text-[10px] font-normal tracking-widest text-ink-3 ${
+                  className={`${FROZEN_HEAD} ${HEAD_TOP} border-b border-line px-3 py-2 text-[11px] font-normal tracking-widest text-ink-3 ${
                     i === 1 ? "text-left" : "text-right"
                   } ${i === lead.length - 1 ? "border-r border-line" : ""}`}
                 >
@@ -191,7 +191,7 @@ export default function AdvancedTable({
                       /* The highlight rides on the button rather than the
                          cell: the cell has to stay opaque or the rows scroll
                          through the heading. */
-                      className={`w-full px-3 py-2 text-right text-[10px] tracking-widest whitespace-nowrap ${
+                      className={`w-full px-3 py-2 text-right text-[11px] tracking-widest whitespace-nowrap ${
                         on
                           ? "bg-accent/15 text-ink"
                           : "text-ink-3 hover:text-ink"
@@ -254,7 +254,7 @@ export default function AdvancedTable({
                             reads — the mark says which team, the face is
                             what the eye picks the row out by. */}
                         <PlayerLink id={r.id}>{r.name}</PlayerLink>
-                        <span className="text-[10px] tracking-wider text-ink-3">
+                        <span className="text-[11px] tracking-wider text-ink-3">
                           <TeamLink id={r.teamId} name={r.team} logo={false} />
                         </span>
                       </>
@@ -267,7 +267,7 @@ export default function AdvancedTable({
                 {pos && (
                   <td
                     style={{ left: LEFT.pos }}
-                    className={`${FROZEN} z-10 border-r border-b border-line border-b-grid px-3 py-1.5 text-right text-[10px] tracking-wider text-ink-3`}
+                    className={`${FROZEN} z-10 border-r border-b border-line border-b-grid px-3 py-1.5 text-right text-[11px] tracking-wider text-ink-3`}
                   >
                     {r.position || "—"}
                   </td>
@@ -288,7 +288,7 @@ export default function AdvancedTable({
         </table>
       </div>
 
-      <p className="text-[10px] tracking-wider text-ink-3">
+      <p className="text-[11px] tracking-wider text-ink-3">
         {board.note}
         {active ? ` Sorted by ${active.label} — ${active.title}.` : ""}
         {board.missing.length

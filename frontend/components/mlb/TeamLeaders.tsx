@@ -32,7 +32,7 @@ function LeaderRow({
               {l.name}
             </PlayerLink>
           </span>
-          <span className="text-[10px] tabular-nums text-ink-3">{l.value}</span>
+          <span className="text-[11px] tabular-nums text-ink-3">{l.value}</span>
         </>
       ) : (
         <span className="text-ink-3">—</span>
@@ -42,7 +42,7 @@ function LeaderRow({
   return (
     <tr className="border-b border-grid last:border-b-0">
       {cell(away, false)}
-      <td className="px-2 py-1.5 text-center text-[10px] tracking-[0.2em] whitespace-nowrap text-ink-3">
+      <td className="px-2 py-1.5 text-center text-[11px] tracking-[0.2em] whitespace-nowrap text-ink-3">
         {label}
       </td>
       {cell(home, true)}
@@ -97,7 +97,7 @@ export default function TeamLeaders({
                 <th
                   key={i}
                   scope="col"
-                  className={`border-b border-line px-2 py-1.5 text-[10px] font-normal tracking-widest text-ink-3 ${
+                  className={`border-b border-line px-2 py-1.5 text-[11px] font-normal tracking-widest text-ink-3 ${
                     ["text-left", "text-center", "text-right"][i]
                   }`}
                 >

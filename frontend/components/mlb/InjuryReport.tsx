@@ -22,7 +22,7 @@ const placed = (iso: string) =>
     : "—";
 
 const TH =
-  "border-b border-line px-2 py-1.5 text-[10px] font-normal tracking-widest text-ink-3";
+  "border-b border-line px-2 py-1.5 text-[11px] font-normal tracking-widest text-ink-3";
 
 export default function InjuryReport({
   clubs,
@@ -67,9 +67,9 @@ export default function InjuryReport({
                           <PlayerLink id={i.id} headshot={false}>
                             {i.name}
                           </PlayerLink>{" "}
-                          <span className="text-[10px] text-ink-3">{i.position}</span>
+                          <span className="text-[11px] text-ink-3">{i.position}</span>
                           {i.note && (
-                            <span className="block text-[10px] text-ink-3">{i.note}</span>
+                            <span className="block text-[11px] text-ink-3">{i.note}</span>
                           )}
                         </td>
                         <td className="px-2 py-1.5 text-right align-top whitespace-nowrap text-ink-2">
@@ -89,7 +89,7 @@ export default function InjuryReport({
       </div>
       <Link
         href="/injuries"
-        className="mt-2 block border border-line px-2 py-1.5 text-center text-[10px] tracking-[0.2em] text-ink-3 hover:border-accent hover:text-ink"
+        className="mt-2 block border border-line px-2 py-1.5 text-center text-[11px] tracking-[0.2em] text-ink-3 hover:border-accent hover:text-ink"
       >
         FULL INJURY REPORT
       </Link>

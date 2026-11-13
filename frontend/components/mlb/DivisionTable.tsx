@@ -33,7 +33,7 @@ export default function DivisionTable({
     <Panel
       title={`${divisionName(division.id) || division.name} Standings`}
       right={
-        <span className="text-[10px] text-ink-3">{division.league}</span>
+        <span className="text-[11px] text-ink-3">{division.league}</span>
       }
     >
       <div className="overflow-x-auto border border-line">
@@ -52,7 +52,7 @@ export default function DivisionTable({
                 <th
                   key={h}
                   scope="col"
-                  className={`border-b border-line bg-surface px-2 py-2 text-[10px] font-normal tracking-widest text-ink-3 ${
+                  className={`border-b border-line bg-surface px-2 py-2 text-[11px] font-normal tracking-widest text-ink-3 ${
                     i === 0 ? "text-left" : "text-right"
                   }`}
                 >
@@ -107,7 +107,7 @@ export default function DivisionTable({
       {full && (
         <Link
           href="/league/standings"
-          className="mt-2 block border border-line px-2 py-1.5 text-center text-[10px] tracking-[0.2em] text-ink-3 hover:border-accent hover:text-ink"
+          className="mt-2 block border border-line px-2 py-1.5 text-center text-[11px] tracking-[0.2em] text-ink-3 hover:border-accent hover:text-ink"
         >
           FULL STANDINGS
         </Link>

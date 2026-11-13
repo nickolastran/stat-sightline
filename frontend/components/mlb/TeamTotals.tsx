@@ -35,13 +35,13 @@ export default function TeamTotals({ box }: { box: BoxScore }) {
         <table className="w-full border-collapse text-xs">
           <thead>
             <tr>
-              <th scope="col" className="border-b border-line px-2 py-1.5 text-left text-[10px] font-normal tracking-widest text-ink-3">
+              <th scope="col" className="border-b border-line px-2 py-1.5 text-left text-[11px] font-normal tracking-widest text-ink-3">
                 {box.away.abbr}
               </th>
-              <th scope="col" className="border-b border-line px-2 py-1.5 text-center text-[10px] font-normal tracking-widest text-ink-3">
+              <th scope="col" className="border-b border-line px-2 py-1.5 text-center text-[11px] font-normal tracking-widest text-ink-3">
                 &nbsp;
               </th>
-              <th scope="col" className="border-b border-line px-2 py-1.5 text-right text-[10px] font-normal tracking-widest text-ink-3">
+              <th scope="col" className="border-b border-line px-2 py-1.5 text-right text-[11px] font-normal tracking-widest text-ink-3">
                 {box.home.abbr}
               </th>
             </tr>
@@ -79,7 +79,7 @@ export default function TeamTotals({ box }: { box: BoxScore }) {
                   {bar(a, false)}
                   <td
                     title={c.title}
-                    className="px-2 py-1.5 text-center text-[10px] tracking-[0.2em] whitespace-nowrap text-ink-3"
+                    className="px-2 py-1.5 text-center text-[11px] tracking-[0.2em] whitespace-nowrap text-ink-3"
                   >
                     {c.label}
                   </td>

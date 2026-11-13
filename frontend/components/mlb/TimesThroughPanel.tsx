@@ -54,7 +54,7 @@ export default function TimesThroughPanel({ pitches }: { pitches: Pitch[] }) {
     },
   ];
   const first = rows.find((r) => r.tto === 1);
-  const th = "border-b border-line bg-surface px-2 py-2 text-[10px] font-normal tracking-widest text-ink-3";
+  const th = "border-b border-line bg-surface px-2 py-2 text-[11px] font-normal tracking-widest text-ink-3";
 
   return (
     <div className="space-y-2">
@@ -89,7 +89,7 @@ export default function TimesThroughPanel({ pitches }: { pitches: Pitch[] }) {
                     <td key={c.key} className="px-2 py-1.5 text-right tabular-nums">
                       <span className="text-ink">{v === null ? "—" : c.fmt(v)}</span>
                       {r.tto !== 1 && v !== null && base != null && (
-                        <span className="ml-1.5 text-[10px] text-ink-3">{c.delta(v - base)}</span>
+                        <span className="ml-1.5 text-[11px] text-ink-3">{c.delta(v - base)}</span>
                       )}
                     </td>
                   );
@@ -99,7 +99,7 @@ export default function TimesThroughPanel({ pitches }: { pitches: Pitch[] }) {
           </tbody>
         </table>
       </div>
-      <p className="text-[10px] tracking-wider text-ink-3">
+      <p className="text-[11px] tracking-wider text-ink-3">
         CHANGE FROM THE FIRST TIME THROUGH BESIDE EACH FIGURE. VELOCITY IS HIS MAIN FASTBALL&apos;S.
         FADED ROWS HAVE FEWER THAN {THIN} PA.
       </p>

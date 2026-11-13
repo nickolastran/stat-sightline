@@ -36,13 +36,13 @@ const LINE = "flex h-8 items-center gap-2 border-b border-grid px-3 text-xs last
 /* The footer strip, link or not, so a card with no full board behind it
    still ends where its neighbours do. */
 const FOOT =
-  "flex items-center justify-center gap-1 border-t border-line py-1 text-[10px] tracking-[0.2em] text-ink-3";
+  "flex items-center justify-center gap-1 border-t border-line py-1 text-[11px] tracking-[0.2em] text-ink-3";
 
 /** One ranked line: rank (tie-marked), player, value. */
 function Row({ leader, tied }: { leader: LeaderRow; tied: boolean }) {
   return (
     <li className={LINE}>
-      <span className="w-6 text-right text-[10px] text-ink-3 tabular-nums">
+      <span className="w-6 text-right text-[11px] text-ink-3 tabular-nums">
         {tied ? `T-${leader.rank}` : leader.rank}
       </span>
       <span className="min-w-0 flex-1 truncate text-ink-2">
@@ -87,7 +87,7 @@ function Board({
 
   return (
     <div className="self-start border border-line bg-bg">
-      <h3 className="border-b border-line px-3 py-1.5 text-[10px] tracking-[0.2em] text-ink-2">
+      <h3 className="border-b border-line px-3 py-1.5 text-[11px] tracking-[0.2em] text-ink-2">
         {board.label}
       </h3>
       <ol>

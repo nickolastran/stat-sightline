@@ -63,7 +63,7 @@ function Views({ active, season }: { active: AdvView; season: number }) {
           key={v.id}
           href={`/stats/${v.id}?season=${season}`}
           aria-current={v.id === active ? "page" : undefined}
-          className={`flex h-7 items-center border px-2 text-[10px] tracking-wider ${
+          className={`flex h-7 items-center border px-2 text-[11px] tracking-wider ${
             v.id === active
               ? "border-accent bg-accent/10 text-ink"
               : "border-line text-ink-2 hover:border-accent hover:text-ink"
@@ -98,7 +98,7 @@ function SeasonIndex({ view, current }: { view: AdvView; current: number }) {
           </Link>
         ))}
       </div>
-      <p className="text-[10px] tracking-wider text-ink-3">
+      <p className="text-[11px] tracking-wider text-ink-3">
         Every season Statcast covers. Bat tracking begins in 2023 and outs
         above average in 2016 — an earlier board simply drops those columns.
       </p>
@@ -196,14 +196,14 @@ export default async function AdvancedPage({
         title={titleCase(index ? `${found.title} — BY SEASON` : found.title)}
         right={
           index ? (
-            <span className="text-[10px] text-ink-3">
+            <span className="text-[11px] text-ink-3">
               {ADV_FIRST_SEASON}–{current}
             </span>
           ) : custom ? (
             /* The custom board's season lives in its own filter bar, beside
                everything else it is filtered by — and the column count on the
                bar that owns the columns. */
-            <span className="text-[10px] text-ink-3">
+            <span className="text-[11px] text-ink-3">
               {CUSTOM_GROUPS.find((g) => g.value === query.group)?.label}
             </span>
           ) : (

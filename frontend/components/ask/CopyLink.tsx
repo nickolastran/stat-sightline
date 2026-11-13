@@ -27,7 +27,7 @@ export default function CopyLink() {
     <button
       type="button"
       onClick={copy}
-      className="border border-line px-2 py-1 text-[10px] tracking-widest text-ink-2 hover:border-accent hover:text-ink"
+      className="border border-line px-2 py-1 text-[11px] tracking-widest text-ink-2 hover:border-accent hover:text-ink"
     >
       {/* Announced, so a screen reader hears the copy land. */}
       <span aria-live="polite">

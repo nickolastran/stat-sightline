@@ -213,7 +213,7 @@ export default async function AwardSeasonPage({
           <h1 className="mt-2 text-2xl tracking-[0.15em] text-ink">
             {season} AWARDS VOTING
           </h1>
-          <p className="mt-2 text-[10px] tracking-widest text-ink-3">
+          <p className="mt-2 text-[11px] tracking-widest text-ink-3">
             {ballots.length} BALLOTS · BBWAA
           </p>
         </div>
@@ -249,7 +249,7 @@ export default async function AwardSeasonPage({
           </div>
         ))}
 
-        <p className="border border-line bg-bg px-3 py-2 text-[10px] leading-5 text-ink-3">
+        <p className="border border-line bg-bg px-3 py-2 text-[11px] leading-5 text-ink-3">
           <span className="font-bold text-ink">BOLD</span> figures led the
           league. <span className="font-bold italic text-ink">BOLD ITALIC</span>{" "}
           led all major leagues. Voting results are the BBWAA&apos;s own,

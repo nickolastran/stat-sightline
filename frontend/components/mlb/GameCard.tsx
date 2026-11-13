@@ -55,7 +55,7 @@ function TeamRow({
       >
         {s.abbr !== "—" ? s.abbr : s.name}
         {s.wins !== null && (
-          <span className="ml-1.5 text-[10px] text-ink-3">
+          <span className="ml-1.5 text-[11px] text-ink-3">
             {playoff ? `(${s.wins}-${s.losses})` : `${s.wins}-${s.losses}`}
           </span>
         )}
@@ -64,7 +64,7 @@ function TeamRow({
           is thrown there is nothing left to announce, and a played game needs
           the room for its line score. */}
       {detailed && upcoming && (
-        <span className="hidden truncate text-[10px] text-ink-3 sm:block">
+        <span className="hidden truncate text-[11px] text-ink-3 sm:block">
           {s.probable?.name ?? "TBA"}
         </span>
       )}
@@ -109,7 +109,7 @@ function Decisions({
     <div className="mt-1.5 space-y-1 border-t border-grid pt-1.5">
       {arms.map(([role, who]) => (
         <div key={role} className="flex h-6 items-center gap-2 text-[11px]">
-          <span className="w-9 shrink-0 text-[9px] tracking-[0.15em] text-ink-3">
+          <span className="w-10 shrink-0 text-[11px] tracking-[0.15em] text-ink-3">
             {who ? role : ""}
           </span>
           {who && (
@@ -129,7 +129,7 @@ function Decisions({
 }
 
 const BUTTON =
-  "flex-1 border border-line px-2 py-1 text-center text-[10px] tracking-[0.15em] text-ink-2 hover:border-accent hover:text-ink";
+  "flex-1 border border-line px-2 py-1 text-center text-[11px] tracking-[0.15em] text-ink-2 hover:border-accent hover:text-ink";
 
 export default function GameCard({
   game,
@@ -163,18 +163,18 @@ export default function GameCard({
             park: its own page names it, and the line score and the pitchers
             are what is read here. */}
         {game.series ? (
-          <span className="min-w-0 truncate text-[10px] tracking-wider text-ink-2">
+          <span className="min-w-0 truncate text-[11px] tracking-wider text-ink-2">
             {/* Just "ALDS G4": the standing already sits by each club. */}
             {game.series.split(" · ")[0]}
           </span>
         ) : detailed && !full && game.venue && (
-          <span className="hidden truncate text-[10px] text-ink-3 sm:block">
+          <span className="hidden truncate text-[11px] text-ink-3 sm:block">
             {game.venue}
           </span>
         )}
       </div>
       {line && (
-        <div className="flex items-center gap-2 text-[9px] leading-none tracking-[0.15em] text-ink-3">
+        <div className="flex items-center gap-2 text-[11px] leading-none tracking-[0.15em] text-ink-3">
           <span className="flex-1" />
           {["R", "H", "E"].map((h) => (
             <span key={h} className={FIG}>

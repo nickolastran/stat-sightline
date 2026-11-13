@@ -128,7 +128,7 @@ export default async function AwardPage({
           <h1 className="mt-2 text-2xl tracking-[0.15em] text-ink">
             {table.season} {table.label.toUpperCase()}
           </h1>
-          <p className="mt-2 text-[10px] tracking-widest text-ink-3">
+          <p className="mt-2 text-[11px] tracking-widest text-ink-3">
             {table.winners.length} WINNER
             {table.winners.length === 1 ? "" : "S"}
             {table.date && ` · AWARDED ${table.date}`}
@@ -154,7 +154,7 @@ export default async function AwardPage({
           ))
         )}
 
-        <p className="border border-line bg-bg px-3 py-2 text-[10px] leading-5 text-ink-3">
+        <p className="border border-line bg-bg px-3 py-2 text-[11px] leading-5 text-ink-3">
           <span className="font-bold text-ink">BOLD</span> figures led the
           league. <span className="font-bold italic text-ink">BOLD ITALIC</span>{" "}
           led all major leagues. MLB publishes the winner of a vote and not the

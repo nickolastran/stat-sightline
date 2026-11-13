@@ -130,13 +130,13 @@ export default function ParamMultiSelect({
 
   return (
     <div ref={box} className="relative">
-      <div className="flex items-center gap-1.5 text-[10px] tracking-[0.2em] text-ink-3">
+      <div className="flex items-center gap-1.5 text-[11px] tracking-[0.2em] text-ink-3">
         {label}
         <button
           type="button"
           onClick={() => setOpen((o) => !o)}
           aria-expanded={open}
-          className={`flex min-w-24 items-center justify-between gap-2 border px-1.5 py-0.5 text-[10px] tracking-normal hover:border-accent ${
+          className={`flex min-w-24 items-center justify-between gap-2 border px-1.5 py-0.5 text-[11px] tracking-normal hover:border-accent ${
             value.length ? "border-accent text-ink" : "border-line text-ink"
           } ${pending ? "opacity-50" : ""}`}
         >
@@ -197,13 +197,13 @@ export default function ParamMultiSelect({
             <img src={image} alt="" className="w-full border border-grid" />
           )}
 
-          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 border-t border-grid pt-1.5 text-[10px] text-ink-3">
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 border-t border-grid pt-1.5 text-[11px] text-ink-3">
             {quick.map((q) => (
               <button
                 key={q.label}
                 type="button"
                 onClick={() => toggle(q.values, true)}
-                className="tracking-wider text-accent hover:underline"
+                className="tracking-wider text-ink-2 hover:text-accent hover:underline"
               >
                 {q.label}
               </button>
@@ -211,7 +211,7 @@ export default function ParamMultiSelect({
             <button
               type="button"
               onClick={() => commit(new Set())}
-              className="ml-auto tracking-wider text-accent hover:underline"
+              className="ml-auto tracking-wider text-ink-2 hover:text-accent hover:underline"
             >
               CLEAR
             </button>
@@ -237,7 +237,7 @@ function Box({
 }) {
   return (
     <label
-      className={`flex cursor-pointer items-center gap-1.5 text-[10px] tracking-wider text-ink-2 hover:text-ink ${className}`}
+      className={`flex cursor-pointer items-center gap-1.5 text-[11px] tracking-wider text-ink-2 hover:text-ink ${className}`}
     >
       <input
         type="checkbox"

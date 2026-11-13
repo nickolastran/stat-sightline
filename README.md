@@ -154,6 +154,9 @@ makeup is played (dropped from both results and games remaining).
 
 ## Run it
 
+`./dev.sh` starts both: the API on :8001 and the site on :3000, from the
+repo's `.venv`. Ctrl-C stops both. Or run them separately:
+
 ```bash
 uvicorn api.main:app --reload --port 8000    # docs at /docs
 cd frontend && npm install && npm run dev    # http://localhost:3000

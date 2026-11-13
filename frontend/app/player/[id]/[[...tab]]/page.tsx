@@ -119,7 +119,7 @@ async function StreakBadge({ id, role }: { id: number; role: RollRole }) {
   return (
     <span
       title={`xwOBA${role === "pitcher" ? " allowed" : ""} ${rollText("xwoba", s.value)} over his ${s.label} vs ${rollText("xwoba", s.season)} on the season`}
-      className={`shrink-0 border px-1.5 py-px text-[10px] font-bold tracking-wider ${s.hot ? "border-crit text-crit" : "border-accent text-accent"}`}
+      className={`shrink-0 border px-1.5 py-px text-[11px] font-bold tracking-wider ${s.hot ? "border-crit text-crit" : "border-accent text-accent"}`}
     >
       {s.hot ? "HOT" : "COLD"} · {s.label.toUpperCase()}
     </span>
@@ -168,7 +168,7 @@ function Identity({ p }: { p: PlayerSummary }) {
             <StreakBadge id={p.id} role={p.pos === "P" ? "pitcher" : "batter"} />
           </Suspense>
         </div>
-        <p className="mt-1 truncate text-[10px] tracking-[0.2em] text-ink-3">
+        <p className="mt-1 truncate text-[11px] tracking-[0.2em] text-ink-3">
           {[p.team.toUpperCase(), ...facts].join(" · ")}
         </p>
       </div>

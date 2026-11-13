@@ -21,7 +21,7 @@ export function Card({ card }: { card: TopCard }) {
     <div className="self-start border border-line bg-bg">
       <h3
         title={card.title}
-        className="flex items-baseline gap-1.5 border-b border-line px-3 py-1.5 text-[10px] tracking-[0.2em]"
+        className="flex items-baseline gap-1.5 border-b border-line px-3 py-1.5 text-[11px] tracking-[0.2em]"
       >
         <span className="text-ink-3">{card.group}</span>
         <span className="text-ink-2">{card.label}</span>
@@ -32,7 +32,7 @@ export function Card({ card }: { card: TopCard }) {
             key={l.id}
             className="flex items-center gap-2 border-b border-grid px-3 py-1.5 text-xs last:border-b-0"
           >
-            <span className="w-4 text-right text-[10px] text-ink-3 tabular-nums">
+            <span className="w-4 text-right text-[11px] text-ink-3 tabular-nums">
               {l.rank}
             </span>
             {l.teamId !== null && (
@@ -62,7 +62,7 @@ export function Card({ card }: { card: TopCard }) {
       {card.href && (
         <Link
           href={card.href}
-          className="flex items-center justify-center gap-1 border-t border-line py-1 text-[10px] tracking-[0.2em] text-ink-3 hover:text-ink"
+          className="flex items-center justify-center gap-1 border-t border-line py-1 text-[11px] tracking-[0.2em] text-ink-3 hover:text-ink"
         >
           COMPLETE LIST →
         </Link>

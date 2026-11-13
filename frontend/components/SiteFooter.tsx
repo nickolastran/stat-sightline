@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 /*
  * Site footer — attribution and provenance, on every page rather than only the
  * landing one it used to live on. The year is read at render, so it follows the
@@ -34,10 +36,19 @@ const ICONS: Record<(typeof LINKS)[number]["icon"], React.ReactNode> = {
 
 export default function SiteFooter() {
   return (
-    <footer className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2 border-t border-line px-6 py-4 text-[10px] tracking-wider text-ink-3 sm:px-10">
+    <footer className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2 border-t border-line px-6 py-4 text-[11px] tracking-wider text-ink-3 sm:px-10">
       <span>© {new Date().getFullYear()} NICKOLAS TRAN · STAT//SIGHTLINE</span>
       <span className="flex flex-wrap items-center gap-x-4 gap-y-2">
         <span>DATA: MLB STATCAST. NOT AFFILIATED WITH MLB.</span>
+        {[
+          { href: "/privacy", label: "PRIVACY" },
+          { href: "/terms", label: "TERMS" },
+          { href: "/changelog", label: "CHANGELOG" },
+        ].map((l) => (
+          <Link key={l.href} href={l.href} className="hover:text-ink hover:underline">
+            {l.label}
+          </Link>
+        ))}
         {LINKS.map((l) => (
           <a
             key={l.href}

@@ -166,7 +166,7 @@ export default function AbsBoard({
         <button
           type="button"
           onClick={() => setMore((m) => !m)}
-          className="border border-line bg-bg px-2 py-1 text-[10px] tracking-wider text-ink-2 hover:border-accent hover:text-ink"
+          className="border border-line bg-bg px-2 py-1 text-[11px] tracking-wider text-ink-2 hover:border-accent hover:text-ink"
         >
           {more ? "HIDE MORE COLUMNS" : "SHOW MORE COLUMNS"}
         </button>
@@ -176,7 +176,7 @@ export default function AbsBoard({
           onChange={(e) => setQuery(e.target.value)}
           placeholder={teams ? "SEARCH TEAM" : "SEARCH PLAYER"}
           aria-label={teams ? "Search teams" : "Search players"}
-          className="w-56 border border-line bg-bg px-2 py-1 text-[10px] tracking-wider text-ink placeholder:text-ink-3 hover:border-accent focus:border-accent focus:outline-none"
+          className="w-56 border border-line bg-bg px-2 py-1 text-[11px] tracking-wider text-ink placeholder:text-ink-3 hover:border-accent focus:border-accent focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent"
         />
       </div>
 
@@ -200,7 +200,7 @@ export default function AbsBoard({
             <tr>
               <th
                 scope="col"
-                className="sticky top-0 z-10 border-b border-line bg-surface px-3 py-1.5 text-right text-[10px] font-normal tracking-widest text-ink-3"
+                className="sticky top-0 z-10 border-b border-line bg-surface px-3 py-1.5 text-right text-[11px] font-normal tracking-widest text-ink-3"
               >
                 RK
               </th>
@@ -216,7 +216,7 @@ export default function AbsBoard({
                   link you read, the logo is the club you scan for. */}
               <th
                 scope="col"
-                className="sticky top-0 z-10 border-b border-line border-l border-grid bg-surface px-3 py-1.5 text-left text-[10px] font-normal tracking-widest text-ink-3"
+                className="sticky top-0 z-10 border-b border-line border-l border-grid bg-surface px-3 py-1.5 text-left text-[11px] font-normal tracking-widest text-ink-3"
               >
                 TEAM
               </th>
@@ -261,7 +261,7 @@ export default function AbsBoard({
                  challenge on this slice, whoever made it. */
               <tr className="border-b border-line bg-surface-2/60 font-bold text-ink">
                 <td className="px-3 py-1.5" />
-                <td className="px-3 py-1.5 text-[10px] tracking-[0.2em] text-ink-3">
+                <td className="px-3 py-1.5 text-[11px] tracking-[0.2em] text-ink-3">
                   LEAGUE
                 </td>
                 <td className="border-l border-grid px-3 py-1.5" />
@@ -308,7 +308,7 @@ export default function AbsBoard({
                   )}
                 </td>
                 {split && (
-                  <td className="overflow-hidden px-3 py-1.5 text-[10px] tracking-wider whitespace-nowrap text-ink-3">
+                  <td className="overflow-hidden px-3 py-1.5 text-[11px] tracking-wider whitespace-nowrap text-ink-3">
                     {r.split ?? "—"}
                   </td>
                 )}
@@ -339,7 +339,7 @@ export default function AbsBoard({
         <button
           type="button"
           onClick={() => setVisible((v) => v + PAGE)}
-          className="block w-full py-1 text-center text-[10px] tracking-[0.2em] text-accent hover:underline"
+          className="block w-full py-1 text-center text-[11px] tracking-[0.2em] text-ink-2 hover:text-accent hover:underline"
         >
           SHOW MORE +{Math.min(PAGE, ranked.length - visible)}
         </button>

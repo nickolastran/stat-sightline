@@ -31,7 +31,7 @@ const NAMED_TYPES: ReadonlySet<string> = new Set(Object.keys(PITCH_SLOTS));
 /* Bar column scale, set once over the first section like Savant's. */
 function Scale() {
   return (
-    <div className="grid grid-cols-[9rem_1fr_3rem] gap-3 text-[9px] tracking-widest">
+    <div className="grid grid-cols-[9rem_1fr_3rem] gap-3 text-[11px] tracking-widest">
       <span />
       <span className="flex justify-between">
         <span style={{ color: pctColor(0) }}>▲ POOR</span>
@@ -60,7 +60,7 @@ function PercentileBar({ pct, qualified }: { pct: number; qualified: boolean }) 
       />
       {qualified && (
         <span
-          className="absolute flex h-6 w-6 -translate-x-1/2 items-center justify-center rounded-full border-2 border-surface text-[10px] font-bold text-white tabular-nums"
+          className="absolute flex h-6 w-6 -translate-x-1/2 items-center justify-center rounded-full border-2 border-surface text-[11px] font-bold text-white tabular-nums"
           style={{ left: `clamp(0.75rem, ${pct}%, calc(100% - 0.75rem))`, background: color }}
         >
           {pct}
@@ -115,7 +115,7 @@ function Percentiles({ sections, season }: { sections: PercentileSection[]; seas
             </section>
           ))}
           {rows.some((r) => !r.qualified) && (
-            <p className="text-[10px] tracking-wider text-ink-3">
+            <p className="text-[11px] tracking-wider text-ink-3">
               HATCHED — BELOW SAVANT&apos;S PLAYING-TIME MINIMUM; PLACED AGAINST THE QUALIFIED FIELD
             </p>
           )}

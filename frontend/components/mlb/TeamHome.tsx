@@ -75,7 +75,7 @@ function TeamLeaders({
         <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3">
           {filled.map((b) => (
             <div key={b.key} className="border border-line bg-bg">
-              <h3 className="border-b border-line px-3 py-1.5 text-[10px] tracking-[0.2em] text-ink-2">
+              <h3 className="border-b border-line px-3 py-1.5 text-[11px] tracking-[0.2em] text-ink-2">
                 {b.label}
               </h3>
               <ul>
