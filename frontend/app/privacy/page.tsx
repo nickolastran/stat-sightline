@@ -18,14 +18,6 @@ export default function PrivacyPage() {
         stores and where your requests go.
       </p>
 
-      <DocSection title="NO ACCOUNTS, NO ANALYTICS">
-        <p>
-          There are no sign-ups, no analytics scripts, no ad networks and no tracking
-          pixels. The site doesn&apos;t build a profile of you or sell anything about
-          you.
-        </p>
-      </DocSection>
-
       <DocSection title="WHAT YOUR BROWSER KEEPS">
         <p>
           If you star a favorite team, its id and name are saved in your browser&apos;s

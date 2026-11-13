@@ -17,15 +17,18 @@ export function DocPage({
   return (
     <div className="mx-auto max-w-6xl px-4">
       <section className="border-x border-line px-4 py-8 sm:px-8">
-        <p className="mb-4 text-xs tracking-[0.3em] text-ink-3">{kicker}</p>
-        <div className="max-w-3xl border border-line bg-surface p-6">
-          <h1 className="text-sm font-bold tracking-widest text-ink">{title}</h1>
-          {updated && (
-            <p className="mt-2 text-[11px] tracking-wider text-ink-3">
-              LAST UPDATED {updated}
-            </p>
-          )}
-          <div className="mt-6 space-y-6 text-sm leading-6 text-ink-2">{children}</div>
+        {/* The card centred in the column; its text stays left-aligned. */}
+        <div className="mx-auto max-w-3xl">
+          <p className="mb-4 text-xs tracking-[0.3em] text-ink-3">{kicker}</p>
+          <div className="border border-line bg-surface p-6">
+            <h1 className="text-sm font-bold tracking-widest text-ink">{title}</h1>
+            {updated && (
+              <p className="mt-2 text-[11px] tracking-wider text-ink-3">
+                LAST UPDATED {updated}
+              </p>
+            )}
+            <div className="mt-6 space-y-6 text-sm leading-6 text-ink-2">{children}</div>
+          </div>
         </div>
       </section>
     </div>
