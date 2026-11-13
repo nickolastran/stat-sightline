@@ -248,7 +248,9 @@ export default function SprayChart({
             </svg>
             {/* Bottom right, beside the right-field line: foul ground, where
                 no hit on the chart ever lands. */}
-            <ul className="pointer-events-none absolute bottom-0 right-0 leading-3">
+            {/* w-max sizes the list to its widest row, so the label column
+                fits "HOME RUN" at any text size and the counts line up. */}
+            <ul className="pointer-events-none absolute bottom-0 right-0 w-max leading-3">
               {KINDS.map((k) => (
                 <li
                   key={k.kind}
@@ -258,8 +260,8 @@ export default function SprayChart({
                     className="h-2 w-2 border border-ink/50"
                     style={{ background: k.color, borderRadius: "50%" }}
                   />
-                  <span className="w-12">{k.label}</span>
-                  <span className="tabular-nums text-ink">
+                  <span className="flex-1">{k.label}</span>
+                  <span className="ml-2 tabular-nums text-ink">
                     {shown.filter((h) => h.kind === k.kind).length}
                   </span>
                 </li>
