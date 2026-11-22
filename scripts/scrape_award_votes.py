@@ -6,9 +6,10 @@ The BBWAA ballots, since MLB's own feed has none.
 runners-up. bbwaa.com publishes the whole ballot for MVP, Cy Young and Rookie
 of the Year back to 2003, so this pulls those pages once, matches each name to
 its MLBAM id off that season's player list, and writes the flat table the site
-reads. Re-run it each November when the new results are posted:
+reads. Re-run it each November when the new results are posted, with the
+season to start from so it doesn't re-pull twenty years of pages:
 
-    python3 scripts/scrape_award_votes.py
+    python3 scripts/scrape_award_votes.py 2026
 
 Managers come along too. A manager has no player page and no season line, so
 his row carries his club's record instead, read off that season's standings.
@@ -26,7 +27,10 @@ from pathlib import Path
 
 OUT = Path(__file__).resolve().parent.parent / "frontend" / "data" / "award-votes.json"
 
-FIRST_YEAR, LAST_YEAR = 2003, 2025
+import datetime
+
+FIRST_YEAR = int(sys.argv[1]) if len(sys.argv) > 1 else 2003
+LAST_YEAR = datetime.date.today().year  # a year not posted yet just 404s
 
 # slug piece -> (MLB award id suffix, points a first-place vote is worth), which
 # is what turns a points total into the share Baseball-Reference prints.
@@ -292,7 +296,7 @@ def main() -> None:
     fresh = {(r["award"], r["season"]) for r in rows}
     held = [r for r in kept if (r["award"], r["season"]) not in fresh]
     if held:
-        print(f"kept {len(held)} lines from the last run for pages that failed")
+        print(f"kept {len(held)} lines from the last run (seasons not pulled, or pages that failed)")
     rows = sorted(rows + held, key=lambda r: (-r["season"], r["award"], r["rank"]))
 
     OUT.parent.mkdir(parents=True, exist_ok=True)
