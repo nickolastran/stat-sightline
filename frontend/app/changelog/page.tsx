@@ -14,6 +14,18 @@ export const metadata: Metadata = {
  */
 const RELEASES: Release[] = [
   {
+    version: "v0.14.0",
+    date: "2026-11-21",
+    title: "The 2026 awards, and an OFFSEASON tab.",
+    summary:
+      "Every 2026 BBWAA ballot is in, the offseason pages sit under one tab, and stat boards are back on the regular season.",
+    changes: [
+      { kind: "added", text: "The 2026 MVP, Cy Young, Rookie and Manager of the Year ballots.", href: "/award/2026" },
+      { kind: "improved", text: "After the World Series, free agents, the season's awards and salaries fold under one OFFSEASON tab." },
+      { kind: "fixed", text: "Stat leaders and player stats open on the regular season again once the World Series is over.", href: "/league/leaders" },
+    ],
+  },
+  {
     version: "v0.13.0",
     date: "2026-11-12",
     title: "Easier to read, and free agents by what they did.",

@@ -33,7 +33,7 @@ import {
   getLeaderboards,
   getTeamLeaderboards,
   getStatLeaders,
-  postseasonStart,
+  inPostseason,
   leaderCols,
   pickLeaderOrder,
   pickLeaderStat,
@@ -354,17 +354,17 @@ export default async function LeagueSectionPage({
      for. */
   const teamType = found.id === "teams" ? pickPlayerGameType(sp.type) : "R";
   const group = pickGroup(sp.group);
-  /* Once this October's first pitch is thrown, the player boards and the
-     leaders open on the postseason — the regular season is settled and the
-     playoffs are what is being played. A chosen type, or any other year,
-     reads as asked. */
+  /* While this October is being played, the player boards and the leaders
+     open on the postseason; once the World Series is over they go back to
+     the regular season, the line the winter is read on. A chosen type, or
+     any other year, reads as asked. */
   /* Player cards and club cards, one set of controls between them. */
   const leadersBoard = found.id === "leaders" || found.id === "teamleaders";
-  const start =
+  const live =
     (playerBoard || leadersBoard) && season === current
-      ? await postseasonStart(current).catch(() => null)
-      : null;
-  const october = start && today >= start ? "P" : "R";
+      ? await inPostseason(current, today).catch(() => false)
+      : false;
+  const october = live ? "P" : "R";
   const leaderType = pickPlayerGameType(sp.type, october);
   /* Player boards carry a post-season of their own, which no standings or
      team table does — so this is the three-way game type, not the two. */

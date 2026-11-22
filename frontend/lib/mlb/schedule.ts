@@ -144,17 +144,10 @@ async function postseasonDates(season: number): Promise<string[]> {
   return (data.dates ?? []).map((d: { date: string }) => d.date);
 }
 
-/**
- * The day a season's postseason throws its first pitch, YYYY-MM-DD, or null
- * before one is scheduled. Off the schedule rather than the season's own
- * `postSeasonStartDate`, which MLB sets a day early to leave room for a
- * tiebreaker nobody plays.
- */
-export const postseasonStart = async (season: number): Promise<string | null> =>
-  (await postseasonDates(season))[0] ?? null;
-
 /** Whether `date` falls within the season's postseason, first game to last
- *  scheduled. */
+ *  scheduled. Off the schedule rather than the season's own
+ *  `postSeasonStartDate`, which MLB sets a day early for a tiebreaker nobody
+ *  plays. */
 export async function inPostseason(season: number, date: string): Promise<boolean> {
   const dates = await postseasonDates(season);
   return dates.length > 0 && dates[0] <= date && date <= dates[dates.length - 1];

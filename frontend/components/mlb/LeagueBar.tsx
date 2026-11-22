@@ -2,7 +2,7 @@ import Link from "next/link";
 import StatsMenu from "@/components/mlb/StatsMenu";
 import MyTeamLink from "@/components/mlb/MyTeamLink";
 import { LEAGUE_SECTIONS } from "@/lib/leagueSections";
-import { inPostseason, seasonOf, todayPT, worldSeriesOver } from "@/lib/mlb";
+import { ballotIndex, inPostseason, seasonOf, todayPT, worldSeriesOver } from "@/lib/mlb";
 
 /*
  * League bar — the dashboard's reference sections, and the places you bring
@@ -15,7 +15,8 @@ import { inPostseason, seasonOf, todayPT, worldSeriesOver } from "@/lib/mlb";
  * same kind of thing: one strip of everywhere the site goes. PLAYOFFS leads
  * the row while the postseason is on, and waits in the grid the rest of the
  * year. From the World Series' last out to New Year's, the three day-of-games
- * sections fold into one SCORES tab. The two that
+ * sections fold into one SCORES tab, and FREE AGENTS becomes OFFSEASON — the
+ * market, the season's ballots and the payrolls, the winter's reading. The two that
  * aren't a league-wide board at all — a pair of players or clubs held up
  * against each other, and the season's hardware — sit behind the grid at the
  * end instead, out of the run of sections without being any harder to reach.
@@ -42,30 +43,47 @@ const TAB =
  *  Series is over — a winter of empty slates doesn't earn three tabs. */
 const SCORES = new Set(["gamefeed", "scoreboard", "probables"]);
 
+/* Scoreboard first: it is where the SCORES tab itself goes. */
 const SCORE_LINKS = (final: string) => [
-  { href: `/league/gamefeed?date=${final}`, label: "GAME FEED" },
   { href: `/league/scoreboard?date=${final}`, label: "SCOREBOARD" },
+  { href: `/league/gamefeed?date=${final}`, label: "GAME FEED" },
   { href: "/league/probables", label: "PROBABLES" },
 ];
 
+/** OFFSEASON's box: who's signing, how the vote went (once the BBWAA has
+ *  posted it), and what the clubs pay. */
+const OFFSEASON_LINKS = (season: number) => [
+  { href: "/free-agents", label: "FREE AGENTS" },
+  ...(ballotIndex().some((y) => y.season === season)
+    ? [{ href: `/award/${season}`, label: `${season} AWARDS` }]
+    : []),
+  { href: "/salaries", label: "SALARIES" },
+];
+
 /*
- * SCORES, the offseason's one tab for them: the same hover box as
+ * SCORES and OFFSEASON, the winter's folded tabs: the same hover box as
  * STATISTICS. The feed and the scoreboard open on the World Series' last
  * day rather than on an empty today.
  */
-function ScoresMenu({ final }: { final: string }) {
+function HoverMenu({
+  label,
+  links,
+}: {
+  label: string;
+  links: { href: string; label: string }[];
+}) {
   return (
     <div className="group relative hidden shrink-0 lg:block">
       <Link
-        href={`/league/scoreboard?date=${final}`}
+        href={links[0].href}
         className="flex h-9 items-center gap-1 border border-line px-2 lg:h-7 text-[11px] tracking-wider text-ink-2 group-focus-within:border-accent group-focus-within:text-ink group-hover:border-accent group-hover:text-ink"
       >
-        SCORES
+        {label}
         <span aria-hidden className="text-[8px] leading-none">▼</span>
       </Link>
       <div className="invisible absolute top-full left-0 z-50 -translate-y-1 border border-line bg-bg p-3 opacity-0 shadow-lg transition group-focus-within:visible group-focus-within:translate-y-0 group-focus-within:opacity-100 group-hover:visible group-hover:translate-y-0 group-hover:opacity-100">
         <div className="space-y-1.5">
-          {SCORE_LINKS(final).map((l) => (
+          {links.map((l) => (
             <Link
               key={l.label}
               href={l.href}
@@ -151,6 +169,21 @@ function MoreMenu({ playoffs }: { playoffs: boolean }) {
   );
 }
 
+/** A folded tab: the hover box on a wide screen, and on a phone — no hover to
+ *  open it with — its links as tabs of their own; the strip scrolls anyway. */
+function Folded({ label, links }: { label: string; links: { href: string; label: string }[] }) {
+  return (
+    <>
+      <HoverMenu label={label} links={links} />
+      {links.map((l) => (
+        <Link key={l.label} href={l.href} className={`${TAB} lg:hidden`}>
+          {l.label}
+        </Link>
+      ))}
+    </>
+  );
+}
+
 export default async function LeagueBar() {
   const today = todayPT();
   const [live, final] = await Promise.all([
@@ -165,18 +198,7 @@ export default async function LeagueBar() {
             PLAYOFFS
           </Link>
         )}
-        {final && (
-          <>
-            <ScoresMenu final={final} />
-            {/* No hover on a phone to open the box with, so its three links
-                are tabs of their own there — the strip scrolls anyway. */}
-            {SCORE_LINKS(final).map((l) => (
-              <Link key={l.label} href={l.href} className={`${TAB} lg:hidden`}>
-                {l.label}
-              </Link>
-            ))}
-          </>
-        )}
+        {final && <Folded label="SCORES" links={SCORE_LINKS(final)} />}
         {LEAGUE_SECTIONS.filter(
           (s) => (!("inBar" in s) || s.inBar) && !(final && SCORES.has(s.id)),
         ).map((s) => (
@@ -189,9 +211,13 @@ export default async function LeagueBar() {
         <Link href="/pitcher/top" className={TAB}>
           MODULES
         </Link>
-        <Link href="/free-agents" className={TAB}>
-          FREE AGENTS
-        </Link>
+        {final ? (
+          <Folded label="OFFSEASON" links={OFFSEASON_LINKS(seasonOf(final))} />
+        ) : (
+          <Link href="/free-agents" className={TAB}>
+            FREE AGENTS
+          </Link>
+        )}
         <StatsMenu current={seasonOf(today)} />
         <MyTeamLink className={TAB} />
         <MoreMenu playoffs={!live} />
